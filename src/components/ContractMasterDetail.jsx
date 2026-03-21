@@ -253,6 +253,33 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
     const totalSatecoDueFromTL = filteredProjects.filter(p => (p.acting_entity_key || '').toLowerCase() === 'thanglong').reduce((s, p) => s + (p.satecoInternalRevenue - (p.internal_paid || 0)), 0);
     const totalSatecoDueFromTP = filteredProjects.filter(p => (p.acting_entity_key || '').toLowerCase() === 'thanhphat').reduce((s, p) => s + (p.satecoInternalRevenue - (p.internal_paid || 0)), 0);
 
+    // === AGGREGATE PERFORMANCE KPIs ===
+    const projectsWithData = filteredProjects.filter(p => (parseFloat(p.totalValuePostVat) || 0) > 0);
+    const count = projectsWithData.length || 1;
+
+    const avg_lng_dt = projectsWithData.reduce((acc, p) => {
+        const satecoNetProfit = (p.totalIncome * (parseFloat(p.sateco_actual_ratio || 95.5) / 100)) - (p.totalExpensesSateco || 0);
+        return acc + (p.satecoInternalRevenue > 0 ? (satecoNetProfit / p.satecoInternalRevenue) * 100 : 0);
+    }, 0) / count;
+
+    const avg_sl_cp = projectsWithData.reduce((acc, p) => {
+        return acc + (p.totalInvoice > 0 ? (((p.totalInvoice || 0) - (p.totalExpensesSateco || 0)) / p.totalInvoice) * 100 : 0);
+    }, 0) / count;
+
+    const avg_spi = projectsWithData.reduce((acc, p) => {
+        const today = new Date();
+        const start = new Date(p.start_date);
+        const end = new Date(p.end_date);
+        const total = Math.max(1, (end - start) / 86400000);
+        const passed = Math.max(0, (today - start) / 86400000);
+        const planned = (p.satecoInternalRevenue || 0) * Math.min(1, passed / total);
+        return acc + (planned > 0 ? (p.totalInvoice / planned) : 1);
+    }, 0) / count;
+
+    const avg_dt_sl = projectsWithData.reduce((acc, p) => acc + (p.totalInvoice > 0 ? (p.totalIncome / p.totalInvoice) * 100 : 0), 0) / count;
+    const avg_thu_dt = projectsWithData.reduce((acc, p) => acc + (p.satecoInternalRevenue > 0 ? (p.totalIncome / p.satecoInternalRevenue) * 100 : 0), 0) / count;
+    const avg_thu_chi = projectsWithData.reduce((acc, p) => acc + (p.totalExpensesSateco > 0 ? (p.totalIncome / p.totalExpensesSateco) : 0), 0) / count;
+
     const totalValueAll = filteredProjects.reduce((s, p) => s + p.totalValuePostVat, 0);
     const totalIncomeAll = filteredProjects.reduce((s, p) => s + (p.totalIncome || 0), 0);
     const totalInvoiceAll = filteredProjects.reduce((s, p) => s + (p.totalInvoice || 0), 0);
@@ -481,6 +508,38 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                         </div>
                     </div>
                 ))}
+            </div>
+
+            {/* NEW: Global Performance Overview */}
+            <div className="mb-8">
+                <div className="flex items-center gap-3 mb-4 px-2">
+                    <div className="h-px flex-1 bg-slate-200/60"></div>
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap">Hiệu suất Vận hành Trung bình</h3>
+                    <div className="h-px flex-1 bg-slate-200/60"></div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    {[
+                        { label: 'LNG / Doanh thu', value: avg_lng_dt, suffix: '%', icon: 'trending_up', color: 'emerald' },
+                        { label: 'Sản lượng / Chi phí', value: avg_sl_cp, suffix: '%', icon: 'balance', color: 'blue' },
+                        { label: 'Hệ số SPI (TB)', value: avg_spi, suffix: '', icon: 'speed', color: 'amber' },
+                        { label: 'Thu tiền / Sản lượng', value: avg_dt_sl, suffix: '%', icon: 'account_balance_wallet', color: 'indigo' },
+                        { label: 'Thu tiền / Doanh thu', value: avg_thu_dt, suffix: '%', icon: 'violet', color: 'violet' },
+                        { label: 'Cân đối Thu / Chi', value: avg_thu_chi, suffix: 'x', icon: 'compare_arrows', color: 'rose' },
+                    ].map((k, i) => (
+                        <div key={i} className="bg-white/40 backdrop-blur-sm rounded-2xl p-4 border border-slate-200/60 flex flex-col items-center text-center shadow-sm hover:shadow-md transition-all group">
+                            <div className={`w-8 h-8 rounded-lg bg-${k.color === 'violet' ? 'purple' : k.color}-50 text-${k.color === 'violet' ? 'purple' : k.color}-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform shadow-inner`}>
+                                <span className="material-symbols-outlined notranslate text-[18px]" translate="no">{k.icon}</span>
+                            </div>
+                            <p className="text-[8px] font-black text-slate-500 uppercase tracking-tighter mb-1 h-6 flex items-center">{k.label}</p>
+                            <div className="flex items-baseline gap-0.5">
+                                <span className={`text-base font-black text-${k.color === 'violet' ? 'purple' : k.color}-700 tracking-tighter`}>
+                                    {k.value.toFixed(k.suffix === 'x' || k.suffix === '' ? 2 : 1)}
+                                </span>
+                                <span className="text-[9px] font-bold text-slate-400">{k.suffix}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
 
             <div className="glass-panel p-0 overflow-hidden shadow-sm border border-slate-200/60 bg-white/70">

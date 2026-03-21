@@ -158,6 +158,53 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
     const thangLongNetProfit = cdtTotalIncome - (cdtTotalIncome * SATECO_ACTUAL_RATIO); // TL giữ lại = Tổng thu - Tiền trả Sateco thực
     const satecoNetProfit = (cdtTotalIncome * SATECO_ACTUAL_RATIO) - totalExpensesSateco; // STC giữ lại = Tiền nhận từ TL - Tổng chi phí
 
+    // === 6 PERFORMANCE KPIs & RATING (New Request) ===
+    
+    // 1. Tỷ suất LNG/DT (10%)
+    const kpi_lng_dt = contractValueSateco > 0 ? (satecoNetProfit / contractValueSateco) * 100 : 0;
+    
+    // 2. Tỷ suất SL & CP (15%)
+    const kpi_sl_cp = cdtTotalInvoiced > 0 ? ((cdtTotalInvoiced - totalExpensesSateco) / cdtTotalInvoiced) * 100 : 0;
+    
+    // 3. Hệ số SPI (20%)
+    const today = new Date();
+    const startDate = new Date(project.start_date);
+    const endDate = new Date(project.end_date);
+    const totalDays = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24));
+    const daysPassed = Math.max(0, (today - startDate) / (1000 * 60 * 60 * 24));
+    const timeProgress = Math.min(1, daysPassed / totalDays);
+    const plannedVolume = contractValueSateco * timeProgress;
+    const kpi_spi = plannedVolume > 0 ? (cdtTotalInvoiced / plannedVolume) : (cdtTotalInvoiced > 0 ? 1.2 : 1.0); // SPI > 1 is good
+
+    // 4. Chuyển đổi DT -> SL (20%)
+    const kpi_dt_sl = cdtTotalInvoiced > 0 ? (cdtTotalIncome / cdtTotalInvoiced) * 100 : 0;
+    
+    // 5. Chuyển đổi Thu -> DT (10%)
+    const kpi_thu_dt = contractValueSateco > 0 ? (cdtTotalIncome / contractValueSateco) * 100 : 0;
+    
+    // 6. Cân đối Thu - Chi (5%)
+    const kpi_thu_chi = totalExpensesSateco > 0 ? (cdtTotalIncome / totalExpensesSateco) : 0;
+
+    // Project Rating (Scale 0-100)
+    // Weights: 10, 15, 20, 20, 10, 5 -> Total 80
+    const ratingScoreRaw = (
+        (Math.min(100, Math.max(0, kpi_lng_dt + 10)) * 10) + // Offsetting for margin, typical 10% profit = 20 points
+        (Math.min(100, Math.max(0, kpi_sl_cp + 5)) * 15) + 
+        (Math.min(100, kpi_spi * 50) * 20) + 
+        (Math.min(100, kpi_dt_sl) * 20) + 
+        (Math.min(100, kpi_thu_dt) * 10) + 
+        (Math.min(100, kpi_thu_chi * 50) * 5)
+    ) / 80;
+    
+    const ratingScore = Math.min(100, Math.round(ratingScoreRaw));
+    const getRatingLabel = (s) => {
+        if (s >= 90) return { label: 'A+', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', desc: 'Xuất sắc' };
+        if (s >= 80) return { label: 'A', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', desc: 'Tốt' };
+        if (s >= 65) return { label: 'B', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', desc: 'Trung bình' };
+        return { label: 'C', color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-200', desc: 'Cần lưu ý' };
+    };
+    const rating = getRatingLabel(ratingScore);
+
     if (loading) {
         return (
             <div className="space-y-6 animate-pulse p-6">
@@ -301,406 +348,222 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
 
             {/* ── Tab: Tổng quan ── */}
             {activeTab === 'overview' && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    {/* LEFT COLUMN */}
-                    <div className="lg:col-span-4 space-y-6">
-                        {/* Contract Specs */}
-                        <div className="glass-panel p-6 shadow-sm border border-slate-200/60">
-                            <h3 className="font-bold text-sm mb-5 flex items-center gap-2 border-b border-slate-100 pb-3">
-                                <span className="material-symbols-outlined notranslate text-blue-500 text-[20px]" translate="no">description</span>Đặc tả Hợp đồng
-                            </h3>
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Loại hợp đồng</span>
-                                    <span className="font-bold text-slate-700">{project.project_type || 'Thi công'}</span>
+                <div className="space-y-6">
+                    {/* Performance Row */}
+                    <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+                        {/* Rating Card */}
+                        <div className={`p-6 rounded-2xl border ${rating.border} ${rating.bg} flex flex-col items-center justify-center relative overflow-hidden group`}>
+                             <div className={`absolute inset-0 ${rating.bg} opacity-30 -z-10 group-hover:scale-110 transition-transform duration-700`}></div>
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 z-10">Xếp hạng Dự án</h3>
+                            <div className={`w-24 h-24 rounded-full border-4 ${rating.border} bg-white flex flex-col items-center justify-center shadow-md z-10 relative`}>
+                                <span className={`text-3xl font-black ${rating.color}`}>{rating.label}</span>
+                                <div className="absolute -bottom-2 px-2 py-0.5 rounded-full bg-white border border-slate-100 shadow-sm">
+                                    <span className="text-[10px] font-black text-slate-500">{ratingScore}đ</span>
                                 </div>
-                                <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Khu vực</span>
-                                    <span className="font-bold text-slate-700">{project.location || 'Chưa cập nhật'}</span>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100/50">
-                                         <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest block mb-1">Khởi công</span>
-                                         <span className="font-bold text-blue-700">{fmtDate(project.start_date)}</span>
-                                    </div>
-                                    <div className="bg-emerald-50/50 p-3 rounded-lg border border-emerald-100/50">
-                                         <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest block mb-1">Hoàn thành</span>
-                                         <span className="font-bold text-emerald-700">{fmtDate(project.end_date)}</span>
-                                    </div>
-                                </div>
-                                {/* Payment Schedule (Milestones) */}
-                                {(project.payment_schedule && project.payment_schedule.length > 0) ? (
-                                    <div className="mt-4 space-y-3">
-                                        <p className="text-[10px] text-blue-500 uppercase font-black tracking-widest mb-2 flex items-center gap-1">
-                                            <span className="material-symbols-outlined notranslate text-[16px]" translate="no">account_tree</span> Lộ trình Thanh toán ({project.payment_schedule.length} đợt)
-                                        </p>
-                                        <div className="space-y-2">
-                                            {project.payment_schedule.map((ms, idx) => (
-                                                <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm relative overflow-hidden group">
-                                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 opacity-30"></div>
-                                                    <div className="flex justify-between items-start mb-1.5">
-                                                        <span className="text-xs font-black text-slate-800">{ms.name}</span>
-                                                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                                                            {ms.has_guarantee && (
-                                                                <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 text-[8px] font-black border border-amber-100 uppercase">Bảo lãnh</span>
-                                                            )}
-                                                            {ms.due_days > 0 && (
-                                                                <span className="px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 text-[8px] font-black border border-orange-100 flex items-center gap-0.5">
-                                                                    <span className="material-symbols-outlined text-[10px]">schedule</span>
-                                                                    {ms.due_days} ngày
-                                                                </span>
-                                                            )}
-                                                            <span className="text-blue-600 font-black text-xs">{ms.percentage}%</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex justify-between items-baseline">
-                                                        <span className="text-[10px] text-slate-400 font-medium truncate max-w-[180px]" title={ms.condition}>{ms.condition || '—'}</span>
-                                                        <span className="font-bold text-slate-700 text-sm">{fmtB(ms.amount)}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    project.payment_terms && (
-                                        <div className="mt-2 bg-slate-50 p-4 rounded-lg border border-slate-100">
-                                            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-2 flex items-center gap-1">
-                                                <span className="material-symbols-outlined notranslate text-[14px]" translate="no">gavel</span> Điều khoản TT
-                                            </p>
-                                            <p className="text-sm font-medium text-slate-600 leading-relaxed">{project.payment_terms}</p>
-                                        </div>
-                                    )
-                                )}
-
-                                {/* Fallback for textual terms if schedule exists */}
-                                {(project.payment_schedule && project.payment_schedule.length > 0 && project.payment_terms) && (
-                                    <div className="mt-4 p-3 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-                                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-1">Ghi chú bổ sung</p>
-                                        <p className="text-[11px] text-slate-500 italic">{project.payment_terms}</p>
-                                    </div>
-                                )}
                             </div>
+                            <p className={`mt-5 px-3 py-1 rounded-full text-[10px] font-black uppercase ${rating.bg} ${rating.color} border ${rating.border} z-10`}>{rating.desc}</p>
                         </div>
-
-                        {/* Sateco Details */}
-                         <div className="glass-panel p-6 shadow-sm border border-slate-200/60 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-100 rounded-full blur-[50px] -z-10"></div>
-                            <h3 className="font-bold text-sm mb-5 flex items-center gap-2 border-b border-slate-100 pb-3">
-                                <span className="material-symbols-outlined notranslate text-indigo-500 text-[20px]" translate="no">account_tree</span>Quyết toán Nội bộ (Sateco)
-                            </h3>
-                            <div className="space-y-4">
-                                
-                                <div className="grid grid-cols-2 gap-3 mb-2">
-                                    <div className="bg-white border border-slate-200 p-3 rounded-lg shadow-sm text-center">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Tỷ lệ HĐ</span>
-                                        <span className="font-black text-indigo-600 text-lg">{project.sateco_contract_ratio || 98}%</span>
+                        
+                        {/* KPI Grid */}
+                        <div className="xl:col-span-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                            {[
+                                { label: 'Tỷ suất LNG/DT', value: kpi_lng_dt, suffix: '%', icon: 'trending_up', color: 'emerald', desc: 'Mali / Doanh thu' },
+                                { label: 'Tỷ suất SL & CP', value: kpi_sl_cp, suffix: '%', icon: 'balance', color: 'blue', desc: '(SL - CP) / SL' },
+                                { label: 'Chỉ số SPI', value: kpi_spi, suffix: '', icon: 'speed', color: kpi_spi >= 1 ? 'green' : 'rose', desc: 'Tiến độ thi công' },
+                                { label: 'Chuyển đổi ĐT-SL', value: kpi_dt_sl, suffix: '%', icon: 'account_balance_wallet', color: 'amber', desc: 'Thu / Sản lượng' },
+                                { label: 'Chuyển đổi Thu-DT', value: kpi_thu_dt, suffix: '%', icon: 'currency_exchange', color: 'indigo', desc: 'Thu / Tổng HĐ' },
+                                { label: 'Cân đối Thu - Chi', value: kpi_thu_chi, suffix: 'x', icon: 'compare_arrows', color: kpi_thu_chi >= 1 ? 'emerald' : 'orange', desc: 'Thu / Chi thực' },
+                            ].map((k, i) => (
+                                <div key={i} className="glass-panel p-4 shadow-sm border border-slate-200/60 hover:shadow-md transition-all group bg-white">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className={`w-8 h-8 rounded-lg bg-${k.color}-50 text-${k.color}-600 flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                                            <span className="material-symbols-outlined notranslate text-[18px]" translate="no">{k.icon}</span>
+                                        </div>
+                                        <span className="text-[12px] font-black text-slate-200">#0{i+1}</span>
                                     </div>
-                                    <div className="bg-white border border-slate-200 p-3 rounded-lg shadow-sm text-center">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Tỷ lệ Thực tế</span>
-                                        <span className="font-black text-purple-600 text-lg">{project.sateco_actual_ratio || 95.5}%</span>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-[11px] font-bold text-slate-500">Giới hạn Chi phí (Thực tế)</span>
-                                        <span className="font-black text-slate-800">{fmt(actualValueSateco)} ₫</span>
-                                    </div>
-                                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                                        <div className="bg-indigo-500 h-full rounded-full transition-all" style={{ width: `${Math.min(100, (totalExpensesSateco / actualValueSateco) * 100 || 0)}%` }} />
-                                    </div>
-                                    <div className="flex justify-between items-center mt-1">
-                                         <span className="text-[10px] text-slate-400 font-medium">Đã chi / Tiêu hao</span>
-                                         <span className="font-bold text-[#f97316] text-xs">{fmt(totalExpensesSateco)} ₫</span>
-                                    </div>
-
-                                    <div className="h-px w-full bg-slate-100 my-4"></div>
-
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span className="font-bold text-slate-600">Thăng Long đã thanh toán</span>
-                                        <span className="font-bold text-emerald-600">{fmt(satecoInternalPaid)} ₫</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span className="font-bold text-slate-600">Dư nợ Sateco</span>
-                                        <span className="font-bold text-rose-500">{fmt(satecoRemainingDebt)} ₫</span>
+                                    <div>
+                                        <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-tighter mb-1 h-6">{k.label}</h4>
+                                        <div className="flex items-baseline gap-0.5">
+                                            <span className={`text-base font-black text-${k.color}-600 tracking-tighter`}>{k.value.toFixed(k.suffix === 'x' ? 2 : 1)}</span>
+                                            <span className="text-[9px] font-bold text-slate-400">{k.suffix}</span>
+                                        </div>
+                                        <p className="text-[8px] text-slate-400 mt-2 italic truncate">{k.desc}</p>
                                     </div>
                                 </div>
-
-                                {internalRefundToThangLong > 0 && (
-                                     <div className="mt-4 bg-purple-50/80 rounded-xl p-4 border border-purple-200">
-                                         <div className="flex items-center gap-2 mb-2">
-                                              <span className="material-symbols-outlined notranslate text-[16px] text-purple-600" translate="no">currency_exchange</span>
-                                              <span className="text-[10px] font-black text-purple-800 uppercase tracking-widest">Sateco hoàn tiền</span>
-                                         </div>
-                                         <div className="flex justify-between items-end">
-                                             <span className="text-xs font-medium text-purple-700 w-2/3 leading-tight">Dự kiến bồi hoàn nội bộ chênh lệch tỷ lệ ({(project.sateco_contract_ratio || 98) - (project.sateco_actual_ratio || 95.5)}%)</span>
-                                             <span className="font-black text-purple-700">{fmt(internalRefundToThangLong)} ₫</span>
-                                         </div>
-                                     </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Warranty Timeline: Premium Redesign */}
-                        <div className="glass-panel p-8 shadow-sm border border-slate-200/60 relative overflow-hidden bg-white/40">
-                            {/* Decorative background element */}
-                            <div className="absolute -top-10 -right-10 w-40 h-40 bg-amber-50 rounded-full blur-[80px] -z-10"></div>
-                            
-                            <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-4">
-                                <h3 className="font-black text-sm flex items-center gap-3 text-slate-700">
-                                    <span className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
-                                        <span className="material-symbols-outlined notranslate text-[20px]" translate="no">verified_user</span>
-                                    </span>
-                                    Lịch thu hồi Bảo hành ({project.warranty_percentage || 5}%)
-                                </h3>
-                                {project.handover_date && (
-                                    <div className="text-right">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Bàn giao ngày</span>
-                                        <span className="font-bold text-slate-700 text-xs bg-slate-100 px-2 py-1 rounded-md border border-slate-200">{fmtDate(project.handover_date)}</span>
-                                    </div>
-                                )}
-                            </div>
-                            
-                            {!project.handover_date ? (
-                                <div className="text-center py-10 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
-                                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-slate-100">
-                                        <span className="material-symbols-outlined notranslate text-slate-300 text-3xl" translate="no">event_busy</span>
-                                    </div>
-                                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Thiếu dữ liệu vận hành</p>
-                                    <p className="text-[11px] text-slate-400 mt-2 max-w-[200px] mx-auto leading-relaxed">Cập nhật <span className="font-bold text-slate-600">Ngày bàn giao thực tế</span> để kích hoạt bộ đếm ngược bảo hành.</p>
-                                </div>
-                            ) : (
-                                <div className="relative pl-8">
-                                    {/* The Vertical Timeline Line */}
-                                    <div className="absolute left-[15px] top-2 bottom-6 w-0.5 bg-gradient-to-b from-amber-200 via-slate-100 to-slate-100"></div>
-                                    
-                                    <div className="space-y-8">
-                                        {(() => {
-                                            const schedule = (project.warranty_schedule && project.warranty_schedule.length > 0) 
-                                                ? project.warranty_schedule 
-                                                : [{ label: 'Thu hồi Bảo hành', ratio: project.warranty_percentage || 5, months: project.warranty_duration_months || 24 }];
-                                            
-                                            return schedule.map((stage, idx) => {
-                                                const { target, windowStart, windowEnd } = getWarrantyStageDates(project.handover_date, stage.months);
-                                                const now = new Date();
-                                                const isCurrentWindow = now >= windowStart && now <= windowEnd;
-                                                const isPast = now > windowEnd;
-
-                                                return (
-                                                    <div key={idx} className="relative group animate-fade-in" style={{ animationDelay: `${idx * 150}ms` }}>
-                                                        {/* Timeline Dot Marker */}
-                                                        <div className={`absolute -left-[25.5px] top-1 w-5 h-5 rounded-full z-10 flex items-center justify-center border-2 transition-all duration-500 ${
-                                                            isCurrentWindow 
-                                                                ? 'bg-amber-500 border-amber-200 shadow-[0_0_12px_rgba(245,158,11,0.5)] scale-125' 
-                                                                : isPast 
-                                                                    ? 'bg-emerald-500 border-emerald-100' 
-                                                                    : 'bg-white border-slate-200 group-hover:border-amber-300'
-                                                        }`}>
-                                                            {isPast ? (
-                                                                <span className="material-symbols-outlined notranslate text-white text-[12px]" translate="no">check</span>
-                                                            ) : isCurrentWindow ? (
-                                                                <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping"></span>
-                                                            ) : (
-                                                                <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                                                            )}
-                                                        </div>
-
-                                                        {/* Stage Card */}
-                                                        <div className={`p-5 rounded-2xl border transition-all duration-300 ${
-                                                            isCurrentWindow 
-                                                                ? 'bg-amber-50/80 border-amber-300 shadow-md ring-1 ring-amber-200 -translate-y-1' 
-                                                                : 'bg-white/60 border-slate-100 hover:border-slate-300 hover:shadow-sm'
-                                                        }`}>
-                                                            <div className="flex justify-between items-start mb-4">
-                                                                <div>
-                                                                    <div className="flex items-center gap-2 mb-1">
-                                                                        <p className={`text-[10px] font-black uppercase tracking-[0.1em] ${isCurrentWindow ? 'text-amber-700' : 'text-slate-400'}`}>{stage.label}</p>
-                                                                        {isPast && <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">Đã xong</span>}
-                                                                    </div>
-                                                                    <p className="font-black text-slate-800 text-xl tracking-tight leading-none leading-none flex items-baseline gap-1">
-                                                                        {stage.ratio}% 
-                                                                        <span className="text-[11px] font-medium text-slate-400 ml-1">≈ {fmtB(totalContractValueThangLong * (stage.ratio / 100))}</span>
-                                                                    </p>
-                                                                </div>
-                                                                <div className="text-right">
-                                                                    <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Dự kiến thu</p>
-                                                                    <p className="text-sm font-black text-slate-700">{fmtDate(target)}</p>
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50/80 border border-slate-100/50">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className={`material-symbols-outlined notranslate text-[16px] ${isCurrentWindow ? 'text-amber-500' : 'text-blue-500'}`} translate="no">calendar_today</span>
-                                                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Cửa sổ thanh toán:</span>
-                                                                </div>
-                                                                <span className={`text-[11px] font-black ${isCurrentWindow ? 'text-amber-700 animate-pulse' : 'text-blue-700'}`}>
-                                                                    {windowStart.getDate()}-{windowEnd.getDate()} Tháng {windowStart.getMonth() + 1}/{windowStart.getFullYear()}
-                                                                </span>
-                                                            </div>
-
-                                                            {isCurrentWindow && (
-                                                                <div className="mt-4 flex items-center gap-2 text-amber-700 bg-amber-100/50 p-2.5 rounded-xl border border-amber-200/50">
-                                                                    <span className="material-symbols-outlined notranslate text-[18px] animate-bounce" translate="no">verified</span>
-                                                                    <p className="text-[10px] font-black uppercase tracking-tight">Yêu cầu thu hồi ngay!</p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            });
-                                        })()}
-                                    </div>
-                                </div>
-                            )}
-
-                            {project.has_warranty_guarantee && (
-                                <div className="mt-8 p-4 bg-gradient-to-br from-emerald-50 to-white border border-emerald-200 rounded-2xl flex items-center gap-4 relative overflow-hidden group">
-                                     <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-100/50 rounded-full -mr-10 -mt-10 blur-xl group-hover:scale-150 transition-transform"></div>
-                                     <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
-                                        <span className="material-symbols-outlined notranslate text-[24px]" translate="no">verified</span>
-                                     </div>
-                                     <div className="relative z-10">
-                                        <p className="text-[11px] font-black text-emerald-800 uppercase tracking-widest leading-none mb-1">Sẵn sàng bảo lãnh ngân hàng</p>
-                                        <p className="text-[10px] text-emerald-600 font-medium leading-relaxed">Tiền bảo hành sẽ được thu hồi ngay lập tức qua ngân hàng, không chờ mốc thời gian.</p>
-                                     </div>
-                                </div>
-                            )}
+                            ))}
                         </div>
                     </div>
 
-                    {/* MIDDLE COLUMN: Cash Operations */}
-                    <div className="lg:col-span-8 space-y-6">
-                        {/* External Payments Timeline */}
-                        <div className="glass-panel p-6 shadow-sm border border-slate-200/60 relative">
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="font-bold text-lg flex items-center gap-2 text-slate-800">
-                                    <span className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center text-green-600">
-                                        <span className="material-symbols-outlined notranslate text-[18px]" translate="no">receipt_long</span>
-                                    </span>
-                                    Tiến độ Phê duyệt & Thanh toán từ CĐT
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        {/* LEFT COLUMN: Docs & Specs */}
+                        <div className="lg:col-span-4 space-y-6">
+                            {/* Contract Specs */}
+                            <div className="glass-panel p-6 shadow-sm border border-slate-200/60 bg-white/50">
+                                <h3 className="font-bold text-sm mb-5 flex items-center gap-2 border-b border-slate-100 pb-3 text-slate-700">
+                                    <span className="material-symbols-outlined notranslate text-blue-500 text-[20px]" translate="no">description</span>Đặc tả Hợp đồng
                                 </h3>
-                                <div className="text-right">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tỷ lệ Lấy tiền</p>
-                                    <p className="font-black text-green-600 text-xl">{cdtPaymentPercentage.toFixed(1)}%</p>
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Loại hợp đồng</span>
+                                        <span className="font-bold text-slate-700 text-sm">{project.project_type || 'Thi công'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100/50">
+                                             <span className="text-[9px] font-bold text-blue-500 uppercase tracking-widest block mb-1">Khởi công</span>
+                                             <span className="font-bold text-blue-700 text-xs">{fmtDate(project.start_date)}</span>
+                                        </div>
+                                        <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100/50">
+                                             <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest block mb-1">Hoàn thành</span>
+                                             <span className="font-bold text-emerald-700 text-xs">{fmtDate(project.end_date)}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Payment Schedule (Milestones) */}
+                                    {(project.payment_schedule && project.payment_schedule.length > 0) && (
+                                        <div className="mt-4 space-y-3">
+                                            <p className="text-[10px] text-blue-500 uppercase font-black tracking-widest mb-2 flex items-center gap-1">
+                                                <span className="material-symbols-outlined notranslate text-[16px]" translate="no">account_tree</span> Lộ trình Thanh toán ({project.payment_schedule.length})
+                                            </p>
+                                            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                                {project.payment_schedule.map((ms, idx) => (
+                                                    <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm relative overflow-hidden group">
+                                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 opacity-20"></div>
+                                                        <div className="flex justify-between items-start mb-1">
+                                                            <span className="text-[11px] font-black text-slate-800 truncate pr-2">{ms.name}</span>
+                                                            <span className="text-blue-600 font-black text-[11px] shrink-0">{ms.percentage}%</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-baseline">
+                                                            <span className="text-[9px] text-slate-400 truncate max-w-[120px]">{ms.condition || '—'}</span>
+                                                            <span className="font-bold text-slate-700 text-xs">{fmtB(ms.amount)}</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                            
-                            {payments.length === 0 ? (
-                                <div className="text-center py-10 bg-slate-50 border border-dashed border-slate-200 rounded-xl flex flex-col items-center">
-                                    <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center mb-3">
-                                        <span className="material-symbols-outlined notranslate text-slate-300 text-2xl" translate="no">payments</span>
+
+                            {/* Internal Settlement */}
+                            <div className="glass-panel p-6 shadow-sm border border-slate-200/60 bg-white/50 relative overflow-hidden">
+                                <div className="absolute -top-6 -right-6 w-24 h-24 bg-indigo-50 rounded-full blur-2xl"></div>
+                                <h3 className="font-bold text-sm mb-5 flex items-center gap-2 border-b border-slate-100 pb-3 text-slate-700 relative z-10">
+                                    <span className="material-symbols-outlined notranslate text-indigo-500 text-[20px]" translate="no">account_tree</span>Quyết toán Nội bộ (Sateco)
+                                </h3>
+                                <div className="space-y-4 relative z-10">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-white border border-slate-100 p-3 rounded-xl shadow-sm text-center">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Tỷ lệ HĐ</span>
+                                            <span className="font-black text-indigo-600 text-base">{project.sateco_contract_ratio || 98}%</span>
+                                        </div>
+                                        <div className="bg-white border border-slate-100 p-3 rounded-xl shadow-sm text-center">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Tỷ lệ Thực</span>
+                                            <span className="font-black text-purple-600 text-base">{project.sateco_actual_ratio || 95.5}%</span>
+                                        </div>
                                     </div>
-                                    <p className="text-sm font-bold text-slate-500">Chưa tạo Đợt yêu cầu thanh toán nào.</p>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center text-[11px] font-bold text-slate-500">
+                                            <span>Tiêu hao Ngân sách</span>
+                                            <span className="text-slate-700">{Math.round((totalExpensesSateco / actualValueSateco) * 100 || 0)}%</span>
+                                        </div>
+                                        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                            <div className="bg-indigo-500 h-full rounded-full transition-all" style={{ width: `${Math.min(100, (totalExpensesSateco / actualValueSateco) * 100 || 0)}%` }} />
+                                        </div>
+                                        <div className="flex justify-between items-center text-[10px] text-slate-400 font-medium">
+                                             <span>Đã chi: {fmt(totalExpensesSateco)} ₫</span>
+                                             <span>Quỹ: {fmt(actualValueSateco)} ₫</span>
+                                        </div>
+                                    </div>
                                 </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {payments.map((p, i) => {
+                            </div>
+                        </div>
+
+                        {/* RIGHT COLUMN: Operations & Timeline */}
+                        <div className="lg:col-span-8 space-y-6">
+                            {/* Payments Timeline */}
+                            <div className="glass-panel p-6 shadow-sm border border-slate-200/60 bg-white/50">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="font-bold text-sm flex items-center gap-2 text-slate-800">
+                                        <span className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center text-green-600">
+                                            <span className="material-symbols-outlined notranslate text-[18px]" translate="no">payments</span>
+                                        </span>
+                                        Tiến độ Phê duyệt & Thu hồi từ CĐT
+                                    </h3>
+                                    <span className="text-xs font-black text-green-600 bg-green-50 px-3 py-1.5 rounded-xl border border-green-100 shadow-sm">
+                                        Đã thu: {cdtPaymentPercentage.toFixed(1)}%
+                                    </span>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {payments.slice(0, 4).map((p, i) => {
                                         const isPaid = Number(p.external_income) >= Number(p.payment_request_amount) && Number(p.payment_request_amount) > 0;
-                                        const isPartial = Number(p.external_income) > 0 && !isPaid;
                                         return (
-                                            <div key={p.id} className="bg-white border border-slate-200 rounded-xl p-5 hover:border-blue-400 cursor-pointer transition-all hover:shadow-md group"
-                                                onClick={() => setActiveTab('payment')}>
-                                                <div className="flex justify-between items-center mb-4">
-                                                    <div className="flex gap-4 items-center">
-                                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black shadow-inner border-2 ${isPaid ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : isPartial ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                                                            {i + 1}
-                                                        </div>
-                                                        <div>
-                                                            <div className="font-bold text-[15px] group-hover:text-blue-600 transition-colors">{p.stage_name}</div>
-                                                            <div className="text-xs font-medium text-slate-400 mt-0.5 flex items-center gap-1.5">
-                                                                <span className="material-symbols-outlined notranslate text-[14px]" translate="no">event</span> Ngày xuất HĐ: {fmtDate(p.invoice_date)}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <span className={`px-3 py-1 rounded-md text-[11px] font-black uppercase tracking-widest ${isPaid ? 'bg-emerald-100 text-emerald-700' : isPartial ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600'}`}>
-                                                        {isPaid ? 'Hoàn thành' : isPartial ? 'Một phần' : 'Chờ thu'}
+                                            <div key={p.id} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:border-green-200 transition-all cursor-pointer group" onClick={() => setActiveTab('payment')}>
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <span className="text-[10px] font-black text-slate-300 uppercase">Đợt {i+1}</span>
+                                                    <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
+                                                        {isPaid ? 'Đã thu' : 'Chờ thu'}
                                                     </span>
                                                 </div>
-                                                <div className="grid grid-cols-3 gap-3">
-                                                    <div className="bg-slate-50 rounded-lg p-3 border border-slate-100/50">
-                                                        <div className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-1">Đề nghị / Nghiệm thu</div>
-                                                        <div className="font-black text-slate-700">{fmt(p.payment_request_amount)} ₫</div>
+                                                <div className="font-bold text-xs text-slate-800 mb-2 truncate">{p.stage_name}</div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div className="p-2 bg-slate-50 rounded-lg">
+                                                        <p className="text-[8px] font-bold text-slate-400 uppercase">Nghiệm thu</p>
+                                                        <p className="font-black text-slate-700 text-[11px]">{fmtB(p.payment_request_amount)}</p>
                                                     </div>
-                                                    <div className="bg-green-50/50 rounded-lg p-3 border border-green-100/50 relative overflow-hidden">
-                                                        <div className="absolute top-0 right-0 w-8 h-8 bg-green-200 rounded-full blur-[20px]"></div>
-                                                        <div className="text-green-600 text-[10px] uppercase font-bold tracking-widest mb-1 relative z-10">Thực thu CĐT</div>
-                                                        <div className="font-black text-green-700 relative z-10">{fmt(p.external_income)} ₫</div>
-                                                    </div>
-                                                    <div className="bg-rose-50/50 rounded-lg p-3 border border-rose-100/50">
-                                                        <div className="text-rose-500 text-[10px] uppercase font-bold tracking-widest mb-1">CĐT Giam nợ HĐ</div>
-                                                        <div className="font-black text-rose-600">{fmt(Number(p.invoice_amount) - Number(p.external_income))} ₫</div>
+                                                    <div className="p-2 bg-green-50/50 rounded-lg">
+                                                        <p className="text-[8px] font-bold text-green-500 uppercase">Thực thu</p>
+                                                        <p className="font-black text-green-700 text-[11px]">{fmtB(p.external_income)}</p>
                                                     </div>
                                                 </div>
                                             </div>
                                         );
                                     })}
+                                    {payments.length === 0 && (
+                                        <div className="col-span-2 text-center py-10 opacity-50">Chưa có dữ liệu thanh toán</div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
+                            </div>
 
-                        {/* P&L Estimations */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                             {/* Thang Long Profit */}
-                             <div className="glass-panel p-6 shadow-sm border border-slate-200/60 relative overflow-hidden bg-gradient-to-br from-white to-blue-50/30">
-                                 <div className="absolute top-0 right-0 p-4 opacity-[0.03]">
-                                     <span className="material-symbols-outlined notranslate text-[100px]" translate="no">account_balance</span>
-                                 </div>
-                                 <h3 className="font-bold text-sm mb-5 flex items-center gap-2 border-b border-primary/10 pb-3 z-10 relative">
-                                    <span className="material-symbols-outlined notranslate text-primary text-[20px]" translate="no">query_stats</span>Hiệu quả Đầu tư (Thăng Long)
-                                </h3>
-                                <div className="relative z-10 space-y-4">
-                                     <div>
-                                        <div className="flex justify-between items-center text-xs font-bold text-slate-500 mb-1">
-                                            <span>Tiền thu về từ CĐT</span>
-                                            <span>{fmt(cdtTotalIncome)} ₫</span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-xs font-bold text-slate-500 mb-2">
-                                            <span>Trích chuyển lại Sateco (TT)</span>
-                                            <span>- {fmt(cdtTotalIncome * SATECO_ACTUAL_RATIO)} ₫</span>
-                                        </div>
-                                     </div>
-                                     <div className="pt-3 border-t border-primary/10">
-                                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Lợi nhuận Gross Thăng Long giữ</p>
-                                         <p className={`text-3xl font-black tabular-nums tracking-tight ${thangLongNetProfit >= 0 ? 'text-blue-600' : 'text-rose-600'}`}>
-                                            {thangLongNetProfit >= 0 ? '+' : ''}{fmt(thangLongNetProfit)} ₫
+                            {/* P&L Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                 {/* TL Profit */}
+                                 <div className="glass-panel p-6 shadow-sm border border-slate-200/60 bg-gradient-to-br from-blue-50/50 to-white relative overflow-hidden">
+                                     <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-blue-100/50 rounded-full blur-2xl"></div>
+                                     <h3 className="text-xs font-black text-blue-800 uppercase tracking-widest mb-4 flex items-center gap-2 relative z-10">
+                                         <span className="material-symbols-outlined text-[18px]">account_balance</span> Thăng Long (Invest)
+                                     </h3>
+                                     <div className="relative z-10">
+                                         <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Lợi nhuận Gross Dự kiến</p>
+                                         <p className={`text-2xl font-black tabular-nums ${thangLongNetProfit >= 0 ? 'text-blue-600' : 'text-rose-600'}`}>
+                                            {fmt(thangLongNetProfit)} ₫
                                          </p>
+                                         <div className="mt-4 pt-4 border-t border-blue-100 flex justify-between items-center text-[10px] font-bold text-slate-500">
+                                             <span>Thực thu CĐT:</span>
+                                             <span>{fmt(cdtTotalIncome)} ₫</span>
+                                         </div>
                                      </div>
-                                </div>
-                             </div>
-
-                             {/* Sateco Profit */}
-                             <div className="glass-panel p-6 shadow-sm border border-slate-200/60 relative overflow-hidden bg-gradient-to-br from-white to-orange-50/30">
-                                 <div className="absolute top-0 right-0 p-4 opacity-[0.03]">
-                                     <span className="material-symbols-outlined notranslate text-[100px]" translate="no">engineering</span>
                                  </div>
-                                 <h3 className="font-bold text-sm mb-5 flex items-center gap-2 border-b border-orange-500/10 pb-3 z-10 relative">
-                                    <span className="material-symbols-outlined notranslate text-orange-500 text-[20px]" translate="no">insights</span>Hiệu quả Thi công (Sateco)
-                                </h3>
-                                 <div className="relative z-10 space-y-4">
-                                      <div className="space-y-2">
-                                        <div className="flex justify-between text-xs font-bold text-slate-600 items-center">
-                                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-orange-400"></span> Vật tư</span>
-                                            <span>{fmt(totalMaterialExpenses)} ₫</span>
-                                        </div>
-                                        <div className="flex justify-between text-xs font-bold text-slate-600 items-center">
-                                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-purple-400"></span> Thầu phụ/Nhân công</span>
-                                            <span>{fmt(totalLaborExpenses)} ₫</span>
-                                        </div>
-                                        <div className="flex justify-between text-xs font-bold text-slate-600 items-center">
-                                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-indigo-400"></span> Chi phí BQL & Khác</span>
-                                            <span>{fmt(totalGenericExpenses)} ₫</span>
-                                        </div>
-                                     </div>
-                                     <div className="pt-3 border-t border-orange-500/10">
-                                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Lợi nhuận Thi công Sateco</p>
-                                         <p className={`text-3xl font-black tabular-nums tracking-tight ${satecoNetProfit >= 0 ? 'text-green-600' : 'text-rose-600'}`}>
-                                            {satecoNetProfit >= 0 ? '+' : ''}{fmt(satecoNetProfit)} ₫
-                                         </p>
-                                     </div>
-                                </div>
-                             </div>
-                        </div>
 
+                                 {/* Sateco Profit */}
+                                 <div className="glass-panel p-6 shadow-sm border border-slate-200/60 bg-gradient-to-br from-emerald-50/50 to-white relative overflow-hidden">
+                                     <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-emerald-100/50 rounded-full blur-2xl"></div>
+                                     <h3 className="text-xs font-black text-emerald-800 uppercase tracking-widest mb-4 flex items-center gap-2 relative z-10">
+                                         <span className="material-symbols-outlined text-[18px]">engineering</span> Sateco (Execute)
+                                     </h3>
+                                     <div className="relative z-10">
+                                         <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Lợi nhuận Thi công</p>
+                                         <p className={`text-2xl font-black tabular-nums ${satecoNetProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            {fmt(satecoNetProfit)} ₫
+                                         </p>
+                                         <div className="mt-4 pt-4 border-t border-emerald-100 flex justify-between items-center text-[10px] font-bold text-slate-500">
+                                             <span>Tổng chi phí:</span>
+                                             <span>{fmt(totalExpensesSateco)} ₫</span>
+                                         </div>
+                                     </div>
+                                 </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
