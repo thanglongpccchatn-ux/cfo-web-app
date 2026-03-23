@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { CashFlowChart, PortfolioChart, ReceivablesAgingChart, TopProfitChart } from './DashboardCharts';
 
 const formatVND = (v) => v ? Number(Math.round(v)).toLocaleString('vi-VN') : '0';
 
@@ -9,6 +10,14 @@ export default function DashboardOverview() {
         pendingPayments: 0, 
         approvedPayments: 0
     });
+    const [financials, setFinancials] = useState({
+        totalValueAll: 0,
+        totalIncomeAll: 0,
+        totalDebtInvoiceAll: 0,
+        totalRequestedAll: 0,
+        totalInvoiceAll: 0,
+        recoveryRate: 0
+    });
     const [performance, setPerformance] = useState({
         avg_lng_dt: 0,
         avg_sl_cp: 0,
@@ -16,6 +25,12 @@ export default function DashboardOverview() {
         avg_dt_sl: 0,
         avg_thu_dt: 0,
         avg_thu_chi: 0
+    });
+    const [chartData, setChartData] = useState({
+        trend: { labels: [], values: [] },
+        portfolio: { labels: [], values: [] },
+        aging: { labels: [], invoiceValues: [], incomeValues: [] },
+        topProfit: { labels: [], values: [] }
     });
     const [loading, setLoading] = useState(true);
 
@@ -34,21 +49,94 @@ export default function DashboardOverview() {
                     approvedPayments: approvedCount || 0
                 });
 
-                // 2. Performance Metrics
-                const { data: projects, error: projError } = await supabase
-                    .from('projects')
-                    .select('*, payments(*), external_payment_history(*), internal_payment_history(*)');
+                // 2. Performance & Financial Metrics
+                const { data: projs } = await supabase.from('projects').select('*');
+                const { data: pmts } = await supabase.from('payments').select('*');
+                const { data: adds } = await supabase.from('addendas').select('*').eq('status', 'Đã duyệt');
+                const { data: extHist } = await supabase.from('external_payment_history').select('*');
+                const { data: intHist } = await supabase.from('internal_payment_history').select('*');
                 
-                if (projects && projects.length > 0) {
-                    const processed = projects.map(p => {
-                        const totalIncome = (p.external_payment_history || []).reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
-                        const totalInvoice = (p.payments || []).reduce((sum, pay) => sum + (parseFloat(pay.payment_request_amount) || 0), 0);
-                        const satecoInternalRevenue = parseFloat(p.sateco_internal_revenue) || (parseFloat(p.totalValuePostVat || 0) * (parseFloat(p.sateco_contract_ratio || 98) / 100));
-                        const totalExpensesSateco = (p.internal_payment_history || []).reduce((sum, h) => sum + (parseFloat(h.amount_spent) || 0), 0);
+                if (projs && projs.length > 0) {
+                    const processed = projs.map(p => {
+                        const projPmts = (pmts || []).filter(pm => pm.project_id === p.id);
+                        const projExtHist = (extHist || []).filter(h => h.project_id === p.id);
+                        const projIntHist = (intHist || []).filter(h => h.project_id === p.id);
+
+                        const totalValuePreVat = parseFloat(p.original_value) || 0;
+                        const vatAmount = p.vat_amount || (totalValuePreVat * (p.vat_percentage ?? 8) / 100);
+                        const totalValuePostVat = p.total_value_post_vat || (totalValuePreVat + vatAmount);
+
+                        const totalIncomeFromHistory = projExtHist.reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
+                        const totalIncomeFromPayments = projPmts.reduce((sum, pm) => sum + (parseFloat(pm.external_income) || 0), 0);
+                        const totalIncome = totalIncomeFromHistory > 0 ? totalIncomeFromHistory : totalIncomeFromPayments;
+
+                        const totalInvoice = projPmts.reduce((sum, pay) => sum + (parseFloat(pay.invoice_amount) || 0), 0);
+                        const totalRequested = projPmts.reduce((sum, pay) => sum + (parseFloat(pay.payment_request_amount) || 0), 0);
                         
-                        return { ...p, totalIncome, totalInvoice, satecoInternalRevenue, totalExpensesSateco };
+                        const satecoInternalRevenue = parseFloat(p.sateco_internal_revenue) || (totalValuePostVat * (parseFloat(p.sateco_contract_ratio || 98) / 100));
+                        const totalExpensesSateco = projIntHist.reduce((sum, h) => sum + (parseFloat(h.amount_spent) || 0), 0);
+                        
+                        const profit = (totalIncome * (parseFloat(p.sateco_actual_ratio || 95.5) / 100)) - totalExpensesSateco;
+
+                        return { ...p, totalIncome, totalInvoice, totalRequested, totalValuePostVat, satecoInternalRevenue, totalExpensesSateco, profit };
                     });
 
+                    // Aggregate Financials
+                    const totalValueAll = processed.reduce((s, p) => s + (p.totalValuePostVat || 0), 0);
+                    const totalIncomeAll = processed.reduce((s, p) => s + (p.totalIncome || 0), 0);
+                    const totalInvoiceAll = processed.reduce((s, p) => s + (p.totalInvoice || 0), 0);
+                    const totalRequestedAll = processed.reduce((s, p) => s + (p.totalRequested || 0), 0);
+                    const totalDebtInvoiceAll = totalInvoiceAll - totalIncomeAll;
+                    const recoveryRate = totalValueAll > 0 ? (totalIncomeAll / totalValueAll) * 100 : 0;
+
+                    setFinancials({ totalValueAll, totalIncomeAll, totalDebtInvoiceAll, totalRequestedAll, totalInvoiceAll, recoveryRate });
+
+                    // 3. Chart Data Processing
+                    // Trend Chart (Last 6 Months Income)
+                    const monthlyIncome = {};
+                    (extHist || []).forEach(h => {
+                        const date = new Date(h.payment_date);
+                        const key = `Tháng ${date.getMonth() + 1}/${date.getFullYear().toString().slice(-2)}`;
+                        monthlyIncome[key] = (monthlyIncome[key] || 0) + (parseFloat(h.amount) || 0);
+                    });
+                    const trendLabels = Object.keys(monthlyIncome).sort().slice(-6);
+                    const trendValues = trendLabels.map(l => monthlyIncome[l]);
+
+                    // Portfolio Chart (Value by Status)
+                    const statusGroups = {};
+                    processed.forEach(p => {
+                        statusGroups[p.status || 'Khác'] = (statusGroups[p.status || 'Khác'] || 0) + (p.totalValuePostVat || 0);
+                    });
+                    
+                    // Aging Chart (Monthly Invoice vs Income)
+                    const monthlyInvoice = {};
+                    const monthlyRec = {};
+                    (pmts || []).forEach(pm => {
+                        const date = new Date(pm.created_at);
+                        const key = `${date.getMonth() + 1}/${date.getFullYear().toString().slice(-2)}`;
+                        monthlyInvoice[key] = (monthlyInvoice[key] || 0) + (parseFloat(pm.invoice_amount) || 0);
+                        monthlyRec[key] = (monthlyRec[key] || 0) + (parseFloat(pm.external_income) || 0);
+                    });
+                    const agingLabels = Object.keys(monthlyInvoice).sort().slice(-6);
+                    
+                    // Top Profit
+                    const top5Profit = [...processed].sort((a,b) => b.profit - a.profit).slice(0, 5);
+
+                    setChartData({
+                        trend: { labels: trendLabels, values: trendValues },
+                        portfolio: { labels: Object.keys(statusGroups), values: Object.values(statusGroups) },
+                        aging: { 
+                            labels: agingLabels, 
+                            invoiceValues: agingLabels.map(l => monthlyInvoice[l] || 0), 
+                            incomeValues: agingLabels.map(l => monthlyRec[l] || 0) 
+                        },
+                        topProfit: { 
+                            labels: top5Profit.map(p => p.code || p.name || 'N/A').map(s => String(s).length > 15 ? String(s).slice(0,12)+'...' : s), 
+                            values: top5Profit.map(p => p.profit) 
+                        }
+                    });
+
+                    // Aggregate Performance
                     const projectsWithData = processed.filter(p => (parseFloat(p.totalValuePostVat) || 0) > 0);
                     const count = projectsWithData.length || 1;
 
@@ -78,13 +166,18 @@ export default function DashboardOverview() {
                     setPerformance({ avg_lng_dt, avg_sl_cp, avg_spi, avg_dt_sl, avg_thu_dt, avg_thu_chi });
                 }
             } catch (error) {
-                console.error("Error fetching generic stats:", error);
+                console.error("Error fetching stats:", error);
             } finally {
                 setLoading(false);
             }
         };
         fetchStats();
     }, []);
+
+    const formatBillion = (val) => {
+        if (!val) return '0';
+        return (val / 1000000000).toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+    };
 
     if (loading) {
         return (
@@ -96,7 +189,44 @@ export default function DashboardOverview() {
 
     return (
         <div className="space-y-8 animate-fade-in">
-            {/* Top Row: Basic Stats */}
+            {/* Top Row: Financial KPIs (Moved from Contracts) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                {[
+                    { label: 'TỔNG GIÁ TRỊ HĐ', subLabel: '(SAU VAT, GỒM PHÁT SINH)', value: financials.totalValueAll, icon: 'payments', color: 'blue' },
+                    { label: 'THỰC THU (CASH-IN)', value: financials.totalIncomeAll, icon: 'account_balance_wallet', color: 'emerald' },
+                    { label: 'CÔNG NỢ HÓA ĐƠN', subLabel: '(ĐÃ XUẤT HĐ - THỰC THU)', value: financials.totalDebtInvoiceAll, icon: 'assignment_turned_in', color: 'rose' },
+                    { label: 'CÔNG NỢ ĐỀ NGHỊ', subLabel: '(ĐỀ NGHỊ - THỰC THU)', value: financials.totalRequestedAll - financials.totalIncomeAll, icon: 'pending_actions', color: 'amber' },
+                    { label: 'TỔNG XUẤT HÓA ĐƠN', value: financials.totalInvoiceAll, icon: 'description', color: 'slate' },
+                    { label: 'TỶ LỆ THU HỒI DÒNG TIỀN', value: financials.recoveryRate, icon: 'analytics', color: 'indigo', isPercent: true }
+                ].map((kpi, idx) => (
+                    <div key={idx} className="bg-white rounded-[20px] p-4 shadow-sm border border-slate-200/60 relative overflow-hidden group hover:shadow-md transition-all">
+                        <div className={`absolute -right-4 -top-4 w-20 h-20 bg-${kpi.color === 'slate' ? 'slate' : kpi.color}-50 rounded-full opacity-60 group-hover:scale-110 transition-transform`} />
+                        <div className="relative flex flex-col h-full justify-between">
+                            <div className="mb-2">
+                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-tight">{kpi.label}</p>
+                                {kpi.subLabel && (
+                                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">{kpi.subLabel}</p>
+                                )}
+                            </div>
+                            <div className="flex justify-between items-end">
+                                <div className="flex items-baseline gap-1">
+                                    <h3 className={`text-xl font-black text-${kpi.color === 'slate' ? 'slate-700' : (kpi.color === 'rose' ? 'rose-600' : (kpi.color === 'emerald' ? 'emerald-600' : (kpi.color === 'amber' ? 'amber-600' : (kpi.color === 'blue' ? 'blue-600' : 'indigo-600'))))} tracking-tighter`}>
+                                        {kpi.isPercent ? kpi.value.toFixed(1) : formatBillion(kpi.value)}
+                                    </h3>
+                                    <span className="text-[10px] font-black text-slate-400 capitalize">
+                                        {kpi.isPercent ? '%' : 'Tỷ'}
+                                    </span>
+                                </div>
+                                <div className={`w-8 h-8 rounded-lg bg-${kpi.color === 'slate' ? 'slate' : kpi.color}-50 text-${kpi.color === 'slate' ? 'slate' : kpi.color}-500 flex items-center justify-center shadow-inner shrink-0`}>
+                                    <span className="material-symbols-outlined notranslate text-[18px]" translate="no">{kpi.icon}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Middle Row: Basic Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between hover:shadow-md transition-all group">
                     <div className="flex justify-between items-start">
@@ -151,6 +281,84 @@ export default function DashboardOverview() {
                 </div>
             </div>
 
+            {/* Strategic Analysis Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Chart 1: Cash Flow Trend */}
+                <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-200/60 overflow-hidden group">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-[20px]">trending_up</span>
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Xu hướng Thực thu</h4>
+                                <p className="text-[10px] font-bold text-slate-400">Dòng tiền Cash-in 6 tháng gần nhất</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Đơn vị: Tỷ VNĐ</span>
+                        </div>
+                    </div>
+                    <div className="h-[280px]">
+                        <CashFlowChart data={chartData.trend} />
+                    </div>
+                </div>
+
+                {/* Chart 2: Portfolio Distribution */}
+                <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-200/60 overflow-hidden group">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-[20px]">pie_chart</span>
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Cơ cấu Giá trị Dự án</h4>
+                                <p className="text-[10px] font-bold text-slate-400">Phân bổ giá trị theo trạng thái</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="h-[280px]">
+                        <PortfolioChart data={chartData.portfolio} />
+                    </div>
+                </div>
+
+                {/* Chart 3: Receivables Aging */}
+                <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-200/60 overflow-hidden group">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-[20px]">fact_check</span>
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Hiệu quả Thu nợ</h4>
+                                <p className="text-[10px] font-bold text-slate-400">So sánh Xuất HĐ vs Thực thu</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="h-[280px]">
+                        <ReceivablesAgingChart data={chartData.aging} />
+                    </div>
+                </div>
+
+                {/* Chart 4: Top Profit Projects */}
+                <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-200/60 overflow-hidden group">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-[20px]">workspace_premium</span>
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Top Lợi nhuận Dự kiến</h4>
+                                <p className="text-[10px] font-bold text-slate-400">5 dự án đóng góp lợi nhuận cao nhất</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="h-[280px]">
+                        <TopProfitChart data={chartData.topProfit} />
+                    </div>
+                </div>
+            </div>
+
             {/* Performance Overview section */}
             <div className="bg-white/40 backdrop-blur-md rounded-[32px] p-8 border border-white/60 shadow-xl shadow-slate-200/50">
                 <div className="flex items-center gap-4 mb-8">
@@ -166,22 +374,23 @@ export default function DashboardOverview() {
 
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-5">
                     {[
-                        { label: 'LNG / Doanh thu', value: performance.avg_lng_dt, suffix: '%', icon: 'trending_up', color: 'emerald' },
-                        { label: 'Sản lượng / Chi phí', value: performance.avg_sl_cp, suffix: '%', icon: 'balance', color: 'blue' },
-                        { label: 'Hệ số SPI (TB)', value: performance.avg_spi, suffix: '', icon: 'speed', color: 'amber' },
-                        { label: 'Thu tiền / Sản lượng', value: performance.avg_dt_sl, suffix: '%', icon: 'account_balance_wallet', color: 'indigo' },
-                        { label: 'Thu tiền / Doanh thu', value: performance.avg_thu_dt, suffix: '%', icon: 'purple', color: 'purple' },
-                        { label: 'Cân đối Thu / Chi', value: performance.avg_thu_chi, suffix: 'x', icon: 'compare_arrows', color: 'rose' },
+                        { label: 'LNG / Doanh thu', value: performance.avg_lng_dt, suffix: '%', icon: 'trending_up', color: 'emerald', note: 'Lợi nhuận gộp / Doanh thu nội bộ (Sau thuế)' },
+                        { label: 'Sản lượng / Chi phí', value: performance.avg_sl_cp, suffix: '%', icon: 'balance', color: 'blue', note: 'Tỷ lệ hồ sơ thanh toán trên chi phí SXKD' },
+                        { label: 'Hệ số SPI (TB)', value: performance.avg_spi, suffix: '', icon: 'speed', color: 'amber', note: 'Chỉ số hiệu quả tiến độ (SPI)' },
+                        { label: 'Thu tiền / Sản lượng', value: performance.avg_dt_sl, suffix: '%', icon: 'account_balance_wallet', color: 'indigo', note: 'Tỷ lệ thu hồi nợ trên giá trị hồ sơ' },
+                        { label: 'Thu tiền / Doanh thu', value: performance.avg_thu_dt, suffix: '%', icon: 'payments', color: 'purple', note: 'Tỷ lệ tiền thực thu trên doanh thu nội bộ' },
+                        { label: 'Cân đối Thu / Chi', value: performance.avg_thu_chi, suffix: 'x', icon: 'compare_arrows', color: 'rose', note: 'An toàn dòng tiền (Tổng Thu / Tổng Chi)' },
                     ].map((k, i) => (
-                        <div key={i} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-lg hover:border-indigo-100 transition-all group flex flex-col justify-between min-h-[140px]">
-                            <div className="flex justify-between items-start mb-4">
+                        <div key={i} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-lg hover:border-indigo-100 transition-all group flex flex-col justify-between min-h-[160px]">
+                            <div className="flex justify-between items-start mb-2">
                                 <div className={`w-10 h-10 rounded-xl bg-${k.color}-50 text-${k.color}-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner`}>
                                     <span className="material-symbols-outlined text-[22px]">{k.icon}</span>
                                 </div>
                                 <span className="text-[11px] font-black text-slate-200">#0{i+1}</span>
                             </div>
                             <div>
-                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-tighter mb-2 leading-tight h-7">{k.label}</p>
+                                <p className="text-[11px] font-black text-slate-500 uppercase tracking-tighter mb-1.5 leading-tight">{k.label}</p>
+                                <p className="text-[10.5px] font-bold text-slate-400 italic mb-2.5 leading-tight h-8 line-clamp-2">{k.note}</p>
                                 <div className="flex items-baseline gap-1">
                                     <span className={`text-2xl font-black text-${k.color}-700 tracking-tighter`}>
                                         {k.value.toFixed(k.suffix === 'x' || k.suffix === '' ? 2 : 1)}
