@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
+import { logAudit } from '../lib/auditLog';
 
 function getDocStatus(stage) {
     const income = Number(stage.external_income || 0);
@@ -189,6 +190,13 @@ export default function DocumentTrackingModule() {
             console.error('Delete error details:', error);
             toast.error('Lỗi khi xóa: ' + (error.details || error.message));
         } else {
+            // Audit log (non-blocking)
+            logAudit({
+                action: 'DELETE',
+                tableName: 'payments',
+                recordId: itemToDelete.id,
+                recordName: `${itemToDelete.payment_code} - ${itemToDelete.stage_name}`
+            });
             toast.success('Đã xóa hồ sơ thanh toán');
             setShowDeleteConfirm(false);
             setItemToDelete(null);
@@ -327,6 +335,19 @@ export default function DocumentTrackingModule() {
                 toast.error('Lỗi khi lưu: ' + error.message);
             }
         } else {
+            // Lấy ID bản ghi vừa lưu (đối với Create, parse từ data trả về nếu có, hoặc để null, supabase v2 không trả về data mặc định nếu không select)
+            let recordId = isEditing ? editingId : null;
+            if (!isEditing && result.data && result.data[0]) recordId = result.data[0].id;
+            
+            // Audit log (non-blocking)
+            logAudit({
+                action: isEditing ? 'UPDATE' : 'CREATE',
+                tableName: 'payments',
+                recordId: recordId,
+                recordName: `${payload.payment_code} - ${payload.stage_name}`,
+                changes: isEditing ? { invoice_amount: { new: payload.invoice_amount }, payment_request_amount: { new: payload.payment_request_amount } } : null
+            });
+
             toast.success(isEditing ? 'Đã cập nhật hồ sơ thanh toán' : 'Đã tạo hồ sơ thanh toán mới');
             setShowModal(false);
             setIsEditing(false);
