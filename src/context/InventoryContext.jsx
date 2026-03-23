@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { logAudit } from '../lib/auditLog';
 
 const InventoryContext = createContext();
 
@@ -111,6 +112,15 @@ export const InventoryProvider = ({ children }) => {
             await processTransactionSideEffects(finalReceipt, items);
         }
 
+        // Audit log (non-blocking)
+        logAudit({
+            action: 'CREATE',
+            tableName: 'inventory_receipts',
+            recordId: receiptData.id,
+            recordName: receiptData.number,
+            metadata: { type: receiptData.type, status: targetStatus, items_count: items.length }
+        });
+
         await fetchData(); // Refresh stocks & POs after transaction
         return receiptData;
     };
@@ -199,6 +209,16 @@ export const InventoryProvider = ({ children }) => {
         // Process side effects
         await processTransactionSideEffects({ ...receipt, status: 'CONFIRMED' }, items);
         
+        // Audit log (non-blocking)
+        logAudit({
+            action: 'UPDATE',
+            tableName: 'inventory_receipts',
+            recordId: receiptId,
+            recordName: receipt.number,
+            changes: { status: { old: 'DRAFT', new: 'CONFIRMED' } },
+            metadata: { type: receipt.type }
+        });
+
         await fetchData();
         return true;
     };
@@ -225,6 +245,15 @@ export const InventoryProvider = ({ children }) => {
             await supabase.from('inventory_requests').delete().match({ id: requestData.id });
             throw iError;
         }
+
+        // Audit log (non-blocking)
+        logAudit({
+            action: 'CREATE',
+            tableName: 'inventory_requests',
+            recordId: requestData.id,
+            recordName: requestData.number,
+            metadata: { items_count: items.length }
+        });
 
         await fetchData();
         return requestData;
