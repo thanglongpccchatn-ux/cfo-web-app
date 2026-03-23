@@ -2,43 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import * as drive from '../lib/googleDrive';
 import SearchableSelect from './common/SearchableSelect';
-
-// ── Helpers ──────────────────────────────────────────────
-/** Format a number to "1.500.000.000 ₫" */
-const formatPrice = (val) => {
-    if (!val && val !== 0) return '0 ₫';
-    return val.toLocaleString('vi-VN') + ' ₫';
-};
-
-/** Parse a formatted string like "48.400.000.000" into a number */
-const parseFormattedNumber = (str) => {
-    if (!str) return 0;
-    const cleaned = str.replace(/[.\s]/g, '').replace(/,/g, '.');
-    const num = Number(cleaned);
-    return isNaN(num) ? 0 : num;
-};
-
-/** Format a number to "48.400.000.000" */
-const formatInputNumber = (num) => {
-    if (!num && num !== 0) return '';
-    return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(Math.round(num));
-};
-
-const fmt = (val) => {
-    if (!val && val !== 0) return '0';
-    return new Intl.NumberFormat('vi-VN').format(Math.round(val));
-};
-
-const formatBillion = (val) => {
-    if (!val) return '0 ₫';
-    if (val >= 1000000000) return (val / 1000000000).toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + ' Tỷ';
-    if (val >= 1000000) return (val / 1000000).toLocaleString('vi-VN', { minimumFractionDigits: 1 }) + ' Triệu';
-    return val.toLocaleString('vi-VN') + ' ₫';
-};
-
-// ── Shared Input Classes ────────────────────────────────
-const inputBase = "w-full rounded-xl border border-slate-200 bg-white/80 p-3.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all shadow-sm";
-const labelBase = "block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2";
+import {
+    formatPrice, parseFormattedNumber, formatInputNumber, fmt, formatBillion,
+    inputBase, labelBase, navItems, companyEntities, defaultPartnerForm,
+    createDefaultMilestone, calculateAllocations
+} from './contract/contractHelpers';
 
 // ─────────────────────────────────────────────────────────
 export default function ContractCreate({ onBack, project }) {
@@ -93,35 +61,14 @@ export default function ContractCreate({ onBack, project }) {
     const [partners, setPartners] = useState([]);
     const [isLoadingPartners, setIsLoadingPartners] = useState(false);
     const [showPartnerModal, setShowPartnerModal] = useState(false);
-    const [partnerForm, setPartnerForm] = useState({
-        name: '', tax_code: '', address: '', phone: '', email: '',
-        representative: '', representative_title: '', bank_name: '', bank_account: '',
-        partner_type: 'Chủ đầu tư'
-    });
+    const [partnerForm, setPartnerForm] = useState({...defaultPartnerForm});
 
     const [isSaving, setIsSaving] = useState(false);
     const [milestoneBase, setMilestoneBase] = useState('pre_vat'); // 'pre_vat' | 'post_vat'
 
     // ── CALCULATIONS ──
-    const actualRatio = contractRatio - internalDeduction;
-    // Thăng Long (100%)
-    const tl_preVat = Math.round(totalValue);
-    const tl_vatAmount = Math.round(totalValue * (vat / 100));
-    const tl_postVat = tl_preVat + tl_vatAmount;
-    // Sateco HĐ (contractRatio%) - Giá trị xuất hóa đơn
-    const st_invoice_preVat = Math.round(totalValue * (contractRatio / 100));
-    const st_invoice_vat = Math.round(st_invoice_preVat * (vat / 100));
-    const st_invoice_postVat = st_invoice_preVat + st_invoice_vat;
-    // Sateco Thực nhận (actualRatio%)
-    const st_actual_preVat = Math.round(totalValue * (actualRatio / 100));
-    const st_actual_vat = Math.round(st_actual_preVat * (vat / 100));
-    const st_actual_postVat = st_actual_preVat + st_actual_vat;
-    // TL giữ lại
-    const tl_cutPercent = 100 - contractRatio;
-    const tl_cutAmount = tl_preVat - st_invoice_preVat;
-    // Chiết khấu nội bộ
-    const internalCutAmount = st_invoice_preVat - st_actual_preVat;
-    // Bảo hành
+    const alloc = calculateAllocations(totalValue, vat, contractRatio, internalDeduction);
+    const { actualRatio, tl_preVat, tl_vatAmount, tl_postVat, st_invoice_preVat, st_invoice_vat, st_invoice_postVat, st_actual_preVat, st_actual_vat, st_actual_postVat, tl_cutPercent, tl_cutAmount, internalCutAmount } = alloc;
     const warrantyAmount = Math.round(totalValue * (warrantyRatio / 100));
 
     // Drive integration
@@ -361,7 +308,7 @@ export default function ContractCreate({ onBack, project }) {
             setPartners(prev => [...prev, data[0]]);
             setPartnerId(data[0].id);
             setShowPartnerModal(false);
-            setPartnerForm({ name: '', tax_code: '', address: '', phone: '', email: '', representative: '', representative_title: '', bank_name: '', bank_account: '', partner_type: 'Chủ đầu tư' });
+            setPartnerForm({...defaultPartnerForm});
         }
     };
 
@@ -498,16 +445,7 @@ export default function ContractCreate({ onBack, project }) {
         }
     };
 
-    // ── LEFT NAV ITEMS ──
-    const navItems = [
-        { id: 'general', label: 'Thông tin pháp lý', icon: 'gavel', color: 'text-blue-600', bg: 'bg-blue-50' },
-        { id: 'partner', label: 'Đối tác & Pháp nhân', icon: 'corporate_fare', color: 'text-orange-600', bg: 'bg-orange-50' },
-        { id: 'value', label: 'Giá trị & Thời gian', icon: 'payments', color: 'text-green-600', bg: 'bg-green-50' },
-        { id: 'milestone', label: 'Lộ trình thanh toán', icon: 'route', color: 'text-teal-600', bg: 'bg-teal-50' },
-        { id: 'sateco', label: 'Phân bổ nội bộ', icon: 'account_balance', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-        { id: 'warranty', label: 'Bảo hành', icon: 'verified_user', color: 'text-amber-600', bg: 'bg-amber-50' },
-        { id: 'banking', label: 'Ngân hàng thụ hưởng', icon: 'account_balance_wallet', color: 'text-rose-600', bg: 'bg-rose-50' },
-    ];
+    // navItems imported from contractHelpers
 
     return (
         <div className="bg-slate-50 text-slate-900 antialiased min-h-screen flex flex-col w-full absolute inset-0 z-50 overflow-hidden font-sans">
@@ -595,11 +533,7 @@ export default function ContractCreate({ onBack, project }) {
                                     Pháp nhân ký kết (Nội bộ Sateco Group) *
                                 </label>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                    {[
-                                        { key: 'thanglong', name: 'THĂNG LONG', color: 'blue', desc: 'Công ty mẹ / PCCC' },
-                                        { key: 'thanhphat', name: 'THÀNH PHÁT', color: 'amber', desc: 'Vật tư / Thi công' },
-                                        { key: 'sateco', name: 'SATECO', color: 'emerald', desc: 'Thi công / Khoán nội bộ' }
-                                    ].map(company => (
+                                    {companyEntities.map(company => (
                                         <button
                                             key={company.key}
                                             type="button"
