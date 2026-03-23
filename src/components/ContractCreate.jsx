@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import * as drive from '../lib/googleDrive';
 import SearchableSelect from './common/SearchableSelect';
+import { logAudit } from '../lib/auditLog';
 import {
     formatPrice, parseFormattedNumber, formatInputNumber, fmt, formatBillion,
     inputBase, labelBase, navItems, companyEntities, defaultPartnerForm,
@@ -440,6 +441,15 @@ export default function ContractCreate({ onBack, project }) {
             console.error('Save failed after retries:', lastError);
             alert('Có lỗi khi lưu! ' + (lastError?.message || 'Lỗi không xác định'));
         } else {
+            // Audit log (non-blocking)
+            logAudit({
+                action: project?.id ? 'UPDATE' : 'CREATE',
+                tableName: 'projects',
+                recordId: finalSavedProject?.id,
+                recordName: name,
+                changes: project?.id ? { original_value: { old: project.original_value, new: totalValue }, status: { old: project.status, new: 'Đang thi công' } } : null,
+                metadata: { code, contract_type: contractType }
+            });
             alert(project?.id ? 'Cập nhật Hợp đồng thành công!' : 'Tạo Hợp đồng thành công!');
             onBack();
         }

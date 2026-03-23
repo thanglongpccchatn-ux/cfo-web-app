@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import ContractDetailedDashboard from './ContractDetailedDashboard';
 import ExcelImportModal from './ExcelImportModal';
 import { useToast } from '../context/ToastContext';
+import { logAudit } from '../lib/auditLog';
 
 export default function ContractMasterDetail({ onOpenFullscreen }) {
     const [view, setView] = useState('list');
@@ -71,6 +72,8 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
             console.log('Project deleted successfully');
             setProjects(projects.filter(p => p.id !== projId));
             toast.success('Đã xóa hợp đồng thành công.');
+            // Audit log (non-blocking)
+            logAudit({ action: 'DELETE', tableName: 'projects', recordId: projId, recordName: projName });
         } catch (error) {
             console.error('Error in handleDeleteProject:', error);
             toast.error('Lỗi khi xóa hợp đồng: ' + (error.message || 'Lỗi không xác định'));
