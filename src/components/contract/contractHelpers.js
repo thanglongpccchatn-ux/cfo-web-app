@@ -89,12 +89,13 @@ export const createDefaultMilestone = () => ({
 /**
  * Calculate all Sateco allocation values
  * @param {number} totalValue - Pre-VAT contract value
- * @param {number} vat - VAT percentage
+ * @param {number} vat - VAT percentage (Client)
+ * @param {number} internalVat - Internal VAT percentage (Sateco)
  * @param {number} contractRatio - Sateco contract ratio %
  * @param {number} internalDeduction - Internal deduction %
  * @returns {Object} All calculated values
  */
-export const calculateAllocations = (totalValue, vat, contractRatio, internalDeduction) => {
+export const calculateAllocations = (totalValue, vat, internalVat, contractRatio, internalDeduction) => {
     const actualRatio = contractRatio - internalDeduction;
     
     // Thăng Long (100%)
@@ -104,12 +105,12 @@ export const calculateAllocations = (totalValue, vat, contractRatio, internalDed
     
     // Sateco HĐ (contractRatio%)
     const st_invoice_preVat = Math.round(totalValue * (contractRatio / 100));
-    const st_invoice_vat = Math.round(st_invoice_preVat * (vat / 100));
+    const st_invoice_vat = Math.round(st_invoice_preVat * (internalVat / 100));
     const st_invoice_postVat = st_invoice_preVat + st_invoice_vat;
     
     // Sateco Thực nhận (actualRatio%)
     const st_actual_preVat = Math.round(totalValue * (actualRatio / 100));
-    const st_actual_vat = Math.round(st_actual_preVat * (vat / 100));
+    const st_actual_vat = Math.round(st_actual_preVat * (internalVat / 100));
     const st_actual_postVat = st_actual_preVat + st_actual_vat;
     
     // TL giữ lại

@@ -68,7 +68,7 @@ export default function ContractCreate({ onBack, project }) {
     const [milestoneBase, setMilestoneBase] = useState('pre_vat'); // 'pre_vat' | 'post_vat'
 
     // ── CALCULATIONS ──
-    const alloc = calculateAllocations(totalValue, vat, contractRatio, internalDeduction);
+    const alloc = calculateAllocations(totalValue, vat, internalVat, contractRatio, internalDeduction);
     const { actualRatio, tl_preVat, tl_vatAmount, tl_postVat, st_invoice_preVat, st_invoice_vat, st_invoice_postVat, st_actual_preVat, st_actual_vat, st_actual_postVat, tl_cutPercent, tl_cutAmount, internalCutAmount } = alloc;
     const warrantyAmount = Math.round(totalValue * (warrantyRatio / 100));
 
