@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import NotificationBell from './NotificationBell';
 
 export default function Header({ title, subtitle, onAction, isSidebarOpen, setIsSidebarOpen }) {
     const { profile, logout } = useAuth();
@@ -29,10 +30,7 @@ export default function Header({ title, subtitle, onAction, isSidebarOpen, setIs
                     />
                 </div>
 
-                <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 relative transition-colors">
-                    <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-[#1a2634]"></span>
-                    <span className="material-symbols-outlined notranslate text-[20px]" translate="no">notifications</span>
-                </button>
+                <NotificationBell />
 
                 {onAction && (
                     <button

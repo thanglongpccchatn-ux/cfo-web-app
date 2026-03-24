@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { logAudit } from '../lib/auditLog';
+import { useNotification } from './NotificationContext';
 
 const InventoryContext = createContext();
 
@@ -11,6 +12,7 @@ export const useInventory = () => {
 };
 
 export const InventoryProvider = ({ children }) => {
+    const { sendNotification } = useNotification();
     const [warehouses, setWarehouses] = useState([]);
     const [stocks, setStocks] = useState([]);
     const [materials, setMaterials] = useState([]);
@@ -120,6 +122,16 @@ export const InventoryProvider = ({ children }) => {
             recordName: receiptData.number,
             metadata: { type: receiptData.type, status: targetStatus, items_count: items.length }
         });
+
+        // Notification: Inbound/Outbound alert
+        const typeLabel = finalReceipt.type === 'IN' ? 'Nhập kho' : 'Xuất kho';
+        sendNotification(
+            'view_inventory',
+            `Phiếu ${typeLabel} mới`,
+            `Phiếu ${typeLabel} số ${receiptData.number || ''} (${items.length} mặt hàng) vừa được tạo thành công.`,
+            finalReceipt.type === 'IN' ? 'INFO' : 'WARNING',
+            '#inventory'
+        );
 
         await fetchData(); // Refresh stocks & POs after transaction
         return receiptData;
@@ -254,6 +266,15 @@ export const InventoryProvider = ({ children }) => {
             recordName: requestData.number,
             metadata: { items_count: items.length }
         });
+
+        // Notification: Material request created
+        sendNotification(
+            'view_inventory',
+            'Yêu cầu xuất vật tư mới',
+            `Yêu cầu xuất kho số ${requestData.number || ''} (${items.length} mặt hàng) đang chờ xác nhận.`,
+            'APPROVAL',
+            '#inventory'
+        );
 
         await fetchData();
         return requestData;

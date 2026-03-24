@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import * as drive from '../lib/googleDrive';
 import { logAudit } from '../lib/auditLog';
+import { useNotification } from '../context/NotificationContext';
 import {
     formatInputNumber, parseFormattedNumber, labelBase, navItems, companyEntities, defaultPartnerForm,
     calculateAllocations
@@ -18,6 +19,7 @@ import ContractWarranty from './contract/ContractWarranty';
 import ContractBanking from './contract/ContractBanking';
 
 export default function ContractCreate({ onBack, project }) {
+    const { sendNotification } = useNotification();
     // ── 1. Contract Basic Info ──
     const [name, setName] = useState('');
     const [code, setCode] = useState('');
@@ -410,6 +412,26 @@ export default function ContractCreate({ onBack, project }) {
                 changes: project?.id ? { original_value: { old: project.original_value, new: totalValue }, status: { old: project.status, new: 'Đang thi công' } } : null,
                 metadata: { code, contract_type: contractType }
             });
+
+            // Notification: Contract created or updated
+            if (!project?.id) {
+                sendNotification(
+                    'view_contracts',
+                    'Hợp đồng mới được tạo',
+                    `Hợp đồng "${name}" (${code}) trị giá ${Number(totalValue || 0).toLocaleString('vi-VN')}đ vừa được thêm vào hệ thống.`,
+                    'INFO',
+                    '#contracts'
+                );
+            } else {
+                sendNotification(
+                    'manage_users',
+                    'Hợp đồng được cập nhật',
+                    `Hợp đồng "${name}" (${code}) vừa được chỉnh sửa giá trị/thông tin.`,
+                    'WARNING',
+                    '#contracts'
+                );
+            }
+
             alert(project?.id ? 'Cập nhật Hợp đồng thành công!' : 'Tạo Hợp đồng thành công!');
             onBack();
         }

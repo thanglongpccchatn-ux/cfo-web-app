@@ -11,9 +11,11 @@ import DeleteConfirmModal from './documentTracking/DeleteConfirmModal';
 import PaymentFormModal from './documentTracking/PaymentFormModal';
 
 import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 
 export default function DocumentTrackingModule() {
     const { hasPermission } = useAuth();
+    const { sendNotification } = useNotification();
 
     const [data, setData] = useState([]);
     const [projects, setProjects] = useState([]);
@@ -279,9 +281,9 @@ export default function DocumentTrackingModule() {
 
         let result;
         if (isEditing) {
-            result = await supabase.from('payments').update(payload).eq('id', editingId);
+            result = await supabase.from('payments').update(payload).eq('id', editingId).select();
         } else {
-            result = await supabase.from('payments').insert([payload]);
+            result = await supabase.from('payments').insert([payload]).select();
         }
 
         const { error } = result;
@@ -295,8 +297,19 @@ export default function DocumentTrackingModule() {
             }
         } else {
             let recordId = isEditing ? editingId : null;
-            if (!isEditing && result.data && result.data[0]) recordId = result.data[0].id;
+            if (result.data && result.data[0]) recordId = result.data[0].id;
             
+            // Send Notification for new payments
+            if (!isEditing && form.requestAmount) {
+                sendNotification(
+                    'edit_payments',
+                    'Đề nghị thanh toán mới',
+                    `Có một hồ sơ thanh toán mới (${form.paymentCode}) trị giá ${form.requestAmount} đang chờ xử lý.`,
+                    'APPROVAL',
+                    '#payments'
+                );
+            }
+
             logAudit({
                 action: isEditing ? 'UPDATE' : 'CREATE',
                 tableName: 'payments',

@@ -27,6 +27,7 @@ import InventoryManager from './components/Inventory/InventoryManager';
 import { InventoryProvider } from './context/InventoryContext';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
 import Login from './components/Login';
 import Settings from './components/Settings';
 import { applyBrandTheme, currentTheme } from './config/brand';
@@ -230,7 +231,9 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <NotificationProvider>
+        <AppContent />
+      </NotificationProvider>
     </AuthProvider>
   );
 }
