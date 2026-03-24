@@ -427,7 +427,7 @@ export default function DocumentTrackingModule() {
                         </select>
                     </div>
                     
-                    {hasPermission('manage_payments') && (
+                    {hasPermission('create_payments') && (
                         <button 
                             onClick={() => {
                                 setIsEditing(false);
@@ -676,7 +676,7 @@ export default function DocumentTrackingModule() {
                                                    })()
                                                )}
                                                <td className="px-3 py-4 text-center">
-                                                   {hasPermission('manage_payments') && (<div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                   {hasPermission('edit_payments') && (<div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                        <button 
                                                            onClick={(e) => { e.stopPropagation(); handleEdit(item); }}
                                                            className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-white flex items-center justify-center transition-all border border-indigo-100"

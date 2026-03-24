@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useInventory } from '../../context/InventoryContext';
+import { useAuth } from '../../context/AuthContext';
 import InventoryDashboard from './InventoryDashboard';
 import InventoryList from './InventoryList';
 import InventoryInbound from './InventoryInbound';
@@ -43,14 +44,15 @@ class InventoryErrorBoundary extends React.Component {
 export default function InventoryManager() {
     const [subTab, setSubTab] = useState('overview'); // overview, stock, inbound, outbound, requests
     const { loading } = useInventory();
+    const { hasPermission, profile } = useAuth();
 
     const tabs = [
-        { id: 'overview', label: 'Tổng quan', icon: 'dashboard' },
-        { id: 'stock', label: 'Kho vật tư', icon: 'inventory_2' },
-        { id: 'inbound', label: 'Nhập kho', icon: 'login' },
-        { id: 'outbound', label: 'Xuất kho', icon: 'logout' },
-        { id: 'requests', label: 'Yêu cầu', icon: 'assignment' }
-    ];
+        { id: 'overview', label: 'Tổng quan', icon: 'dashboard', perm: 'view_inventory' },
+        { id: 'stock', label: 'Kho vật tư', icon: 'inventory_2', perm: 'view_inventory' },
+        { id: 'inbound', label: 'Nhập kho', icon: 'login', perm: 'import_inventory' },
+        { id: 'outbound', label: 'Xuất kho', icon: 'logout', perm: 'export_inventory' },
+        { id: 'requests', label: 'Yêu cầu', icon: 'assignment', perm: 'view_inventory' }
+    ].filter(t => !t.perm || hasPermission(t.perm) || profile?.role_code === 'ROLE01');
 
     if (loading) {
         return (

@@ -313,7 +313,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                     <p className="text-slate-500 text-xs md:text-sm mt-2 ml-[52px]">{projects.length} hợp đồng đang theo dõi · Dữ liệu thời gian thực</p>
                 </div>
                 <div className="flex gap-2 md:gap-3 w-full md:w-auto">
-                    {hasPermission('create_contract') && (
+                    {hasPermission('create_contracts') && (
                         <button 
                             onClick={() => setIsImportModalOpen(true)}
                             className="btn btn-glass bg-emerald-50 text-emerald-700 font-bold border-emerald-200 hover:bg-emerald-100 flex items-center gap-2 transition-all shadow-sm text-xs md:text-sm"
@@ -321,7 +321,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                             <span className="material-symbols-outlined notranslate text-[18px] md:text-[20px]" translate="no">upload_file</span> Import
                         </button>
                     )}
-                    {hasPermission('create_contract') && (
+                    {hasPermission('create_contracts') && (
                         <button
                             onClick={() => onOpenFullscreen('contract_form', null)}
                             className="btn bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 transition-all group text-xs md:text-sm"
@@ -563,8 +563,8 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                             </td>
                                             <td className="px-3 py-2.5 text-center">
                                                 <div className="flex items-center justify-center gap-1">
-                                                    {hasPermission('edit_contract') && (<button onClick={(e) => { e.stopPropagation(); onOpenFullscreen('contract_form', proj); }} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Sửa"><span className="material-symbols-outlined notranslate text-[18px]" translate="no">edit_note</span></button>)}
-                                                    {hasPermission('delete_contract') && (
+                                                    {hasPermission('edit_contracts') && (<button onClick={(e) => { e.stopPropagation(); onOpenFullscreen('contract_form', proj); }} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Sửa"><span className="material-symbols-outlined notranslate text-[18px]" translate="no">edit_note</span></button>)}
+                                                    {hasPermission('delete_contracts') && (
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();

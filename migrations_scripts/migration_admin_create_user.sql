@@ -68,26 +68,30 @@ BEGIN
     encrypted_pw := crypt(p_password, gen_salt('bf'));
 
     -- Insert into auth.users
+    -- Note: GoTrue requires several token columns to be empty strings rather than NULL
+    -- otherwise it throws "Database error querying schema" during login/session refresh.
     INSERT INTO auth.users (
         instance_id, id, aud, role, email, encrypted_password, 
         email_confirmed_at, created_at, updated_at, 
         raw_app_meta_data, raw_user_meta_data, 
-        is_super_admin, is_sso_user
+        is_super_admin, is_sso_user,
+        confirmation_token, recovery_token, email_change_token_new, email_change
     )
     VALUES (
         '00000000-0000-0000-0000-000000000000', new_user_id, 'authenticated', 'authenticated', p_email, encrypted_pw, 
         now(), now(), now(), 
         '{"provider":"email","providers":["email"]}', 
         jsonb_build_object('full_name', p_full_name), 
-        false, false
+        false, false,
+        '', '', '', ''
     );
 
     -- Insert into auth.identities to ensure GoTrue login works smoothly (email provider)
     INSERT INTO auth.identities (
-        id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+        id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at
     )
     VALUES (
-        gen_random_uuid(), new_user_id, format('{"sub":"%s","email":"%s"}', new_user_id::text, p_email)::jsonb, 'email', now(), now(), now()
+        gen_random_uuid(), new_user_id, format('{"sub":"%s","email":"%s"}', new_user_id::text, p_email)::jsonb, 'email', new_user_id::text, now(), now(), now()
     );
 
     -- Ensure a profile exists for this new user in public schema
