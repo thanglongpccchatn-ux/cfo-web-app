@@ -74,7 +74,7 @@ function ComingSoon({ title = 'Module' }) {
 }
 
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user, loading, hasPermission, profile } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [fullscreenView, setFullscreenView] = useState({ type: null, data: null });
@@ -128,17 +128,24 @@ function AppContent() {
 
   // Regular routing
   const renderContent = () => {
+    const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
     switch (activeTab) {
       case 'dashboard':
-        return <DashboardOverview />;
+        return (hasPermission('view_dashboard') || isAdmin) ? <DashboardOverview /> : (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8">
+                <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">gpp_maybe</span>
+                <h3 className="text-xl font-bold text-slate-700">Không có quyền truy cập</h3>
+                <p className="text-slate-500 mt-2">Tài khoản của bạn không được cấp quyền xem Tổng quan.<br/>Vui lòng chọn chức năng khác ở menu bên trái.</p>
+            </div>
+        );
       case 'contracts':
-        return <ContractMasterDetail onOpenFullscreen={(type, data) => setFullscreenView({ type, data })} />;
+        return (hasPermission('view_contracts') || isAdmin) ? <ContractMasterDetail onOpenFullscreen={(type, data) => setFullscreenView({ type, data })} /> : null;
       case 'doc_tracking':
-        return <DocumentTrackingModule />;
+        return (hasPermission('view_payments') || isAdmin) ? <DocumentTrackingModule /> : null;
       case 'payment_receipts':
-        return <PaymentReceiptsModule />;
+        return (hasPermission('view_payments') || isAdmin) ? <PaymentReceiptsModule /> : null;
       case 'warranty_tracking':
-        return <WarrantyTracking />;
+        return (hasPermission('view_contracts') || isAdmin) ? <WarrantyTracking /> : null;
       case 'payments':
         return <PaymentsMaster />;
       case 'suppliers':
