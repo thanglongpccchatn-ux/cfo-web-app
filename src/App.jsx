@@ -30,6 +30,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import Login from './components/Login';
 import Settings from './components/Settings';
+import UserProfile from './components/UserProfile';
 import { applyBrandTheme, currentTheme } from './config/brand';
 import { supabase } from './lib/supabase';
 
@@ -171,6 +172,8 @@ function AppContent() {
         return <BankManagement />;
       case 'settings':
         return <Settings />;
+      case 'profile':
+        return <UserProfile />;
       default:
         return <ComingSoon title="Module này" />;
     }
@@ -201,6 +204,7 @@ function AppContent() {
             <Header
               isSidebarOpen={isSidebarOpen}
               setIsSidebarOpen={setIsSidebarOpen}
+              setActiveTab={setActiveTab}
               title={
                 activeTab === 'dashboard' ? 'Tổng quan Dòng tiền' :
                   activeTab === 'contracts' ? 'Quản lý Hợp đồng' :
@@ -212,7 +216,8 @@ function AppContent() {
                               activeTab === 'inventory' ? 'Kho vật tư' :
                                 activeTab === 'settings' ? 'Cài đặt hệ thống' :
                                   activeTab === 'permissions' ? 'Phân quyền rủi ro' :
-                                    activeTab === 'users' ? 'Quản lý Người dùng' : 'Hệ thống Quản trị'
+                                    activeTab === 'users' ? 'Quản lý Người dùng' :
+                                      activeTab === 'profile' ? 'Trang cá nhân' : 'Hệ thống Quản trị'
               }
               subtitle={activeTab === 'dashboard' ? "Chào mừng trở lại!" : activeTab === 'contracts' ? "Danh sách và chi tiết dự án" : activeTab === 'inventory' ? "Quản lý kho vật tư công trình" : `${currentTheme.company_name} ${currentTheme.sub_name}`}
               onAction={activeTab === 'contracts' ? () => setFullscreenView({ type: 'contract_new', data: null }) : null}

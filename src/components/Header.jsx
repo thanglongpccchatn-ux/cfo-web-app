@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from './NotificationBell';
 
-export default function Header({ title, subtitle, onAction, isSidebarOpen, setIsSidebarOpen }) {
+export default function Header({ title, subtitle, onAction, isSidebarOpen, setIsSidebarOpen, setActiveTab }) {
     const { profile, logout } = useAuth();
     return (
         <header className="h-16 bg-white dark:bg-[#1a2634] flex items-center justify-between px-3 md:px-8 z-10 shadow-sm flex-shrink-0 relative">
@@ -44,21 +44,23 @@ export default function Header({ title, subtitle, onAction, isSidebarOpen, setIs
                 )}
 
                 <div className="flex items-center gap-2 md:gap-3 pl-2 md:pl-4 border-l border-slate-200 dark:border-slate-700">
-                    <div className="text-right hidden md:block">
-                        <div className="text-sm font-bold text-slate-800 dark:text-white leading-tight">
-                            {profile?.full_name || 'Admin'}
+                    <button onClick={() => setActiveTab && setActiveTab('profile')} className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity cursor-pointer" title="Trang cá nhân">
+                        <div className="text-right hidden md:block">
+                            <div className="text-sm font-bold text-slate-800 dark:text-white leading-tight">
+                                {profile?.full_name || 'Admin'}
+                            </div>
+                            <div className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400">
+                                {profile?.roles?.name || profile?.role_code || 'GUEST'}
+                            </div>
                         </div>
-                        <div className="text-[10px] uppercase font-black tracking-widest text-slate-500 dark:text-slate-400">
-                            {profile?.roles?.name || profile?.role_code || 'GUEST'}
+                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-200 dark:bg-slate-700 border-2 border-white dark:border-slate-800 shadow-sm flex items-center justify-center text-slate-500 overflow-hidden">
+                            {profile?.avatar_url ? (
+                                <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="material-symbols-outlined notranslate text-[18px] md:text-[24px]" translate="no">person</span>
+                            )}
                         </div>
-                    </div>
-                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-200 dark:bg-slate-700 border-2 border-white dark:border-slate-800 shadow-sm flex items-center justify-center text-slate-500 overflow-hidden">
-                        {profile?.avatar_url ? (
-                            <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                            <span className="material-symbols-outlined notranslate text-[18px] md:text-[24px]" translate="no">person</span>
-                        )}
-                    </div>
+                    </button>
                     <button 
                         onClick={logout}
                         title="Đăng xuất"

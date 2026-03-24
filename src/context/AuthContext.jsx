@@ -100,6 +100,12 @@ export const AuthProvider = ({ children }) => {
         return await supabase.auth.signOut();
     };
 
+    const refreshProfile = async () => {
+        if (user) {
+            await fetchUserProfileAndPermissions(user.id);
+        }
+    };
+
     const hasPermission = (permCode) => {
         // If Admin role (ROLE01 or custom admin code), optionally bypass. 
         // For now, rely on strictly mapped permissions.
@@ -113,7 +119,8 @@ export const AuthProvider = ({ children }) => {
         loading,
         login,
         logout,
-        hasPermission
+        hasPermission,
+        refreshProfile
     };
 
     return (
