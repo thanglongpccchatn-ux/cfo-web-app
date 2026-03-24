@@ -21,6 +21,7 @@ import DocumentTrackingModule from './components/DocumentTrackingModule';
 import PaymentReceiptsModule from './components/PaymentReceiptsModule';
 import MonthlyReport from './components/MonthlyReport';
 import ExpenseTracking from './components/ExpenseTracking';
+import WarrantyTracking from './components/WarrantyTracking';
 import PlanningModule from './components/PlanningModule';
 import InventoryManager from './components/Inventory/InventoryManager';
 import { InventoryProvider } from './context/InventoryContext';
@@ -136,6 +137,8 @@ function AppContent() {
         return <DocumentTrackingModule />;
       case 'payment_receipts':
         return <PaymentReceiptsModule />;
+      case 'warranty_tracking':
+        return <WarrantyTracking />;
       case 'payments':
         return <PaymentsMaster />;
       case 'suppliers':

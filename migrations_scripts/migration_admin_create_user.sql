@@ -4,6 +4,9 @@
 --              new user accounts directly from the frontend without the Admin API.
 -- ==============================================================================
 
+-- 0. Enable necessary extensions
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- 1. Create the RPC function with SECURITY DEFINER
 -- This allows the frontend (authenticated user) to perform actions as the database owner (postgres),
 -- which is necessary to insert into the protected auth.users schema.
@@ -16,7 +19,7 @@ CREATE OR REPLACE FUNCTION public.admin_create_user(
 )
 RETURNS JSONB
 LANGUAGE plpgsql
-SECURITY DEFINER SET search_path = public
+SECURITY DEFINER SET search_path = public, extensions
 AS $$
 DECLARE
     new_user_id UUID;
@@ -25,7 +28,7 @@ DECLARE
     result JSONB;
 BEGIN
     -- Security Check: Ensure the caller actually has permission to manage users.
-    -- (Assuming 'manage_users' is a permission granted to admins in role_permissions)
+    -- First check: does user have 'manage_users' permission?
     SELECT EXISTS (
         SELECT 1 FROM public.profiles p
         JOIN public.role_permissions rp ON p.role_code = rp.role_code
@@ -35,11 +38,19 @@ BEGIN
     -- If no RLS/Permissions are strictly enforced yet during setup, we can bypass this check 
     -- if you are the FIRST user. For safety, we allow it if the caller is an ADMIN role.
     IF NOT is_admin THEN
-        -- Fallback check: is caller an ADMIN role directly?
+        -- Fallback check: is caller an ADMIN role directly? (ROLE01 is Admin)
         SELECT EXISTS (
-            SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role_code IN ('ROLE01', 'ADMIN')
+            SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role_code IN ('ROLE01')
         ) INTO is_admin;
         
+        -- If still not admin, check if there are ANY users in profiles. 
+        -- If 0 users, allow the first one to be created as admin (bootstrap).
+        IF NOT is_admin THEN
+            IF (SELECT COUNT(*) FROM public.profiles) = 0 THEN
+                is_admin := TRUE;
+            END IF;
+        END IF;
+
         IF NOT is_admin THEN
             RETURN jsonb_build_object('success', false, 'error', 'Bạn không có quyền tạo người dùng.');
         END IF;

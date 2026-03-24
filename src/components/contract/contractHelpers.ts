@@ -5,38 +5,34 @@
 
 // ── Format Functions ─────────────────────────────────────
 
-/** Format a number to "1.500.000.000 ₫" */
-export const formatPrice = (val) => {
+export const formatPrice = (val: number | string | null | undefined): string => {
     if (!val && val !== 0) return '0 ₫';
-    return val.toLocaleString('vi-VN') + ' ₫';
+    return Number(val).toLocaleString('vi-VN') + ' ₫';
 };
 
-/** Parse a formatted string like "48.400.000.000" into a number */
-export const parseFormattedNumber = (str) => {
+export const parseFormattedNumber = (str: string | null | undefined): number => {
     if (!str) return 0;
-    const cleaned = str.replace(/[.\s]/g, '').replace(/,/g, '.');
+    const cleaned = String(str).replace(/[.\s]/g, '').replace(/,/g, '.');
     const num = Number(cleaned);
     return isNaN(num) ? 0 : num;
 };
 
-/** Format a number to "48.400.000.000" */
-export const formatInputNumber = (num) => {
+export const formatInputNumber = (num: number | string | null | undefined): string => {
     if (!num && num !== 0) return '';
-    return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(Math.round(num));
+    return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(Math.round(Number(num)));
 };
 
-/** Short format for table display */
-export const fmt = (val) => {
+export const fmt = (val: number | string | null | undefined): string => {
     if (!val && val !== 0) return '0';
-    return new Intl.NumberFormat('vi-VN').format(Math.round(val));
+    return new Intl.NumberFormat('vi-VN').format(Math.round(Number(val)));
 };
 
-/** Format to Tỷ/Triệu display */
-export const formatBillion = (val) => {
-    if (!val) return '0 ₫';
-    if (val >= 1000000000) return (val / 1000000000).toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + ' Tỷ';
-    if (val >= 1000000) return (val / 1000000).toLocaleString('vi-VN', { minimumFractionDigits: 1 }) + ' Triệu';
-    return val.toLocaleString('vi-VN') + ' ₫';
+export const formatBillion = (val: number | string | null | undefined): string => {
+    const num = Number(val);
+    if (!num) return '0 ₫';
+    if (num >= 1000000000) return (num / 1000000000).toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + ' Tỷ';
+    if (num >= 1000000) return (num / 1000000).toLocaleString('vi-VN', { minimumFractionDigits: 1 }) + ' Triệu';
+    return num.toLocaleString('vi-VN') + ' ₫';
 };
 
 // ── Shared Input Classes ─────────────────────────────────
@@ -46,7 +42,15 @@ export const labelBase = "block text-[11px] font-bold text-slate-500 uppercase t
 
 // ── Navigation Items ─────────────────────────────────────
 
-export const navItems = [
+export interface NavItem {
+    id: string;
+    label: string;
+    icon: string;
+    color: string;
+    bg: string;
+}
+
+export const navItems: NavItem[] = [
     { id: 'general', label: 'Thông tin pháp lý', icon: 'gavel', color: 'text-blue-600', bg: 'bg-blue-50' },
     { id: 'partner', label: 'Đối tác & Pháp nhân', icon: 'corporate_fare', color: 'text-orange-600', bg: 'bg-orange-50' },
     { id: 'value', label: 'Giá trị & Thời gian', icon: 'payments', color: 'text-green-600', bg: 'bg-green-50' },
@@ -86,16 +90,13 @@ export const createDefaultMilestone = () => ({
 
 // ── Calculation Helpers ──────────────────────────────────
 
-/**
- * Calculate all Sateco allocation values
- * @param {number} totalValue - Pre-VAT contract value
- * @param {number} vat - VAT percentage (Client)
- * @param {number} internalVat - Internal VAT percentage (Sateco)
- * @param {number} contractRatio - Sateco contract ratio %
- * @param {number} internalDeduction - Internal deduction %
- * @returns {Object} All calculated values
- */
-export const calculateAllocations = (totalValue, vat, internalVat, contractRatio, internalDeduction) => {
+export const calculateAllocations = (
+    totalValue: number, 
+    vat: number, 
+    internalVat: number, 
+    contractRatio: number, 
+    internalDeduction: number
+) => {
     const actualRatio = contractRatio - internalDeduction;
     
     // Thăng Long (100%)
@@ -119,8 +120,6 @@ export const calculateAllocations = (totalValue, vat, internalVat, contractRatio
     
     // Chiết khấu nội bộ
     const internalCutAmount = st_invoice_preVat - st_actual_preVat;
-    
-    // Bảo hành (calculated separately)
     
     return {
         actualRatio,

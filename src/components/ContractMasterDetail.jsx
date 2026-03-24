@@ -5,7 +5,11 @@ import ExcelImportModal from './ExcelImportModal';
 import { useToast } from '../context/ToastContext';
 import { logAudit } from '../lib/auditLog';
 
+import { useAuth } from '../context/AuthContext';
+
 export default function ContractMasterDetail({ onOpenFullscreen }) {
+    const { hasPermission } = useAuth();
+
     const [view, setView] = useState('list');
     const [selectedProject, setSelectedProject] = useState(null);
     const [projects, setProjects] = useState([]);
@@ -15,7 +19,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
     const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
     const [filterMonth, setFilterMonth] = useState('all');
     const [activeEntity, setActiveEntity] = useState('all'); // all, thanglong, sateco, thanhphat
-    const [isAdmin, setIsAdmin] = useState(true); // Default to true for now as per Sidebar, but we will add a check if possible
+    // const [isAdmin, setIsAdmin] = useState(true); // Replaced by RBAC hasPermission
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name }
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
@@ -309,18 +313,22 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                     <p className="text-slate-500 text-xs md:text-sm mt-2 ml-[52px]">{projects.length} hợp đồng đang theo dõi · Dữ liệu thời gian thực</p>
                 </div>
                 <div className="flex gap-2 md:gap-3 w-full md:w-auto">
-                    <button 
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="btn btn-glass bg-emerald-50 text-emerald-700 font-bold border-emerald-200 hover:bg-emerald-100 flex items-center gap-2 transition-all shadow-sm text-xs md:text-sm"
-                    >
-                        <span className="material-symbols-outlined notranslate text-[18px] md:text-[20px]" translate="no">upload_file</span> Import
-                    </button>
-                    <button
-                        onClick={() => onOpenFullscreen('contract_form', null)}
-                        className="btn bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 transition-all group text-xs md:text-sm"
-                    >
-                        <span className="material-symbols-outlined notranslate text-[18px] md:text-[20px] group-hover:rotate-90 transition-transform" translate="no">add</span> <span className="hidden sm:inline">Tạo Hợp đồng mới</span><span className="sm:hidden">Tạo HĐ</span>
-                    </button>
+                    {hasPermission('create_contract') && (
+                        <button 
+                            onClick={() => setIsImportModalOpen(true)}
+                            className="btn btn-glass bg-emerald-50 text-emerald-700 font-bold border-emerald-200 hover:bg-emerald-100 flex items-center gap-2 transition-all shadow-sm text-xs md:text-sm"
+                        >
+                            <span className="material-symbols-outlined notranslate text-[18px] md:text-[20px]" translate="no">upload_file</span> Import
+                        </button>
+                    )}
+                    {hasPermission('create_contract') && (
+                        <button
+                            onClick={() => onOpenFullscreen('contract_form', null)}
+                            className="btn bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 transition-all group text-xs md:text-sm"
+                        >
+                            <span className="material-symbols-outlined notranslate text-[18px] md:text-[20px] group-hover:rotate-90 transition-transform" translate="no">add</span> <span className="hidden sm:inline">Tạo Hợp đồng mới</span><span className="sm:hidden">Tạo HĐ</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -555,17 +563,8 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                             </td>
                                             <td className="px-3 py-2.5 text-center">
                                                 <div className="flex items-center justify-center gap-1">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onOpenFullscreen('contract_form', proj);
-                                                        }}
-                                                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                                        title="Sửa"
-                                                    >
-                                                        <span className="material-symbols-outlined notranslate text-[18px]" translate="no">edit_note</span>
-                                                    </button>
-                                                    {isAdmin && (
+                                                    {hasPermission('edit_contract') && (<button onClick={(e) => { e.stopPropagation(); onOpenFullscreen('contract_form', proj); }} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Sửa"><span className="material-symbols-outlined notranslate text-[18px]" translate="no">edit_note</span></button>)}
+                                                    {hasPermission('delete_contract') && (
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();

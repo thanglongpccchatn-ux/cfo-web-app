@@ -4,10 +4,12 @@ ADD COLUMN IF NOT EXISTS handover_date DATE,
 ADD COLUMN IF NOT EXISTS has_warranty_guarantee BOOLEAN DEFAULT FALSE,
 ADD COLUMN IF NOT EXISTS warranty_duration_months INTEGER DEFAULT 24,
 ADD COLUMN IF NOT EXISTS warranty_percentage DECIMAL DEFAULT 5,
-ADD COLUMN IF NOT EXISTS warranty_schedule JSONB DEFAULT '[]';
+ADD COLUMN IF NOT EXISTS warranty_schedule JSONB DEFAULT '[]',
+ADD COLUMN IF NOT EXISTS is_warranty_collected BOOLEAN DEFAULT FALSE;
 
 COMMENT ON COLUMN projects.handover_date IS 'Ngày nghiệm thu bàn giao thực tế';
 COMMENT ON COLUMN projects.has_warranty_guarantee IS 'Có bảo lãnh bảo hành hay không';
 COMMENT ON COLUMN projects.warranty_duration_months IS 'Thời gian bảo hành (tháng)';
 COMMENT ON COLUMN projects.warranty_percentage IS 'Tỷ lệ % giữ lại bảo hành';
 COMMENT ON COLUMN projects.warranty_schedule IS 'Lịch trình thu hồi bảo hành chi tiết cho trường hợp đặc biệt';
+COMMENT ON COLUMN projects.is_warranty_collected IS 'Trạng thái đã thu hồi tiền bảo hành hay chưa';
