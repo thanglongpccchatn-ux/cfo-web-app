@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { logAudit } from '../lib/auditLog';
 
 function getPaymentStatus(stage, lastExternalPaymentDate) {
     const income = Number(stage.external_income || 0);
@@ -186,9 +187,22 @@ export default function PaymentTracking({ project, onBack, embedded }) {
     const handleAddCdtPayment = async () => {
         if (!cdtForm.date || !cdtForm.amount) return;
         const amount = Number(cdtForm.amount);
-        await supabase.from('external_payment_history').insert([{ payment_stage_id: cdtModal.id, payment_date: cdtForm.date, amount, description: cdtForm.notes }]);
-        const newIncome = Number(cdtModal.external_income) + amount;
+        const { data: insertedData } = await supabase.from('external_payment_history').insert([{ payment_stage_id: cdtModal.id, payment_date: cdtForm.date, amount, description: cdtForm.notes }]).select().single();
+        // Fetch-before-write: lấy giá trị mới nhất từ DB để tránh race condition
+        const { data: freshStage } = await supabase.from('payments').select('external_income').eq('id', cdtModal.id).single();
+        const currentIncome = Number(freshStage?.external_income || 0);
+        const newIncome = currentIncome + amount;
         await supabase.from('payments').update({ external_income: newIncome, status: newIncome > 0 ? 'CĐT Đã thanh toán' : 'Chưa thanh toán' }).eq('id', cdtModal.id);
+        
+        await logAudit({
+            action: 'CREATE',
+            tableName: 'external_payment_history',
+            recordId: insertedData?.id || cdtModal.id,
+            recordName: `Thanh toán CĐT - Đợt ${cdtModal.name}`,
+            changes: { amount: { old: null, new: amount } },
+            metadata: { project_id: project.id }
+        });
+
         setCdtForm({ date: '', amount: '', notes: '' });
         fetchAll();
         const { data: updated } = await supabase.from('payments').select('*').eq('id', cdtModal.id).single();
@@ -199,7 +213,20 @@ export default function PaymentTracking({ project, onBack, embedded }) {
     const handleDeleteCdtPayment = async (record) => {
         if (!window.confirm('Xóa giao dịch này?')) return;
         await supabase.from('external_payment_history').delete().eq('id', record.id);
-        const newIncome = Math.max(0, Number(cdtModal.external_income) - Number(record.amount));
+        
+        await logAudit({
+            action: 'DELETE',
+            tableName: 'external_payment_history',
+            recordId: record.id,
+            recordName: `Xóa Nhận tiền CĐT - Đợt ${cdtModal.name}`,
+            changes: { amount: { old: record.amount, new: null } },
+            metadata: { project_id: project.id }
+        });
+
+        // Fetch-before-write: lấy giá trị mới nhất
+        const { data: freshStage } = await supabase.from('payments').select('external_income').eq('id', cdtModal.id).single();
+        const currentIncome = Number(freshStage?.external_income || 0);
+        const newIncome = Math.max(0, currentIncome - Number(record.amount));
         await supabase.from('payments').update({ external_income: newIncome }).eq('id', cdtModal.id);
         fetchAll();
         const { data: updated } = await supabase.from('payments').select('*').eq('id', cdtModal.id).single();
@@ -217,9 +244,22 @@ export default function PaymentTracking({ project, onBack, embedded }) {
     const handleAddTlSatecoPayment = async () => {
         if (!tlSatecoForm.date || !tlSatecoForm.amount) return;
         const amount = Number(tlSatecoForm.amount);
-        await supabase.from('internal_payment_history').insert([{ payment_stage_id: tlSatecoModal.id, payment_date: tlSatecoForm.date, amount, description: tlSatecoForm.notes }]);
-        const newPaid = Number(tlSatecoModal.internal_paid) + amount;
+        const { data: insertedData } = await supabase.from('internal_payment_history').insert([{ payment_stage_id: tlSatecoModal.id, payment_date: tlSatecoForm.date, amount, description: tlSatecoForm.notes }]).select().single();
+        // Fetch-before-write: lấy giá trị mới nhất từ DB để tránh race condition
+        const { data: freshStage } = await supabase.from('payments').select('internal_paid').eq('id', tlSatecoModal.id).single();
+        const currentPaid = Number(freshStage?.internal_paid || 0);
+        const newPaid = currentPaid + amount;
         await supabase.from('payments').update({ internal_paid: newPaid }).eq('id', tlSatecoModal.id);
+        
+        await logAudit({
+            action: 'CREATE',
+            tableName: 'internal_payment_history',
+            recordId: insertedData?.id || tlSatecoModal.id,
+            recordName: `Thanh toán Nội bộ - Đợt ${tlSatecoModal.name}`,
+            changes: { amount: { old: null, new: amount } },
+            metadata: { project_id: project.id }
+        });
+
         setTlSatecoForm({ date: '', amount: '', notes: '' });
         fetchAll();
         const { data: updated } = await supabase.from('payments').select('*').eq('id', tlSatecoModal.id).single();
@@ -230,7 +270,20 @@ export default function PaymentTracking({ project, onBack, embedded }) {
     const handleDeleteTlSatecoPayment = async (record) => {
         if (!window.confirm('Xóa giao dịch này?')) return;
         await supabase.from('internal_payment_history').delete().eq('id', record.id);
-        const newPaid = Math.max(0, Number(tlSatecoModal.internal_paid) - Number(record.amount));
+        
+        await logAudit({
+            action: 'DELETE',
+            tableName: 'internal_payment_history',
+            recordId: record.id,
+            recordName: `Xóa Lịch sử Thanh toán Nội bộ - Đợt ${tlSatecoModal.name}`,
+            changes: { amount: { old: record.amount, new: null } },
+            metadata: { project_id: project.id }
+        });
+
+        // Fetch-before-write: lấy giá trị mới nhất
+        const { data: freshStage } = await supabase.from('payments').select('internal_paid').eq('id', tlSatecoModal.id).single();
+        const currentPaid = Number(freshStage?.internal_paid || 0);
+        const newPaid = Math.max(0, currentPaid - Number(record.amount));
         await supabase.from('payments').update({ internal_paid: newPaid }).eq('id', tlSatecoModal.id);
         fetchAll();
         const { data: updated } = await supabase.from('payments').select('*').eq('id', tlSatecoModal.id).single();

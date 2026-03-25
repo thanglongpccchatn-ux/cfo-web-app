@@ -1,9 +1,11 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import NotificationBell from './NotificationBell';
 
-export default function Header({ title, subtitle, onAction, isSidebarOpen, setIsSidebarOpen, setActiveTab }) {
+export default function Header({ title, subtitle, onAction, isSidebarOpen, setIsSidebarOpen }) {
     const { profile, logout } = useAuth();
+    const navigate = useNavigate();
     return (
         <header className="h-16 bg-white dark:bg-[#1a2634] flex items-center justify-between px-3 md:px-8 z-10 shadow-sm flex-shrink-0 relative">
             <div className="flex items-center gap-2 md:gap-3">
@@ -44,7 +46,7 @@ export default function Header({ title, subtitle, onAction, isSidebarOpen, setIs
                 )}
 
                 <div className="flex items-center gap-2 md:gap-3 pl-2 md:pl-4 border-l border-slate-200 dark:border-slate-700">
-                    <button onClick={() => setActiveTab && setActiveTab('profile')} className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity cursor-pointer" title="Trang cá nhân">
+                    <button onClick={() => navigate('/profile')} className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity cursor-pointer" title="Trang cá nhân">
                         <div className="text-right hidden md:block">
                             <div className="text-sm font-bold text-slate-800 dark:text-white leading-tight">
                                 {profile?.full_name || 'Admin'}

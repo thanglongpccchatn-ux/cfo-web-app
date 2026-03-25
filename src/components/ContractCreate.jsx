@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import * as drive from '../lib/googleDrive';
 import { logAudit } from '../lib/auditLog';
 import { useNotification } from '../context/NotificationContext';
+import { useToast } from '../context/ToastContext';
 import {
     formatInputNumber, parseFormattedNumber, labelBase, navItems, companyEntities, defaultPartnerForm,
     calculateAllocations
@@ -20,6 +21,7 @@ import ContractBanking from './contract/ContractBanking';
 
 export default function ContractCreate({ onBack, project }) {
     const { sendNotification } = useNotification();
+    const toast = useToast();
     // ── 1. Contract Basic Info ──
     const [name, setName] = useState('');
     const [code, setCode] = useState('');
@@ -281,18 +283,19 @@ export default function ContractCreate({ onBack, project }) {
         const { data, error } = await supabase.from('partners').insert([payload]).select();
         setIsSaving(false);
         if (error) {
-            alert('Lỗi khi tạo đối tác: ' + (error.message || 'Lỗi không xác định'));
+            toast.error('Lỗi khi tạo đối tác: ' + (error.message || 'Lỗi không xác định'));
         } else if (data?.[0]) {
             setPartners(prev => [...prev, data[0]]);
             setPartnerId(data[0].id);
             setShowPartnerModal(false);
             setPartnerForm({...defaultPartnerForm});
+            toast.success('Tạo đối tác thành công!');
         }
     };
 
     const handleSave = async () => {
         if (!name || !code || !partnerId) {
-            alert('Vui lòng điền đủ Tên hợp đồng, Mã và chọn Đối tác!');
+            toast.warning('Vui lòng điền đủ Tên hợp đồng, Mã và chọn Đối tác!');
             return;
         }
         setIsSaving(true);
@@ -352,41 +355,19 @@ export default function ContractCreate({ onBack, project }) {
             acting_entity_id: allCompanies.find(c => (c.company_key || '').toLowerCase() === (actingEntityKey || '').toLowerCase())?.id || null
         };
 
-        let currentPayload = { ...fullPayload };
-        let lastError = null;
         let finalSavedProject = null;
         let success = false;
-        let attempts = 0;
 
-        while (!success && attempts < 15) {
-            attempts++;
-            const { data, error: opError } = project?.id 
-                ? await supabase.from('projects').update(currentPayload).eq('id', project.id).select().single()
-                : await supabase.from('projects').insert([currentPayload]).select().single();
+        const { data, error: opError } = project?.id 
+            ? await supabase.from('projects').update(fullPayload).eq('id', project.id).select().single()
+            : await supabase.from('projects').insert([fullPayload]).select().single();
 
-            if (!opError) {
-                finalSavedProject = data;
-                success = true;
-                break;
-            }
-
-            if (opError.code === 'PGRST204' || (opError.message && (opError.message.includes('column') || opError.message.includes('not found')))) {
-                const matches = opError.message.match(/['"]([^'"]+)['"]/g);
-                if (matches) {
-                    let strippedAny = false;
-                    for (const m of matches) {
-                        const colName = m.replace(/['"]/g, '');
-                        if (currentPayload[colName] !== undefined) {
-                            delete currentPayload[colName];
-                            strippedAny = true;
-                        }
-                    }
-                    if (strippedAny) continue;
-                }
-            }
-            
-            lastError = opError;
-            break;
+        if (!opError) {
+            finalSavedProject = data;
+            success = true;
+        } else {
+            console.error('[ContractCreate] Lỗi lưu hợp đồng:', opError);
+            console.error('[ContractCreate] Payload gửi đi:', fullPayload);
         }
 
         if (success && finalSavedProject && isDriveConnected && !googleDriveFolderId) {
@@ -402,7 +383,7 @@ export default function ContractCreate({ onBack, project }) {
 
         setIsSaving(false);
         if (!success) {
-            alert('Có lỗi khi lưu! ' + (lastError?.message || 'Lỗi không xác định'));
+            toast.error('Có lỗi khi lưu hợp đồng! ' + (opError?.message || 'Lỗi không xác định'));
         } else {
             logAudit({
                 action: project?.id ? 'UPDATE' : 'CREATE',
@@ -432,7 +413,7 @@ export default function ContractCreate({ onBack, project }) {
                 );
             }
 
-            alert(project?.id ? 'Cập nhật Hợp đồng thành công!' : 'Tạo Hợp đồng thành công!');
+            toast.success(project?.id ? 'Cập nhật Hợp đồng thành công!' : 'Tạo Hợp đồng thành công!');
             onBack();
         }
     };
@@ -463,7 +444,7 @@ export default function ContractCreate({ onBack, project }) {
                                 try {
                                     await drive.requestAccessToken();
                                     setIsDriveConnected(true);
-                                } catch (err) { alert('Lỗi kết nối Google: ' + (err.message || 'Hủy')); }
+                                } catch (err) { toast.error('Lỗi kết nối Google: ' + (err.message || 'Hủy')); }
                             }}
                             className="btn bg-white border-blue-200 text-blue-600 hover:bg-blue-50 flex items-center gap-2 shadow-sm px-4"
                         >

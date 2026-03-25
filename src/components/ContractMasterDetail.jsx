@@ -450,33 +450,18 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                 </p>
                             </div>
                         ) : (
-                            <table className="w-full text-[13px] text-left border-separate border-spacing-0 whitespace-nowrap">
-                                <thead className="bg-slate-50 text-slate-500 uppercase tracking-widest text-[9px] font-black sticky top-0 z-20 shadow-sm border-b border-slate-200">
-                                    <tr>
-                                        <Th label="Mã DA/HĐ" sortKey="code" extraClass="px-3" />
-                                        <Th label="Mã Đối tác" sortKey="partnerCode" extraClass="px-3" />
-                                        <Th label="HĐ Trước VAT" sortKey="preVat" align="right" extraClass="border-l border-slate-100 bg-blue-50/30" />
-                                        <Th label="VAT (%)" sortKey="vatPercent" align="right" extraClass="bg-blue-50/30 text-blue-400" />
-                                        <Th label="Giá trị Sau VAT" sortKey="postVat" align="right" extraClass="font-black text-blue-700 bg-blue-50/30" />
-                                        <Th label="Tổng Xuất HĐ" sortKey="totalInvoice" align="right" extraClass="border-l border-slate-100" />
-                                        <Th label="Tổng Đề nghị" sortKey="totalRequested" align="right" />
-                                        <Th label="Tổng Thanh toán" sortKey="totalIncome" align="right" />
-                                        <Th label="Công nợ HĐ" sortKey="debtInvoice" align="right" extraClass="border-l border-rose-50 font-black text-rose-600" />
-                                        <Th label="Công nợ ĐN" sortKey="debtPayment" align="right" extraClass="font-black text-amber-700" />
-                                        <Th label="Trạng thái" sortKey="status" align="center" extraClass="px-3" />
-                                        <th className="px-3 py-3 text-center">Tác vụ</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 bg-white">
+                            <>
+                                {/* Mobile Card View */}
+                                <div className="block lg:hidden space-y-4 p-4 bg-slate-50/50">
                                     {sortedProjects.map(proj => (
-                                        <tr
-                                            key={proj.id}
-                                            onClick={() => handleViewDetail(proj)}
-                                            className={`hover:bg-blue-50/50 transition-colors cursor-pointer group ${proj.vat_percentage === 0 ? 'bg-yellow-50/50' : ''}`}
+                                        <div 
+                                            key={proj.id} 
+                                            onClick={() => handleViewDetail(proj)} 
+                                            className={`bg-white rounded-2xl shadow-sm border p-5 relative cursor-pointer active:scale-[0.98] transition-all overflow-hidden ${proj.vat_percentage === 0 ? 'border-yellow-200' : 'border-slate-200'}`}
                                         >
-                                            <td className="px-3 py-2.5">
+                                            <div className="flex justify-between items-start mb-3">
                                                 <div className="flex items-center gap-2">
-                                                    <div className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter ${
+                                                    <div className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter ${
                                                         activeEntity === 'sateco' ? 'bg-emerald-100 text-emerald-700' :
                                                         (proj.acting_entity_key || '').toLowerCase() === 'thanhphat' ? 'bg-amber-100 text-amber-700' : 
                                                         (proj.acting_entity_key || '').toLowerCase() === 'sateco' ? 'bg-emerald-100 text-emerald-700' : 
@@ -486,73 +471,13 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                          (proj.acting_entity_key || '').toLowerCase() === 'thanhphat' ? 'TP' : 
                                                          (proj.acting_entity_key || '').toLowerCase() === 'sateco' ? 'ST' : 'TL'}
                                                     </div>
-                                                    <div className="font-mono text-[12px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded inline-block border border-blue-100">
-                                                        {proj.internal_code || proj.code}
-                                                    </div>
+                                                    <span className="font-mono text-sm font-bold text-blue-600">{proj.internal_code || proj.code}</span>
                                                 </div>
-                                                {proj.internal_code && proj.code && (
-                                                    <div className="text-[11px] text-slate-400 mt-0.5 font-medium">#{proj.code}</div>
-                                                )}
-                                            </td>
-                                            <td className="px-3 py-2.5">
-                                                <div className="font-bold text-slate-700 truncate uppercase" title={proj.partners?.name || proj.client}>
-                                                    {activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? (
-                                                        <span className="flex items-center gap-1.5 text-slate-700">
-                                                            <span className="material-symbols-outlined text-[16px] text-emerald-600">sync_alt</span>
-                                                            {proj.acting_entity_key === 'thanhphat' ? 'THÀNH PHÁT (Nội bộ)' : 'THĂNG LONG (Nội bộ)'}
-                                                        </span>
-                                                    ) : (
-                                                        proj.partners?.code || proj.partners?.short_name || proj.client || '—'
-                                                    )}
-                                                </div>
-                                                <div className="text-[11px] font-medium text-slate-400 mt-0.5 truncate max-w-[120px]">
-                                                    {activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.name : (proj.partners?.name || proj.client)}
-                                                </div>
-                                            </td>
-                                            <td className="px-2 py-2.5 text-right text-slate-500 border-l border-slate-50">
-                                                {formatBillion(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue / (1 + (proj.internal_vat_percentage ?? 8) / 100) : proj.totalValuePreVat)}
-                                            </td>
-                                            <td className="px-2 py-2.5 text-right">
-                                                {activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? (
-                                                    <span className="text-slate-400 italic">
-                                                        {proj.internal_vat_percentage ?? 8}%
-                                                    </span>
-                                                ) : (
-                                                    proj.vat_percentage === 0 ? (
-                                                        <span className="px-1.5 py-0.5 rounded bg-yellow-400 text-slate-900 text-[10px] font-black border border-yellow-500 shadow-sm uppercase tracking-tighter">
-                                                            0% VAT
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-slate-400 italic">
-                                                            {proj.vat_percentage ?? 8}%
-                                                        </span>
-                                                    )
-                                                )}
-                                            </td>
-                                            <td className="px-2 py-2.5 text-right font-medium text-blue-700 bg-blue-50/10">
-                                                {formatBillion(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue : proj.totalValuePostVat)}
-                                            </td>
-                                            <td className="px-2 py-2.5 text-right text-slate-600 border-l border-slate-50">
-                                                {formatBillion(proj.totalInvoice)}
-                                            </td>
-                                            <td className="px-2 py-2.5 text-right text-slate-600">
-                                                {formatBillion(proj.totalRequested)}
-                                            </td>
-                                            <td className="px-2 py-2.5 text-right font-medium text-emerald-600">
-                                                {formatBillion(proj.totalIncome)}
-                                            </td>
-                                            <td className={`px-2 py-2.5 text-right font-medium border-l border-rose-50/50 ${proj.debtInvoice > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                                {formatBillion(proj.debtInvoice)}
-                                            </td>
-                                            <td className={`px-2 py-2.5 text-right font-medium ${(proj.totalRequested - proj.totalIncome) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-                                                {formatBillion(proj.totalRequested - proj.totalIncome)}
-                                            </td>
-                                            <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
                                                 <select
                                                     value={proj.status || 'Chưa thi công'}
                                                     onChange={(e) => handleStatusChange(proj.id, e.target.value, e)}
                                                     onClick={(e) => e.stopPropagation()}
-                                                    className={`appearance-none cursor-pointer inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border outline-none transition-all hover:shadow-sm focus:ring-2 focus:ring-blue-500/20 ${getStatusColor(proj.status)}`}
+                                                    className={`appearance-none cursor-pointer px-2 py-1 rounded-md text-[10px] font-bold border outline-none ${getStatusColor(proj.status)}`}
                                                 >
                                                     {statusOptionsList.map(opt => (
                                                         <option key={opt} value={opt} className="bg-white text-slate-700 font-medium">
@@ -560,55 +485,215 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                         </option>
                                                     ))}
                                                 </select>
-                                            </td>
-                                            <td className="px-3 py-2.5 text-center">
-                                                <div className="flex items-center justify-center gap-1">
-                                                    {hasPermission('edit_contracts') && (<button onClick={(e) => { e.stopPropagation(); onOpenFullscreen('contract_form', proj); }} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Sửa"><span className="material-symbols-outlined notranslate text-[18px]" translate="no">edit_note</span></button>)}
-                                                    {hasPermission('delete_contracts') && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                console.log('Delete button clicked for:', proj.name);
-                                                                setDeleteConfirm({ id: proj.id, name: proj.name });
-                                                            }}
-                                                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                                            title="Xóa hợp đồng"
-                                                        >
-                                                            <span className="material-symbols-outlined notranslate text-[18px]" translate="no">delete</span>
-                                                        </button>
-                                                    )}
+                                            </div>
+
+                                            <div className="mb-4">
+                                                <p className="font-bold text-slate-800 text-sm line-clamp-1">
+                                                    {activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' 
+                                                        ? (proj.acting_entity_key === 'thanhphat' ? 'THÀNH PHÁT (Nội bộ)' : 'THĂNG LONG (Nội bộ)') 
+                                                        : (proj.partners?.name || proj.client)}
+                                                </p>
+                                                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{proj.name}</p>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl mb-3 border border-slate-100">
+                                                <div>
+                                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Giá trị HĐ (Sau VAT)</p>
+                                                    <p className="text-sm font-black text-blue-700">{formatBillion(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue : proj.totalValuePostVat)} Tỷ</p>
                                                 </div>
-                                            </td>
-                                        </tr>
+                                                <div>
+                                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Đã Thu</p>
+                                                    <p className="text-sm font-black text-emerald-600">{formatBillion(proj.totalIncome)} Tỷ</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Công nợ Hóa Đơn</p>
+                                                    <p className={`text-sm font-black ${proj.debtInvoice > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{formatBillion(proj.debtInvoice)} Tỷ</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Công nợ Đề Nghị</p>
+                                                    <p className={`text-sm font-black ${(proj.totalRequested - proj.totalIncome) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{formatBillion(proj.totalRequested - proj.totalIncome)} Tỷ</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+                                                {hasPermission('edit_contracts') && (
+                                                    <button onClick={(e) => { e.stopPropagation(); onOpenFullscreen('contract_form', proj); }} className="px-3 py-1.5 rounded-lg text-blue-600 bg-blue-50 font-bold text-xs flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[14px]">edit_note</span> Sửa
+                                                    </button>
+                                                )}
+                                                {hasPermission('delete_contracts') && (
+                                                    <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ id: proj.id, name: proj.name }); }} className="px-3 py-1.5 rounded-lg text-rose-600 bg-rose-50 font-bold text-xs flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[14px]">delete</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
                                     ))}
-                                </tbody>
-                                <tfoot className="bg-slate-50 border-t-2 border-slate-300 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] relative z-10">
-                                    <tr className="divide-x divide-slate-200">
-                                        <td colSpan={2} className="px-3 py-4 text-slate-500 uppercase tracking-widest text-[9px] font-black italic bg-slate-100/50">
-                                            TỔNG HỢP TOÀN BỘ ({filteredProjects.length} DA)
-                                        </td>
-                                        <td colSpan={3} className="px-2 py-4 text-right text-blue-700 text-[14px] font-black bg-blue-50/30">
-                                            {formatBillion(totalValueAll)}
-                                        </td>
-                                        <td className="px-2 py-4 text-right text-slate-700 text-[14px] font-black">
-                                            {formatBillion(totalInvoiceAll)}
-                                        </td>
-                                        <td className="px-2 py-4 text-right text-slate-600 text-[14px] font-black bg-slate-50">
-                                            {formatBillion(totalRequestedAll)}
-                                        </td>
-                                        <td className="px-2 py-4 text-right text-emerald-700 text-[14px] font-black bg-emerald-50/30">
-                                            {formatBillion(totalIncomeAll)}
-                                        </td>
-                                        <td className={`px-2 py-4 text-right text-[14px] font-black ${totalDebtInvoiceAll > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                            {formatBillion(totalDebtInvoiceAll)}
-                                        </td>
-                                        <td className={`px-2 py-4 text-right text-[14px] font-black bg-amber-50/20 ${(totalRequestedAll - totalIncomeAll) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-                                            {formatBillion(totalRequestedAll - totalIncomeAll)}
-                                        </td>
-                                        <td colSpan={2} className="bg-slate-100/30"></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+                                </div>
+
+                                {/* Desktop Table View */}
+                                <div className="hidden lg:block">
+                                    <table className="w-full text-[13px] text-left border-separate border-spacing-0 whitespace-nowrap">
+                                        <thead className="bg-slate-50 text-slate-500 uppercase tracking-widest text-[9px] font-black sticky top-0 z-20 shadow-sm border-b border-slate-200">
+                                            <tr>
+                                                <Th label="Mã DA/HĐ" sortKey="code" extraClass="px-3" />
+                                                <Th label="Mã Đối tác" sortKey="partnerCode" extraClass="px-3" />
+                                                <Th label="HĐ Trước VAT" sortKey="preVat" align="right" extraClass="border-l border-slate-100 bg-blue-50/30" />
+                                                <Th label="VAT (%)" sortKey="vatPercent" align="right" extraClass="bg-blue-50/30 text-blue-400" />
+                                                <Th label="Giá trị Sau VAT" sortKey="postVat" align="right" extraClass="font-black text-blue-700 bg-blue-50/30" />
+                                                <Th label="Tổng Xuất HĐ" sortKey="totalInvoice" align="right" extraClass="border-l border-slate-100" />
+                                                <Th label="Tổng Đề nghị" sortKey="totalRequested" align="right" />
+                                                <Th label="Tổng Thanh toán" sortKey="totalIncome" align="right" />
+                                                <Th label="Công nợ HĐ" sortKey="debtInvoice" align="right" extraClass="border-l border-rose-50 font-black text-rose-600" />
+                                                <Th label="Công nợ ĐN" sortKey="debtPayment" align="right" extraClass="font-black text-amber-700" />
+                                                <Th label="Trạng thái" sortKey="status" align="center" extraClass="px-3" />
+                                                <th className="px-3 py-3 text-center">Tác vụ</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 bg-white">
+                                            {sortedProjects.map(proj => (
+                                                <tr
+                                                    key={proj.id}
+                                                    onClick={() => handleViewDetail(proj)}
+                                                    className={`hover:bg-blue-50/50 transition-colors cursor-pointer group ${proj.vat_percentage === 0 ? 'bg-yellow-50/50' : ''}`}
+                                                >
+                                                    <td className="px-3 py-2.5">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter ${
+                                                                activeEntity === 'sateco' ? 'bg-emerald-100 text-emerald-700' :
+                                                                (proj.acting_entity_key || '').toLowerCase() === 'thanhphat' ? 'bg-amber-100 text-amber-700' : 
+                                                                (proj.acting_entity_key || '').toLowerCase() === 'sateco' ? 'bg-emerald-100 text-emerald-700' : 
+                                                                'bg-blue-100 text-blue-700'
+                                                            }`}>
+                                                                {activeEntity === 'sateco' ? 'ST' : 
+                                                                 (proj.acting_entity_key || '').toLowerCase() === 'thanhphat' ? 'TP' : 
+                                                                 (proj.acting_entity_key || '').toLowerCase() === 'sateco' ? 'ST' : 'TL'}
+                                                            </div>
+                                                            <div className="font-mono text-[12px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded inline-block border border-blue-100">
+                                                                {proj.internal_code || proj.code}
+                                                            </div>
+                                                        </div>
+                                                        {proj.internal_code && proj.code && (
+                                                            <div className="text-[11px] text-slate-400 mt-0.5 font-medium">#{proj.code}</div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        <div className="font-bold text-slate-700 truncate uppercase" title={proj.partners?.name || proj.client}>
+                                                            {activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? (
+                                                                <span className="flex items-center gap-1.5 text-slate-700">
+                                                                    <span className="material-symbols-outlined text-[16px] text-emerald-600">sync_alt</span>
+                                                                    {proj.acting_entity_key === 'thanhphat' ? 'THÀNH PHÁT (Nội bộ)' : 'THĂNG LONG (Nội bộ)'}
+                                                                </span>
+                                                            ) : (
+                                                                proj.partners?.code || proj.partners?.short_name || proj.client || '—'
+                                                            )}
+                                                        </div>
+                                                        <div className="text-[11px] font-medium text-slate-400 mt-0.5 truncate max-w-[120px]">
+                                                            {activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.name : (proj.partners?.name || proj.client)}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-2 py-2.5 text-right text-slate-500 border-l border-slate-50">
+                                                        {formatBillion(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue / (1 + (proj.internal_vat_percentage ?? 8) / 100) : proj.totalValuePreVat)}
+                                                    </td>
+                                                    <td className="px-2 py-2.5 text-right">
+                                                        {activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? (
+                                                            <span className="text-slate-400 italic">
+                                                                {proj.internal_vat_percentage ?? 8}%
+                                                            </span>
+                                                        ) : (
+                                                            proj.vat_percentage === 0 ? (
+                                                                <span className="px-1.5 py-0.5 rounded bg-yellow-400 text-slate-900 text-[10px] font-black border border-yellow-500 shadow-sm uppercase tracking-tighter">
+                                                                    0% VAT
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-slate-400 italic">
+                                                                    {proj.vat_percentage ?? 8}%
+                                                                </span>
+                                                            )
+                                                        )}
+                                                    </td>
+                                                    <td className="px-2 py-2.5 text-right font-medium text-blue-700 bg-blue-50/10">
+                                                        {formatBillion(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue : proj.totalValuePostVat)}
+                                                    </td>
+                                                    <td className="px-2 py-2.5 text-right text-slate-600 border-l border-slate-50">
+                                                        {formatBillion(proj.totalInvoice)}
+                                                    </td>
+                                                    <td className="px-2 py-2.5 text-right text-slate-600">
+                                                        {formatBillion(proj.totalRequested)}
+                                                    </td>
+                                                    <td className="px-2 py-2.5 text-right font-medium text-emerald-600">
+                                                        {formatBillion(proj.totalIncome)}
+                                                    </td>
+                                                    <td className={`px-2 py-2.5 text-right font-medium border-l border-rose-50/50 ${proj.debtInvoice > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                        {formatBillion(proj.debtInvoice)}
+                                                    </td>
+                                                    <td className={`px-2 py-2.5 text-right font-medium ${(proj.totalRequested - proj.totalIncome) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                                                        {formatBillion(proj.totalRequested - proj.totalIncome)}
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                                        <select
+                                                            value={proj.status || 'Chưa thi công'}
+                                                            onChange={(e) => handleStatusChange(proj.id, e.target.value, e)}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className={`appearance-none cursor-pointer inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border outline-none transition-all hover:shadow-sm focus:ring-2 focus:ring-blue-500/20 ${getStatusColor(proj.status)}`}
+                                                        >
+                                                            {statusOptionsList.map(opt => (
+                                                                <option key={opt} value={opt} className="bg-white text-slate-700 font-medium">
+                                                                    {opt}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-center">
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            {hasPermission('edit_contracts') && (<button onClick={(e) => { e.stopPropagation(); onOpenFullscreen('contract_form', proj); }} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Sửa"><span className="material-symbols-outlined notranslate text-[18px]" translate="no">edit_note</span></button>)}
+                                                            {hasPermission('delete_contracts') && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        console.log('Delete button clicked for:', proj.name);
+                                                                        setDeleteConfirm({ id: proj.id, name: proj.name });
+                                                                    }}
+                                                                    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                                                    title="Xóa hợp đồng"
+                                                                >
+                                                                    <span className="material-symbols-outlined notranslate text-[18px]" translate="no">delete</span>
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot className="bg-slate-50 border-t-2 border-slate-300 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] relative z-10">
+                                            <tr className="divide-x divide-slate-200">
+                                                <td colSpan={2} className="px-3 py-4 text-slate-500 uppercase tracking-widest text-[9px] font-black italic bg-slate-100/50">
+                                                    TỔNG HỢP TOÀN BỘ ({filteredProjects.length} DA)
+                                                </td>
+                                                <td colSpan={3} className="px-2 py-4 text-right text-blue-700 text-[14px] font-black bg-blue-50/30">
+                                                    {formatBillion(totalValueAll)}
+                                                </td>
+                                                <td className="px-2 py-4 text-right text-slate-700 text-[14px] font-black">
+                                                    {formatBillion(totalInvoiceAll)}
+                                                </td>
+                                                <td className="px-2 py-4 text-right text-slate-600 text-[14px] font-black bg-slate-50">
+                                                    {formatBillion(totalRequestedAll)}
+                                                </td>
+                                                <td className="px-2 py-4 text-right text-emerald-700 text-[14px] font-black bg-emerald-50/30">
+                                                    {formatBillion(totalIncomeAll)}
+                                                </td>
+                                                <td className={`px-2 py-4 text-right text-[14px] font-black ${totalDebtInvoiceAll > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                    {formatBillion(totalDebtInvoiceAll)}
+                                                </td>
+                                                <td className={`px-2 py-4 text-right text-[14px] font-black bg-amber-50/20 ${(totalRequestedAll - totalIncomeAll) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                                                    {formatBillion(totalRequestedAll - totalIncomeAll)}
+                                                </td>
+                                                <td colSpan={2} className="bg-slate-100/30"></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </>
                         )}
                     </div>
                 )}

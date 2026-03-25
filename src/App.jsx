@@ -1,38 +1,42 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
-import DashboardOverview from './components/DashboardOverview';
-import ContractCreate from './components/ContractCreate';
-import PaymentTracking from './components/PaymentTracking';
-import MaterialTracking from './components/MaterialTracking';
-import LaborTracking from './components/LaborTracking';
-import AddendaCreate from './components/AddendaCreate';
-import ContractMasterDetail from './components/ContractMasterDetail';
-import PaymentsMaster from './components/PaymentsMaster';
-import SuppliersMaster from './components/SuppliersMaster';
-import SubcontractorsMaster from './components/SubcontractorsMaster';
-import MaterialsMaster from './components/MaterialsMaster';
-import PartnerManagement from './components/PartnerManagement';
-import UserManagement from './components/UserManagement';
-import RoleManagement from './components/RoleManagement';
-import BankManagement from './components/BankManagement';
-import PlanActualDashboard from './components/PlanActualDashboard';
-import DocumentTrackingModule from './components/DocumentTrackingModule';
-import PaymentReceiptsModule from './components/PaymentReceiptsModule';
-import MonthlyReport from './components/MonthlyReport';
-import ExpenseTracking from './components/ExpenseTracking';
-import WarrantyTracking from './components/WarrantyTracking';
-import PlanningModule from './components/PlanningModule';
-import InventoryManager from './components/Inventory/InventoryManager';
 import { InventoryProvider } from './context/InventoryContext';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import Login from './components/Login';
-import Settings from './components/Settings';
-import UserProfile from './components/UserProfile';
+import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import { applyBrandTheme, currentTheme } from './config/brand';
 import { supabase } from './lib/supabase';
+
+// Lazy load components for code splitting & better initial load performance
+const DashboardOverview = lazy(() => import('./components/DashboardOverview'));
+const ContractCreate = lazy(() => import('./components/ContractCreate'));
+const PaymentTracking = lazy(() => import('./components/PaymentTracking'));
+const MaterialTracking = lazy(() => import('./components/MaterialTracking'));
+const LaborTracking = lazy(() => import('./components/LaborTracking'));
+const AddendaCreate = lazy(() => import('./components/AddendaCreate'));
+const ContractMasterDetail = lazy(() => import('./components/ContractMasterDetail'));
+const PaymentsMaster = lazy(() => import('./components/PaymentsMaster'));
+const SuppliersMaster = lazy(() => import('./components/SuppliersMaster'));
+const SubcontractorsMaster = lazy(() => import('./components/SubcontractorsMaster'));
+const MaterialsMaster = lazy(() => import('./components/MaterialsMaster'));
+const PartnerManagement = lazy(() => import('./components/PartnerManagement'));
+const UserManagement = lazy(() => import('./components/UserManagement'));
+const RoleManagement = lazy(() => import('./components/RoleManagement'));
+const BankManagement = lazy(() => import('./components/BankManagement'));
+const DocumentTrackingModule = lazy(() => import('./components/DocumentTrackingModule'));
+const PaymentReceiptsModule = lazy(() => import('./components/PaymentReceiptsModule'));
+const WarrantyTracking = lazy(() => import('./components/WarrantyTracking'));
+const PlanningModule = lazy(() => import('./components/PlanningModule'));
+const InventoryManager = lazy(() => import('./components/Inventory/InventoryManager'));
+const Settings = lazy(() => import('./components/Settings'));
+const UserProfile = lazy(() => import('./components/UserProfile'));
+
+const queryClient = new QueryClient();
 
 // Premium Coming Soon Component
 function ComingSoon({ title = 'Module' }) {
@@ -47,50 +51,160 @@ function ComingSoon({ title = 'Module' }) {
           Under Dev
         </div>
       </div>
-
-      <h3 className="text-3xl font-black text-slate-800 dark:text-white mb-4 tracking-tight">
-        {title}
-      </h3>
-
+      <h3 className="text-3xl font-black text-slate-800 dark:text-white mb-4 tracking-tight">{title}</h3>
       <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm mx-auto leading-relaxed font-medium">
         Chúng tôi đang nỗ lực hoàn thiện module <span className="text-blue-500 font-bold">{title}</span> để mang lại trải nghiệm quản trị tài chính tốt nhất cho bạn.
       </p>
-
       <div className="mt-12 flex flex-col items-center gap-6">
         <div className="flex items-center gap-3 px-5 py-2.5 bg-slate-100 dark:bg-slate-800/50 rounded-2xl border border-slate-200/50 dark:border-slate-700/30">
-          <div className="flex -space-x-2">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="w-6 h-6 rounded-full border-2 border-white dark:border-slate-900 bg-slate-300 dark:bg-slate-700 flex items-center justify-center text-[8px] font-bold">AI</div>
-            ))}
-          </div>
           <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400">Team Sateco đang xử lý...</span>
-        </div>
-
-        <div className="animate-pulse flex items-center gap-2 text-blue-500 font-black text-[10px] uppercase tracking-widest">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-          Dự kiến ra mắt: Q2 2026
         </div>
       </div>
     </div>
   );
 }
 
-function AppContent() {
-  const { user, loading, hasPermission, profile } = useAuth();
-  const [activeTab, setActiveTab] = useState('dashboard');
+function LoadingSpinner() {
+  return (
+    <div className="flex justify-center items-center h-full w-full min-h-[50vh]">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>
+  );
+}
+
+function ProtectedRoute({ children, requiredPerms = [] }) {
+  const { user, hasPermission, profile, loading } = useAuth();
+  
+  if (loading) return <LoadingSpinner />;
+  if (!user) return <Navigate to="/login" replace />;
+
+  const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
+  if (isAdmin || requiredPerms.length === 0 || requiredPerms.some(p => hasPermission(p))) {
+    return <Suspense fallback={<LoadingSpinner />}>{children}</Suspense>;
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8">
+      <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">gpp_maybe</span>
+      <h3 className="text-xl font-bold text-slate-700">Không có quyền truy cập</h3>
+      <p className="text-slate-500 mt-2">Tài khoản của bạn không được cấp quyền xem phân hệ này.</p>
+    </div>
+  );
+}
+
+function MainLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const location = useLocation();
+  const path = location.pathname.substring(1) || 'dashboard';
   const [fullscreenView, setFullscreenView] = useState({ type: null, data: null });
+
+  // Handle Header titles based on current route
+  const getHeaderInfo = () => {
+    switch (path) {
+      case 'dashboard': return { title: 'Tổng quan Dòng tiền', subtitle: 'Chào mừng trở lại!' };
+      case 'contracts': return { title: 'Quản lý Hợp đồng', subtitle: 'Danh sách và chi tiết dự án' };
+      case 'doc_tracking': return { title: 'Hồ sơ & Thanh toán', subtitle: `${currentTheme.company_name}` };
+      case 'payment_receipts': return { title: 'Lịch sử thu tiền', subtitle: `${currentTheme.company_name}` };
+      case 'suppliers': return { title: 'Nhà cung cấp', subtitle: 'Bảng theo dõi công nợ nhà cung cấp' };
+      case 'subcontractors': return { title: 'Nhà thầu phụ / Tổ đội', subtitle: 'Bảng theo dõi công nợ thầu phụ' };
+      case 'materials': return { title: 'Danh mục Vật tư', subtitle: 'Quản lý danh pháp vật tư chung' };
+      case 'planning_hub': return { title: 'Kế hoạch & Báo cáo', subtitle: 'Kế hoạch dòng tiền tạm tính' };
+      case 'inventory': return { title: 'Kho vật tư', subtitle: 'Quản lý kho vật tư công trình' };
+      case 'settings': return { title: 'Cài đặt hệ thống', subtitle: 'Cấu hình giao diện và thông số chung' };
+      case 'permissions': return { title: 'Phân quyền rủi ro', subtitle: 'Cấu hình quyền hệ thống' };
+      case 'users': return { title: 'Quản lý Người dùng', subtitle: 'Quản lý và kích hoạt tài khoản' };
+      case 'profile': return { title: 'Trang cá nhân', subtitle: 'Thông tin hồ sơ và mật khẩu' };
+      default: return { title: 'Hệ thống Quản trị', subtitle: `${currentTheme.company_name}` };
+    }
+  };
+
+  const { title, subtitle } = getHeaderInfo();
+
+  // Full-screen takeovers (kept for complex sub-flows)
+  if (fullscreenView.type === 'contract_form' || fullscreenView.type === 'contract_new') {
+    return <Suspense fallback={<LoadingSpinner />}><ContractCreate project={fullscreenView.data} onBack={() => setFullscreenView({ type: null, data: null })} /></Suspense>;
+  }
+  if (fullscreenView.type === 'payment_tracking') {
+    return <Suspense fallback={<LoadingSpinner />}><PaymentTracking project={fullscreenView.data} onBack={() => setFullscreenView({ type: null, data: null })} /></Suspense>;
+  }
+  if (fullscreenView.type === 'material_tracking') {
+    return <Suspense fallback={<LoadingSpinner />}><MaterialTracking project={fullscreenView.data} onBack={() => setFullscreenView({ type: null, data: null })} /></Suspense>;
+  }
+  if (fullscreenView.type === 'labor_tracking') {
+    return <Suspense fallback={<LoadingSpinner />}><LaborTracking project={fullscreenView.data} onBack={() => setFullscreenView({ type: null, data: null })} /></Suspense>;
+  }
+  if (fullscreenView.type === 'addenda_new') {
+    return <Suspense fallback={<LoadingSpinner />}><AddendaCreate project={fullscreenView.data} onBack={() => setFullscreenView({ type: null, data: null })} /></Suspense>;
+  }
+
+  return (
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden font-sans relative">
+      {isSidebarOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-30 transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
+
+      <main className="flex-1 flex flex-col h-full overflow-hidden bg-background-light dark:bg-[#111827]">
+        <Header
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
+          title={title}
+          subtitle={subtitle}
+        />
+
+        <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            
+            {/* Core Modules */}
+            <Route path="/dashboard" element={<ProtectedRoute requiredPerms={['view_dashboard']}><DashboardOverview /></ProtectedRoute>} />
+            <Route path="/contracts" element={<ProtectedRoute requiredPerms={['view_contracts']}><ContractMasterDetail onOpenFullscreen={(type, data) => setFullscreenView({ type, data })} /></ProtectedRoute>} />
+            <Route path="/doc_tracking" element={<ProtectedRoute requiredPerms={['view_payments']}><DocumentTrackingModule /></ProtectedRoute>} />
+            <Route path="/payment_receipts" element={<ProtectedRoute requiredPerms={['view_payments']}><PaymentReceiptsModule /></ProtectedRoute>} />
+            <Route path="/warranty_tracking" element={<ProtectedRoute requiredPerms={['view_contracts']}><WarrantyTracking /></ProtectedRoute>} />
+            
+            {/* Financial & Inventory Modules */}
+            <Route path="/payments" element={<ProtectedRoute requiredPerms={['view_payments']}><PaymentsMaster /></ProtectedRoute>} />
+            <Route path="/suppliers" element={<ProtectedRoute requiredPerms={['view_suppliers', 'view_payments']}><SuppliersMaster /></ProtectedRoute>} />
+            <Route path="/subcontractors" element={<ProtectedRoute requiredPerms={['view_suppliers', 'view_payments']}><SubcontractorsMaster /></ProtectedRoute>} />
+            <Route path="/materials" element={<ProtectedRoute requiredPerms={['view_materials', 'view_payments']}><MaterialsMaster /></ProtectedRoute>} />
+            <Route path="/inventory" element={<ProtectedRoute requiredPerms={['view_materials']}><InventoryManager /></ProtectedRoute>} />
+            
+            {/* Other Modules */}
+            <Route path="/planning_hub" element={<ProtectedRoute><PlanningModule /></ProtectedRoute>} />
+            <Route path="/construction" element={<ProtectedRoute><ComingSoon title="Thi công" /></ProtectedRoute>} />
+            <Route path="/partners" element={<ProtectedRoute><PartnerManagement /></ProtectedRoute>} />
+            <Route path="/permissions" element={<ProtectedRoute><RoleManagement /></ProtectedRoute>} />
+            <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
+            <Route path="/banks" element={<ProtectedRoute><BankManagement /></ProtectedRoute>} />
+            
+            {/* App Settings */}
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+            
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function AppContent() {
+  const { user, loading } = useAuth();
   const [themeLoaded, setThemeLoaded] = useState(false);
 
   useEffect(() => {
     const loadTheme = async () => {
       try {
-        const { data, error } = await supabase.from('theme_settings').select('*').limit(1).maybeSingle();
-        if (data) {
-          applyBrandTheme(data);
-        } else {
-          applyBrandTheme(null);
-        }
+        const { data } = await supabase.from('theme_settings').select('*').limit(1).maybeSingle();
+        applyBrandTheme(data || null);
       } catch (err) {
         applyBrandTheme(null);
       }
@@ -99,147 +213,29 @@ function AppContent() {
     loadTheme();
   }, []);
 
-  if (loading || !themeLoaded) {
-    return (
-      <div className="flex justify-center items-center h-screen bg-slate-50 dark:bg-slate-900">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Login />;
-  }
-
-  // Full-screen takeovers
-  if (fullscreenView.type === 'contract_form' || fullscreenView.type === 'contract_new') {
-    return <ContractCreate project={fullscreenView.data} onBack={() => setFullscreenView({ type: null, data: null })} />;
-  }
-  if (fullscreenView.type === 'payment_tracking') {
-    return <PaymentTracking project={fullscreenView.data} onBack={() => setFullscreenView({ type: null, data: null })} />;
-  }
-  if (fullscreenView.type === 'material_tracking') {
-    return <MaterialTracking project={fullscreenView.data} onBack={() => setFullscreenView({ type: null, data: null })} />;
-  }
-  if (fullscreenView.type === 'labor_tracking') {
-    return <LaborTracking project={fullscreenView.data} onBack={() => setFullscreenView({ type: null, data: null })} />;
-  }
-  if (fullscreenView.type === 'addenda_new') {
-    return <AddendaCreate project={fullscreenView.data} onBack={() => setFullscreenView({ type: null, data: null })} />;
-  }
-
-  // Regular routing
-  const renderContent = () => {
-    const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
-    switch (activeTab) {
-      case 'dashboard':
-        return (hasPermission('view_dashboard') || isAdmin) ? <DashboardOverview /> : (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8">
-                <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">gpp_maybe</span>
-                <h3 className="text-xl font-bold text-slate-700">Không có quyền truy cập</h3>
-                <p className="text-slate-500 mt-2">Tài khoản của bạn không được cấp quyền xem Tổng quan.<br/>Vui lòng chọn chức năng khác ở menu bên trái.</p>
-            </div>
-        );
-      case 'contracts':
-        return (hasPermission('view_contracts') || isAdmin) ? <ContractMasterDetail onOpenFullscreen={(type, data) => setFullscreenView({ type, data })} /> : null;
-      case 'doc_tracking':
-        return (hasPermission('view_payments') || isAdmin) ? <DocumentTrackingModule /> : null;
-      case 'payment_receipts':
-        return (hasPermission('view_payments') || isAdmin) ? <PaymentReceiptsModule /> : null;
-      case 'warranty_tracking':
-        return (hasPermission('view_contracts') || isAdmin) ? <WarrantyTracking /> : null;
-      case 'payments':
-        return <PaymentsMaster />;
-      case 'suppliers':
-        return <SuppliersMaster />;
-      case 'subcontractors':
-        return <SubcontractorsMaster />;
-      case 'materials':
-        return <MaterialsMaster />;
-      case 'inventory':
-        return <InventoryManager />;
-      case 'planning_hub':
-        return <PlanningModule />;
-      case 'construction':
-        return <ComingSoon title="Thi công" />;
-      case 'partners':
-        return <PartnerManagement />;
-      case 'permissions':
-        return <RoleManagement />;
-      case 'users':
-        return <UserManagement />;
-      case 'banks':
-        return <BankManagement />;
-      case 'settings':
-        return <Settings />;
-      case 'profile':
-        return <UserProfile />;
-      default:
-        return <ComingSoon title="Module này" />;
-    }
-  };
-
-  return (
-    <ToastProvider>
-      <InventoryProvider>
-        <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden font-sans relative">
-          
-          {/* Mobile Sidebar Backdrop */}
-          {isSidebarOpen && (
-            <div 
-              className="md:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-30 transition-opacity"
-              onClick={() => setIsSidebarOpen(false)}
-              aria-hidden="true"
-            />
-          )}
-
-          <Sidebar
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            isSidebarOpen={isSidebarOpen}
-            setIsSidebarOpen={setIsSidebarOpen}
-          />
-
-          <main className="flex-1 flex flex-col h-full overflow-hidden bg-background-light dark:bg-[#111827]">
-            <Header
-              isSidebarOpen={isSidebarOpen}
-              setIsSidebarOpen={setIsSidebarOpen}
-              setActiveTab={setActiveTab}
-              title={
-                activeTab === 'dashboard' ? 'Tổng quan Dòng tiền' :
-                  activeTab === 'contracts' ? 'Quản lý Hợp đồng' :
-                    activeTab === 'doc_tracking' ? 'Hồ sơ & Thanh toán' :
-                      activeTab === 'payment_receipts' ? 'Lịch sử thu tiền' :
-                        activeTab === 'suppliers' ? 'Nhà cung cấp' :
-                          activeTab === 'subcontractors' ? 'Nhà thầu phụ / Tổ đội' :
-                            activeTab === 'planning_hub' ? 'Kế hoạch & Báo cáo' :
-                              activeTab === 'inventory' ? 'Kho vật tư' :
-                                activeTab === 'settings' ? 'Cài đặt hệ thống' :
-                                  activeTab === 'permissions' ? 'Phân quyền rủi ro' :
-                                    activeTab === 'users' ? 'Quản lý Người dùng' :
-                                      activeTab === 'profile' ? 'Trang cá nhân' : 'Hệ thống Quản trị'
-              }
-              subtitle={activeTab === 'dashboard' ? "Chào mừng trở lại!" : activeTab === 'contracts' ? "Danh sách và chi tiết dự án" : activeTab === 'inventory' ? "Quản lý kho vật tư công trình" : `${currentTheme.company_name} ${currentTheme.sub_name}`}
-              onAction={activeTab === 'contracts' ? () => setFullscreenView({ type: 'contract_new', data: null }) : null}
-            />
-
-            <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
-              {renderContent()}
-            </div>
-          </main>
-        </div>
-      </InventoryProvider>
-    </ToastProvider>
-  );
+  if (loading || !themeLoaded) return <LoadingSpinner />;
+  if (!user) return <Login />;
+  
+  return <MainLayout />;
 }
 
 function App() {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <AppContent />
-      </NotificationProvider>
-    </AuthProvider>
+    <GlobalErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AuthProvider>
+            <NotificationProvider>
+              <ToastProvider>
+                <InventoryProvider>
+                  <AppContent />
+                </InventoryProvider>
+              </ToastProvider>
+            </NotificationProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </GlobalErrorBoundary>
   );
 }
 

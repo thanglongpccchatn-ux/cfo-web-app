@@ -1,178 +1,157 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { CashFlowChart, PortfolioChart, ReceivablesAgingChart, TopProfitChart } from './DashboardCharts';
 
 const formatVND = (v) => v ? Number(Math.round(v)).toLocaleString('vi-VN') : '0';
 
 export default function DashboardOverview() {
-    const [stats, setStats] = useState({ 
-        totalProjects: 0, 
-        pendingPayments: 0, 
-        approvedPayments: 0
-    });
-    const [financials, setFinancials] = useState({
-        totalValueAll: 0,
-        totalIncomeAll: 0,
-        totalDebtInvoiceAll: 0,
-        totalRequestedAll: 0,
-        totalInvoiceAll: 0,
-        recoveryRate: 0
-    });
-    const [performance, setPerformance] = useState({
-        avg_lng_dt: 0,
-        avg_sl_cp: 0,
-        avg_spi: 1,
-        avg_dt_sl: 0,
-        avg_thu_dt: 0,
-        avg_thu_chi: 0
-    });
-    const [chartData, setChartData] = useState({
-        trend: { labels: [], values: [] },
-        portfolio: { labels: [], values: [] },
-        aging: { labels: [], invoiceValues: [], incomeValues: [] },
-        topProfit: { labels: [], values: [] }
-    });
-    const [loading, setLoading] = useState(true);
+    const { data: dashboardData, isLoading: loading } = useQuery({
+        queryKey: ['dashboard-overview-data'],
+        staleTime: 1000 * 60 * 5, // 5 minutes cache
+        queryFn: async () => {
+            // 1. Basic Counts
+            const { count: projCount } = await supabase.from('projects').select('*', { count: 'exact', head: true });
+            const { count: pendingCount } = await supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'Chờ duyệt');
+            const { count: approvedCount } = await supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'Đã duyệt');
+            
+            const stats = {
+                totalProjects: projCount || 0,
+                pendingPayments: pendingCount || 0,
+                approvedPayments: approvedCount || 0
+            };
 
-    useEffect(() => {
-        const fetchStats = async () => {
-            setLoading(true);
-            try {
-                // 1. Basic Counts
-                const { count: projCount } = await supabase.from('projects').select('*', { count: 'exact', head: true });
-                const { count: pendingCount } = await supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'Chờ duyệt');
-                const { count: approvedCount } = await supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'Đã duyệt');
-                
-                setStats({
-                    totalProjects: projCount || 0,
-                    pendingPayments: pendingCount || 0,
-                    approvedPayments: approvedCount || 0
+            // 2. Performance & Financial Metrics
+            const { data: projs } = await supabase.from('projects').select('*');
+            const { data: pmts } = await supabase.from('payments').select('*');
+            const { data: adds } = await supabase.from('addendas').select('*').eq('status', 'Đã duyệt');
+            const { data: extHist } = await supabase.from('external_payment_history').select('*');
+            const { data: intHist } = await supabase.from('internal_payment_history').select('*');
+            
+            let financials = { totalValueAll: 0, totalIncomeAll: 0, totalDebtInvoiceAll: 0, totalRequestedAll: 0, totalInvoiceAll: 0, recoveryRate: 0 };
+            let performance = { avg_lng_dt: 0, avg_sl_cp: 0, avg_spi: 1, avg_dt_sl: 0, avg_thu_dt: 0, avg_thu_chi: 0 };
+            let chartData = { trend: { labels: [], values: [] }, portfolio: { labels: [], values: [] }, aging: { labels: [], invoiceValues: [], incomeValues: [] }, topProfit: { labels: [], values: [] } };
+
+            if (projs && projs.length > 0) {
+                const processed = projs.map(p => {
+                    const projPmts = (pmts || []).filter(pm => pm.project_id === p.id);
+                    const projExtHist = (extHist || []).filter(h => h.project_id === p.id);
+                    const projIntHist = (intHist || []).filter(h => h.project_id === p.id);
+
+                    const totalValuePreVat = parseFloat(p.original_value) || 0;
+                    const vatAmount = p.vat_amount || (totalValuePreVat * (p.vat_percentage ?? 8) / 100);
+                    const totalValuePostVat = p.total_value_post_vat || (totalValuePreVat + vatAmount);
+
+                    const totalIncomeFromHistory = projExtHist.reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
+                    const totalIncomeFromPayments = projPmts.reduce((sum, pm) => sum + (parseFloat(pm.external_income) || 0), 0);
+                    const totalIncome = totalIncomeFromHistory > 0 ? totalIncomeFromHistory : totalIncomeFromPayments;
+
+                    const totalInvoice = projPmts.reduce((sum, pay) => sum + (parseFloat(pay.invoice_amount) || 0), 0);
+                    const totalRequested = projPmts.reduce((sum, pay) => sum + (parseFloat(pay.payment_request_amount) || 0), 0);
+                    
+                    const satecoInternalRevenue = parseFloat(p.sateco_internal_revenue) || (totalValuePostVat * (parseFloat(p.sateco_contract_ratio || 98) / 100));
+                    const totalExpensesSateco = projIntHist.reduce((sum, h) => sum + (parseFloat(h.amount_spent) || 0), 0);
+                    
+                    const profit = (totalIncome * (parseFloat(p.sateco_actual_ratio || 95.5) / 100)) - totalExpensesSateco;
+
+                    return { ...p, totalIncome, totalInvoice, totalRequested, totalValuePostVat, satecoInternalRevenue, totalExpensesSateco, profit };
                 });
 
-                // 2. Performance & Financial Metrics
-                const { data: projs } = await supabase.from('projects').select('*');
-                const { data: pmts } = await supabase.from('payments').select('*');
-                const { data: adds } = await supabase.from('addendas').select('*').eq('status', 'Đã duyệt');
-                const { data: extHist } = await supabase.from('external_payment_history').select('*');
-                const { data: intHist } = await supabase.from('internal_payment_history').select('*');
+                // Aggregate Financials
+                const totalValueAll = processed.reduce((s, p) => s + (p.totalValuePostVat || 0), 0);
+                const totalIncomeAll = processed.reduce((s, p) => s + (p.totalIncome || 0), 0);
+                const totalInvoiceAll = processed.reduce((s, p) => s + (p.totalInvoice || 0), 0);
+                const totalRequestedAll = processed.reduce((s, p) => s + (p.totalRequested || 0), 0);
+                const totalDebtInvoiceAll = totalInvoiceAll - totalIncomeAll;
+                const recoveryRate = totalValueAll > 0 ? (totalIncomeAll / totalValueAll) * 100 : 0;
+
+                financials = { totalValueAll, totalIncomeAll, totalDebtInvoiceAll, totalRequestedAll, totalInvoiceAll, recoveryRate };
+
+                // 3. Chart Data Processing
+                // Trend Chart (Last 6 Months Income)
+                const monthlyIncome = {};
+                (extHist || []).forEach(h => {
+                    const date = new Date(h.payment_date);
+                    const key = `Tháng ${date.getMonth() + 1}/${date.getFullYear().toString().slice(-2)}`;
+                    monthlyIncome[key] = (monthlyIncome[key] || 0) + (parseFloat(h.amount) || 0);
+                });
+                const trendLabels = Object.keys(monthlyIncome).sort().slice(-6);
+                const trendValues = trendLabels.map(l => monthlyIncome[l]);
+
+                // Portfolio Chart (Value by Status)
+                const statusGroups = {};
+                processed.forEach(p => {
+                    statusGroups[p.status || 'Khác'] = (statusGroups[p.status || 'Khác'] || 0) + (p.totalValuePostVat || 0);
+                });
                 
-                if (projs && projs.length > 0) {
-                    const processed = projs.map(p => {
-                        const projPmts = (pmts || []).filter(pm => pm.project_id === p.id);
-                        const projExtHist = (extHist || []).filter(h => h.project_id === p.id);
-                        const projIntHist = (intHist || []).filter(h => h.project_id === p.id);
+                // Aging Chart (Monthly Invoice vs Income)
+                const monthlyInvoice = {};
+                const monthlyRec = {};
+                (pmts || []).forEach(pm => {
+                    const date = new Date(pm.created_at);
+                    const key = `${date.getMonth() + 1}/${date.getFullYear().toString().slice(-2)}`;
+                    monthlyInvoice[key] = (monthlyInvoice[key] || 0) + (parseFloat(pm.invoice_amount) || 0);
+                    monthlyRec[key] = (monthlyRec[key] || 0) + (parseFloat(pm.external_income) || 0);
+                });
+                const agingLabels = Object.keys(monthlyInvoice).sort().slice(-6);
+                
+                // Top Profit
+                const top5Profit = [...processed].sort((a,b) => b.profit - a.profit).slice(0, 5);
 
-                        const totalValuePreVat = parseFloat(p.original_value) || 0;
-                        const vatAmount = p.vat_amount || (totalValuePreVat * (p.vat_percentage ?? 8) / 100);
-                        const totalValuePostVat = p.total_value_post_vat || (totalValuePreVat + vatAmount);
+                chartData = {
+                    trend: { labels: trendLabels, values: trendValues },
+                    portfolio: { labels: Object.keys(statusGroups), values: Object.values(statusGroups) },
+                    aging: { 
+                        labels: agingLabels, 
+                        invoiceValues: agingLabels.map(l => monthlyInvoice[l] || 0), 
+                        incomeValues: agingLabels.map(l => monthlyRec[l] || 0) 
+                    },
+                    topProfit: { 
+                        labels: top5Profit.map(p => p.code || p.name || 'N/A').map(s => String(s).length > 15 ? String(s).slice(0,12)+'...' : s), 
+                        values: top5Profit.map(p => p.profit) 
+                    }
+                };
 
-                        const totalIncomeFromHistory = projExtHist.reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
-                        const totalIncomeFromPayments = projPmts.reduce((sum, pm) => sum + (parseFloat(pm.external_income) || 0), 0);
-                        const totalIncome = totalIncomeFromHistory > 0 ? totalIncomeFromHistory : totalIncomeFromPayments;
+                // Aggregate Performance
+                const projectsWithData = processed.filter(p => (parseFloat(p.totalValuePostVat) || 0) > 0);
+                const count = projectsWithData.length || 1;
 
-                        const totalInvoice = projPmts.reduce((sum, pay) => sum + (parseFloat(pay.invoice_amount) || 0), 0);
-                        const totalRequested = projPmts.reduce((sum, pay) => sum + (parseFloat(pay.payment_request_amount) || 0), 0);
-                        
-                        const satecoInternalRevenue = parseFloat(p.sateco_internal_revenue) || (totalValuePostVat * (parseFloat(p.sateco_contract_ratio || 98) / 100));
-                        const totalExpensesSateco = projIntHist.reduce((sum, h) => sum + (parseFloat(h.amount_spent) || 0), 0);
-                        
-                        const profit = (totalIncome * (parseFloat(p.sateco_actual_ratio || 95.5) / 100)) - totalExpensesSateco;
+                const avg_lng_dt = projectsWithData.reduce((acc, p) => {
+                    const satecoNetProfit = (p.totalIncome * (parseFloat(p.sateco_actual_ratio || 95.5) / 100)) - (p.totalExpensesSateco || 0);
+                    return acc + (p.satecoInternalRevenue > 0 ? (satecoNetProfit / p.satecoInternalRevenue) * 100 : 0);
+                }, 0) / count;
 
-                        return { ...p, totalIncome, totalInvoice, totalRequested, totalValuePostVat, satecoInternalRevenue, totalExpensesSateco, profit };
-                    });
+                const avg_sl_cp = projectsWithData.reduce((acc, p) => {
+                    return acc + (p.totalInvoice > 0 ? (((p.totalInvoice || 0) - (p.totalExpensesSateco || 0)) / p.totalInvoice) * 100 : 0);
+                }, 0) / count;
 
-                    // Aggregate Financials
-                    const totalValueAll = processed.reduce((s, p) => s + (p.totalValuePostVat || 0), 0);
-                    const totalIncomeAll = processed.reduce((s, p) => s + (p.totalIncome || 0), 0);
-                    const totalInvoiceAll = processed.reduce((s, p) => s + (p.totalInvoice || 0), 0);
-                    const totalRequestedAll = processed.reduce((s, p) => s + (p.totalRequested || 0), 0);
-                    const totalDebtInvoiceAll = totalInvoiceAll - totalIncomeAll;
-                    const recoveryRate = totalValueAll > 0 ? (totalIncomeAll / totalValueAll) * 100 : 0;
+                const avg_spi = projectsWithData.reduce((acc, p) => {
+                    const today = new Date();
+                    const start = new Date(p.start_date);
+                    const end = new Date(p.end_date);
+                    const total = Math.max(1, (end - start) / 86400000);
+                    const passed = Math.max(0, (today - start) / 86400000);
+                    const planned = (p.satecoInternalRevenue || 0) * Math.min(1, passed / total);
+                    return acc + (planned > 0 ? (p.totalInvoice / planned) : 1);
+                }, 0) / count;
 
-                    setFinancials({ totalValueAll, totalIncomeAll, totalDebtInvoiceAll, totalRequestedAll, totalInvoiceAll, recoveryRate });
+                const avg_dt_sl = projectsWithData.reduce((acc, p) => acc + (p.totalInvoice > 0 ? (p.totalIncome / p.totalInvoice) * 100 : 0), 0) / count;
+                const avg_thu_dt = projectsWithData.reduce((acc, p) => acc + (p.satecoInternalRevenue > 0 ? (p.totalIncome / p.satecoInternalRevenue) * 100 : 0), 0) / count;
+                const avg_thu_chi = projectsWithData.reduce((acc, p) => acc + (p.totalExpensesSateco > 0 ? (p.totalIncome / p.totalExpensesSateco) : 0), 0) / count;
 
-                    // 3. Chart Data Processing
-                    // Trend Chart (Last 6 Months Income)
-                    const monthlyIncome = {};
-                    (extHist || []).forEach(h => {
-                        const date = new Date(h.payment_date);
-                        const key = `Tháng ${date.getMonth() + 1}/${date.getFullYear().toString().slice(-2)}`;
-                        monthlyIncome[key] = (monthlyIncome[key] || 0) + (parseFloat(h.amount) || 0);
-                    });
-                    const trendLabels = Object.keys(monthlyIncome).sort().slice(-6);
-                    const trendValues = trendLabels.map(l => monthlyIncome[l]);
-
-                    // Portfolio Chart (Value by Status)
-                    const statusGroups = {};
-                    processed.forEach(p => {
-                        statusGroups[p.status || 'Khác'] = (statusGroups[p.status || 'Khác'] || 0) + (p.totalValuePostVat || 0);
-                    });
-                    
-                    // Aging Chart (Monthly Invoice vs Income)
-                    const monthlyInvoice = {};
-                    const monthlyRec = {};
-                    (pmts || []).forEach(pm => {
-                        const date = new Date(pm.created_at);
-                        const key = `${date.getMonth() + 1}/${date.getFullYear().toString().slice(-2)}`;
-                        monthlyInvoice[key] = (monthlyInvoice[key] || 0) + (parseFloat(pm.invoice_amount) || 0);
-                        monthlyRec[key] = (monthlyRec[key] || 0) + (parseFloat(pm.external_income) || 0);
-                    });
-                    const agingLabels = Object.keys(monthlyInvoice).sort().slice(-6);
-                    
-                    // Top Profit
-                    const top5Profit = [...processed].sort((a,b) => b.profit - a.profit).slice(0, 5);
-
-                    setChartData({
-                        trend: { labels: trendLabels, values: trendValues },
-                        portfolio: { labels: Object.keys(statusGroups), values: Object.values(statusGroups) },
-                        aging: { 
-                            labels: agingLabels, 
-                            invoiceValues: agingLabels.map(l => monthlyInvoice[l] || 0), 
-                            incomeValues: agingLabels.map(l => monthlyRec[l] || 0) 
-                        },
-                        topProfit: { 
-                            labels: top5Profit.map(p => p.code || p.name || 'N/A').map(s => String(s).length > 15 ? String(s).slice(0,12)+'...' : s), 
-                            values: top5Profit.map(p => p.profit) 
-                        }
-                    });
-
-                    // Aggregate Performance
-                    const projectsWithData = processed.filter(p => (parseFloat(p.totalValuePostVat) || 0) > 0);
-                    const count = projectsWithData.length || 1;
-
-                    const avg_lng_dt = projectsWithData.reduce((acc, p) => {
-                        const satecoNetProfit = (p.totalIncome * (parseFloat(p.sateco_actual_ratio || 95.5) / 100)) - (p.totalExpensesSateco || 0);
-                        return acc + (p.satecoInternalRevenue > 0 ? (satecoNetProfit / p.satecoInternalRevenue) * 100 : 0);
-                    }, 0) / count;
-
-                    const avg_sl_cp = projectsWithData.reduce((acc, p) => {
-                        return acc + (p.totalInvoice > 0 ? (((p.totalInvoice || 0) - (p.totalExpensesSateco || 0)) / p.totalInvoice) * 100 : 0);
-                    }, 0) / count;
-
-                    const avg_spi = projectsWithData.reduce((acc, p) => {
-                        const today = new Date();
-                        const start = new Date(p.start_date);
-                        const end = new Date(p.end_date);
-                        const total = Math.max(1, (end - start) / 86400000);
-                        const passed = Math.max(0, (today - start) / 86400000);
-                        const planned = (p.satecoInternalRevenue || 0) * Math.min(1, passed / total);
-                        return acc + (planned > 0 ? (p.totalInvoice / planned) : 1);
-                    }, 0) / count;
-
-                    const avg_dt_sl = projectsWithData.reduce((acc, p) => acc + (p.totalInvoice > 0 ? (p.totalIncome / p.totalInvoice) * 100 : 0), 0) / count;
-                    const avg_thu_dt = projectsWithData.reduce((acc, p) => acc + (p.satecoInternalRevenue > 0 ? (p.totalIncome / p.satecoInternalRevenue) * 100 : 0), 0) / count;
-                    const avg_thu_chi = projectsWithData.reduce((acc, p) => acc + (p.totalExpensesSateco > 0 ? (p.totalIncome / p.totalExpensesSateco) : 0), 0) / count;
-
-                    setPerformance({ avg_lng_dt, avg_sl_cp, avg_spi, avg_dt_sl, avg_thu_dt, avg_thu_chi });
-                }
-            } catch (error) {
-                console.error("Error fetching stats:", error);
-            } finally {
-                setLoading(false);
+                performance = { avg_lng_dt, avg_sl_cp, avg_spi, avg_dt_sl, avg_thu_dt, avg_thu_chi };
             }
-        };
-        fetchStats();
-    }, []);
+
+            return { stats, financials, chartData, performance };
+        }
+    });
+
+    const { stats, financials, chartData, performance } = dashboardData || {
+        stats: { totalProjects: 0, pendingPayments: 0, approvedPayments: 0 },
+        financials: { totalValueAll: 0, totalIncomeAll: 0, totalDebtInvoiceAll: 0, totalRequestedAll: 0, totalInvoiceAll: 0, recoveryRate: 0 },
+        performance: { avg_lng_dt: 0, avg_sl_cp: 0, avg_spi: 1, avg_dt_sl: 0, avg_thu_dt: 0, avg_thu_chi: 0 },
+        chartData: { trend: { labels: [], values: [] }, portfolio: { labels: [], values: [] }, aging: { labels: [], invoiceValues: [], incomeValues: [] }, topProfit: { labels: [], values: [] } }
+    };
 
     const formatBillion = (val) => {
         if (!val) return '0';

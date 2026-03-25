@@ -1,8 +1,12 @@
 import { useAuth } from '../context/AuthContext';
 import { currentTheme } from '../config/brand';
+import { NavLink, useLocation } from 'react-router-dom';
 
-export default function Sidebar({ activeTab, setActiveTab, isSidebarOpen = true, setIsSidebarOpen }) {
+export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
     const { profile, hasPermission, logout } = useAuth();
+    const location = useLocation();
+    // activeTab giờ sẽ được suy ra từ location.pathname
+    const activeTab = location.pathname.substring(1) || 'dashboard';
     
     // Admin always has full access to all tabs. Otherwise, check permissions.
     const canView = (perms) => {
@@ -76,22 +80,26 @@ export default function Sidebar({ activeTab, setActiveTab, isSidebarOpen = true,
 
             <nav className={`flex-1 overflow-y-auto py-6 space-y-1 ${isSidebarOpen ? 'px-4' : 'px-2'}`}>
                 {tabs.map(item => (
-                    <button
+                    <NavLink
                         key={item.id}
+                        to={`/${item.id}`}
                         onClick={() => {
-                            setActiveTab(item.id);
-                            if (window.innerWidth < 768) setIsSidebarOpen(false);
+                            if (window.innerWidth < 768 && setIsSidebarOpen) setIsSidebarOpen(false);
                         }}
                         title={!isSidebarOpen ? item.label : undefined}
-                        className={`w-full flex items-center py-2.5 rounded-lg transition-all mb-1 ${isSidebarOpen ? 'px-3 gap-3' : 'justify-center px-0'
-                            } ${activeTab === item.id
+                        className={({ isActive }) => `w-full flex items-center py-2.5 rounded-lg transition-all mb-1 ${isSidebarOpen ? 'px-3 gap-3' : 'justify-center px-0'
+                            } ${isActive || (activeTab === item.id)
                                 ? 'bg-primary/10 text-primary font-semibold'
                                 : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white group font-medium'
                             }`}
                     >
-                        <span className={`material-symbols-outlined text-[20px] flex-shrink-0 ${activeTab === item.id ? 'filled' : ''}`}>{item.icon}</span>
-                        {isSidebarOpen && <span className="text-sm truncate animate-fade-in">{item.label}</span>}
-                    </button>
+                        {({ isActive }) => (
+                            <>
+                                <span className={`material-symbols-outlined text-[20px] flex-shrink-0 ${isActive || activeTab === item.id ? 'filled' : ''}`}>{item.icon}</span>
+                                {isSidebarOpen && <span className="text-sm truncate animate-fade-in">{item.label}</span>}
+                            </>
+                        )}
+                    </NavLink>
                 ))}
             </nav>
 
@@ -99,22 +107,26 @@ export default function Sidebar({ activeTab, setActiveTab, isSidebarOpen = true,
             <div className={`border-t border-slate-100 dark:border-slate-700/50 py-4 space-y-1 ${isSidebarOpen ? 'px-4' : 'px-2'}`}>
                 {isSidebarOpen && <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Hệ Thống</p>}
                 {systemTabs.map(item => (
-                    <button
+                    <NavLink
                         key={item.id}
+                        to={`/${item.id}`}
                         onClick={() => {
-                            setActiveTab(item.id);
-                            if (window.innerWidth < 768) setIsSidebarOpen(false);
+                            if (window.innerWidth < 768 && setIsSidebarOpen) setIsSidebarOpen(false);
                         }}
                         title={!isSidebarOpen ? item.label : undefined}
-                        className={`w-full flex items-center py-2.5 rounded-lg transition-all mb-1 ${isSidebarOpen ? 'px-3 gap-3' : 'justify-center px-0'
-                            } ${activeTab === item.id
+                        className={({ isActive }) => `w-full flex items-center py-2.5 rounded-lg transition-all mb-1 ${isSidebarOpen ? 'px-3 gap-3' : 'justify-center px-0'
+                            } ${isActive || (activeTab === item.id)
                                 ? 'bg-primary/10 text-primary font-semibold'
                                 : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white group font-medium'
                             }`}
                     >
-                        <span className={`material-symbols-outlined text-[20px] flex-shrink-0 ${activeTab === item.id ? 'filled' : ''}`}>{item.icon}</span>
-                        {isSidebarOpen && <span className="text-sm truncate animate-fade-in">{item.label}</span>}
-                    </button>
+                        {({ isActive }) => (
+                            <>
+                                <span className={`material-symbols-outlined text-[20px] flex-shrink-0 ${isActive || activeTab === item.id ? 'filled' : ''}`}>{item.icon}</span>
+                                {isSidebarOpen && <span className="text-sm truncate animate-fade-in">{item.label}</span>}
+                            </>
+                        )}
+                    </NavLink>
                 ))}
 
             </div>
