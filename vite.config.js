@@ -9,22 +9,22 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['vite.svg'],
       manifest: {
-        name: 'Thăng Long CFO Dashboard',
-        short_name: 'CFO App',
+        name: 'SATECO CFO Dashboard',
+        short_name: 'SATECO',
         description: 'Quản trị Dòng tiền và Hợp đồng',
         theme_color: '#0f172a',
         background_color: '#f8fafc',
         display: 'standalone',
         icons: [
           {
-            src: 'vite.svg',
+            src: 'logo.png',
             sizes: '192x192',
-            type: 'image/svg+xml'
+            type: 'image/png'
           },
           {
-            src: 'vite.svg',
+            src: 'logo.png',
             sizes: '512x512',
-            type: 'image/svg+xml'
+            type: 'image/png'
           }
         ]
       }

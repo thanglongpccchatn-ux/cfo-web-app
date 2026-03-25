@@ -1,6 +1,6 @@
 export const DEFAULT_THEME = {
-    company_name: "Thăng Long",
-    sub_name: "Construction & Admin",
+    company_name: "SATECO",
+    sub_name: "Mechanical & Electrical",
     logo_url: null,
     logo_icon: 'apartment',
     primary_color: '#005faf',
@@ -49,8 +49,8 @@ export const applyBrandTheme = (dbConfig = null) => {
         }
     }
     
-    // Đổi Title web
-    document.title = `${theme.company_name} - CFO Dashboard`;
+    // Đổi Title web - Luôn ưu tiên hiển thị tên gọn theo yêu cầu người dùng
+    document.title = "SATECO";
 };
 
 
