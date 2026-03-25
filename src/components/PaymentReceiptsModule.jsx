@@ -407,13 +407,13 @@ export default function PaymentReceiptsModule() {
             <header className="flex justify-between items-center bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-full -mr-16 -mt-16 opacity-50"></div>
                 <div className="relative z-10">
-                    <h1 className="text-2xl font-black text-slate-800 flex items-center gap-3">
-                        <span className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg ${activeTab === 'external' ? 'bg-orange-500 shadow-orange-100' : 'bg-indigo-600 shadow-indigo-100'}`}>
-                            <span className="material-symbols-outlined notranslate" translate="no">{activeTab === 'external' ? 'receipt_long' : 'sync_alt'}</span>
+                    <h1 className="text-xl md:text-2xl font-black text-slate-800 flex items-center gap-2 md:gap-3">
+                        <span className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center text-white shadow-lg flex-shrink-0 ${activeTab === 'external' ? 'bg-orange-500 shadow-orange-100' : 'bg-indigo-600 shadow-indigo-100'}`}>
+                            <span className="material-symbols-outlined notranslate text-[20px] md:text-[24px]" translate="no">{activeTab === 'external' ? 'receipt_long' : 'sync_alt'}</span>
                         </span>
-                        Lịch sử tiền {activeTab === 'external' ? 'Thu từ CĐT' : 'Chuyển cho Sateco'}
+                        Lịch sử tiền {activeTab === 'external' ? 'Thu' : 'Chuyển'}
                     </h1>
-                    <p className="text-slate-500 text-sm mt-1 font-medium">Theo dõi dòng tiền thực tế {activeTab === 'external' ? 'về từ Chủ đầu tư' : 'chuyển khoản nội bộ'} tập trung</p>
+                    <p className="text-slate-500 text-[10px] md:text-sm mt-1 font-medium italic ml-10 md:ml-[52px]">Theo dõi dòng tiền thực tế tập trung</p>
                 </div>
 
                 <div className="flex items-center gap-3 relative z-10">
@@ -429,33 +429,33 @@ export default function PaymentReceiptsModule() {
 
             {/* Tabs Navigation */}
             <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner overflow-x-auto w-full md:w-fit scrollbar-none">
                     <button 
                         onClick={() => setActiveTab('external')}
-                        className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'external' ? 'bg-white text-orange-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`flex items-center gap-1.5 md:gap-2 px-4 md:px-6 py-2 rounded-xl text-xs md:text-sm font-black transition-all whitespace-nowrap ${activeTab === 'external' ? 'bg-white text-orange-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
                     >
-                        <span className="material-symbols-outlined notranslate text-[20px]" translate="no">account_balance_wallet</span>
-                        1. Thu từ Chủ đầu tư
+                        <span className="material-symbols-outlined notranslate text-[18px] md:text-[20px]" translate="no">account_balance_wallet</span>
+                        1. Thu CĐT
                     </button>
                     <button 
                         onClick={() => setActiveTab('internal')}
-                        className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'internal' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`flex items-center gap-1.5 md:gap-2 px-4 md:px-6 py-2 rounded-xl text-xs md:text-sm font-black transition-all whitespace-nowrap ${activeTab === 'internal' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
                     >
-                        <span className="material-symbols-outlined notranslate text-[20px]" translate="no">sync_alt</span>
-                        2. Chuyển cho Sateco
+                        <span className="material-symbols-outlined notranslate text-[18px] md:text-[20px]" translate="no">sync_alt</span>
+                        2. Nội bộ
                     </button>
                 </div>
 
-                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner overflow-x-auto w-full md:w-fit scrollbar-none">
                     {[
-                        { id: 'all', label: 'TẤT CẢ GROUP' },
+                        { id: 'all', label: 'TẤT CẢ' },
                         { id: 'thanglong', label: 'THĂNG LONG' },
                         { id: 'thanhphat', label: 'THÀNH PHÁT' }
                     ].map(e => (
                         <button
                             key={e.id}
                             onClick={() => setActiveEntity(e.id)}
-                            className={`px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all ${activeEntity === e.id ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+                            className={`px-3 md:px-4 py-2 rounded-xl text-[9px] md:text-[10px] font-black tracking-widest transition-all whitespace-nowrap ${activeEntity === e.id ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
                         >
                             {e.label}
                         </button>
@@ -464,27 +464,27 @@ export default function PaymentReceiptsModule() {
             </div>
 
             {/* Advanced Filters */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                <div className="space-y-1.5 col-span-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tìm kiếm dự án / nội dung</label>
+            <div className="bg-white p-3 md:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:grid md:grid-cols-4 gap-3 md:gap-4 items-end">
+                <div className="space-y-1.5 w-full col-span-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tìm kiếm</label>
                     <div className="relative">
                         <span className="material-symbols-outlined notranslate absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]" translate="no">search</span>
                         <input 
                             type="text" 
-                            placeholder="Mã dự án, mã đợt..."
+                            placeholder="Mã dự án, nội dung..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:bg-white focus:border-blue-500 transition-all outline-none"
+                            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white focus:border-blue-500 transition-all outline-none"
                         />
                     </div>
                 </div>
 
-                <div className="space-y-1.5 col-span-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Lọc theo Đối tác (CĐT)</label>
+                <div className="space-y-1.5 w-full col-span-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Đối tác (CĐT)</label>
                     <select 
                         value={filterPartnerId}
                         onChange={(e) => setFilterPartnerId(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:bg-white focus:border-blue-500 transition-all outline-none"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white focus:border-blue-500 transition-all outline-none appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_10px_center] bg-[size:16px]"
                     >
                         <option value="">-- Tất cả đối tác --</option>
                         {partners.map(p => (
@@ -493,37 +493,35 @@ export default function PaymentReceiptsModule() {
                     </select>
                 </div>
 
-                <div className="space-y-1.5 col-span-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Khoảng ngày {activeTab === 'external' ? 'thu' : 'chuyển'}</label>
+                <div className="space-y-1.5 w-full col-span-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Khoảng ngày</label>
                     <div className="flex items-center gap-2">
                         <input 
                             type="date" 
                             value={dateRange.start}
                             onChange={(e) => { setDateRange(prev => ({ ...prev, start: e.target.value })); setQuickFilter('all'); }}
-                            className="flex-1 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none"
+                            className="flex-1 w-0 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold outline-none"
                         />
                         <span className="text-slate-300 font-bold">→</span>
                         <input 
                             type="date" 
                             value={dateRange.end}
                             onChange={(e) => { setDateRange(prev => ({ ...prev, end: e.target.value })); setQuickFilter('all'); }}
-                            className="flex-1 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none"
+                            className="flex-1 w-0 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold outline-none"
                         />
                     </div>
                 </div>
 
-                <div className="flex flex-wrap gap-1 col-span-1">
+                <div className="flex flex-wrap gap-1 w-full col-span-1 overflow-x-auto pb-1 scrollbar-none">
                     {[
                         { id: 'all', label: 'TẤT CẢ' },
-                        { id: 'thisWeek', label: 'TUẦN NÀY' },
-                        { id: 'lastWeek', label: 'TUẦN TRƯỚC' },
                         { id: 'thisMonth', label: 'THÁNG NÀY' },
                         { id: 'lastMonth', label: 'THÁNG TRƯỚC' }
                     ].map(f => (
                         <button
                             key={f.id}
                             onClick={() => { setQuickFilter(f.id); setDateRange({ start: '', end: '' }); }}
-                            className={`px-2 py-1 rounded-lg text-[9px] font-black tracking-tight transition-all border ${quickFilter === f.id ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'}`}
+                            className={`px-2 py-1 rounded-lg text-[8px] font-black tracking-tight transition-all border whitespace-nowrap ${quickFilter === f.id ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'}`}
                         >
                             {f.label}
                         </button>
@@ -562,7 +560,41 @@ export default function PaymentReceiptsModule() {
 
             {/* Main Table */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
-                <div className="overflow-x-auto">
+                {/* Mobile Card View */}
+                <div className="block lg:hidden space-y-3 p-3 bg-slate-50/50">
+                    {loading ? (
+                        [1,2,3].map(i => <div key={i} className="h-32 bg-white rounded-2xl animate-pulse" />)
+                    ) : currentList.length === 0 ? (
+                        <div className="py-20 text-center text-slate-400 italic text-sm">Chưa có dữ liệu lịch sử</div>
+                    ) : currentList.map(item => (
+                        <div key={item.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col gap-2">
+                            <div className="flex justify-between items-start">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-black text-slate-400">{new Date(item.payment_date).toLocaleDateString('vi-VN')}</span>
+                                    <span className={`text-[11px] font-black uppercase mt-0.5 ${activeTab === 'external' ? 'text-orange-600' : 'text-indigo-600'}`}>{item.payments?.payment_code}</span>
+                                </div>
+                                <div className={`text-[12px] font-black tabular-nums ${activeTab === 'external' ? 'text-emerald-600' : 'text-indigo-700'}`}>
+                                    {fmt(item.amount)} ₫
+                                </div>
+                            </div>
+                            
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[8px] font-black uppercase tracking-tighter">
+                                    #{item.payments?.projects?.internal_code || item.payments?.projects?.code}
+                                </span>
+                                <span className="text-[9px] text-slate-500 font-bold line-clamp-1">{item.description || 'Không có ghi chú'}</span>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-2 border-t border-slate-50 mt-1">
+                                <button onClick={() => handleEdit(item)} className="p-1.5 rounded-lg bg-blue-50 text-blue-600"><span className="material-symbols-outlined text-[16px]">edit</span></button>
+                                <button onClick={() => setConfirmDeleteId(item.id)} className="p-1.5 rounded-lg bg-rose-50 text-rose-600"><span className="material-symbols-outlined text-[16px]">delete</span></button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden lg:block overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-tight">

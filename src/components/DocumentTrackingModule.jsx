@@ -395,47 +395,47 @@ export default function DocumentTrackingModule() {
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 opacity-50"></div>
                 
                 <div className="relative z-10">
-                    <h1 className="text-2xl font-black text-slate-800 flex items-center gap-3">
-                        <span className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                            <span className="material-symbols-outlined notranslate" translate="no">description</span>
+                    <h1 className="text-xl md:text-2xl font-black text-slate-800 flex items-center gap-2 md:gap-3">
+                        <span className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-200 flex-shrink-0">
+                            <span className="material-symbols-outlined notranslate text-[20px] md:text-[24px]" translate="no">description</span>
                         </span>
                         Theo dõi Hồ sơ & Thanh toán
                     </h1>
-                    <p className="text-slate-500 text-sm mt-1 font-medium italic">Quản lý tập trung công nợ, hóa đơn và chứng từ toàn dự án</p>
+                    <p className="text-slate-500 text-[10px] md:text-sm mt-1 font-medium italic ml-10 md:ml-[52px]">Quản lý tập trung công nợ và hóa đơn</p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 w-full md:w-auto relative z-10">
-                    <div className="relative flex-1 md:w-64">
+                    <div className="relative flex-1 min-w-full sm:min-w-[200px]">
                          <span className="material-symbols-outlined notranslate absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]" translate="no">search</span>
                          <input 
                             type="text" 
                             placeholder="Mã HĐ, dự án..." 
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 focus:border-blue-500 outline-none transition-all text-sm font-medium bg-slate-50/30"
+                            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 focus:border-blue-500 outline-none transition-all text-xs md:text-sm font-medium bg-slate-50/30"
                          />
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 -mx-1 px-1 scrollbar-none">
                         <select 
                             value={filterMonth}
                             onChange={(e) => setFilterMonth(e.target.value)}
-                            className="pl-4 pr-10 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_10px_center] bg-[size:16px]"
+                            className="pl-3 pr-8 py-2 md:py-2.5 rounded-xl border border-slate-200 text-[10px] md:text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_8px_center] bg-[size:14px]"
                         >
-                            <option value="all">Tất cả tháng</option>
+                            <option value="all">Tháng</option>
                             {Array.from({length: 12}, (_, i) => (
-                                <option key={i+1} value={(i+1).toString()}>Tháng {i+1}</option>
+                                <option key={i+1} value={(i+1).toString()}>{i+1}</option>
                             ))}
                         </select>
 
                         <select 
                             value={filterYear}
                             onChange={(e) => setFilterYear(e.target.value)}
-                            className="pl-4 pr-10 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_10px_center] bg-[size:16px]"
+                            className="pl-3 pr-8 py-2 md:py-2.5 rounded-xl border border-slate-200 text-[10px] md:text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_8px_center] bg-[size:14px]"
                         >
-                            <option value="all">Tất cả năm</option>
+                            <option value="all">Năm</option>
                             {['2024', '2025', '2026'].map(y => (
-                                <option key={y} value={y}>Năm {y}</option>
+                                <option key={y} value={y}>{y}</option>
                             ))}
                         </select>
                     </div>
@@ -490,7 +490,88 @@ export default function DocumentTrackingModule() {
             <SummaryCards filtered={filtered} activeEntity={activeEntity} />
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
-                <div className="overflow-x-auto">
+                {/* Mobile Card View */}
+                <div className="block lg:hidden space-y-3 p-3 bg-slate-50/50">
+                    {loading ? (
+                        [1,2,3].map(i => <div key={i} className="h-40 bg-white rounded-2xl animate-pulse" />)
+                    ) : filtered.length === 0 ? (
+                        <div className="py-20 text-center text-slate-400 italic text-sm px-4">Không tìm thấy dữ liệu phù hợp</div>
+                    ) : filtered.map(item => {
+                        const status = getDocStatus(item);
+                        const isInternalSatecoView = activeEntity === 'sateco' && (item.projects?.acting_entity_key || 'thanglong').toLowerCase() !== 'sateco';
+                        const invoiceAmt = isInternalSatecoView ? Number(item.internal_debt_invoice || 0) : Number(item.invoice_amount || 0);
+                        const requestAmt = isInternalSatecoView ? Number(item.internal_debt_actual || 0) : Number(item.payment_request_amount || 0);
+                        const actualAmt = isInternalSatecoView ? Number(item.internal_paid || 0) : Number(item.external_income || 0);
+                        const remaining = Math.max(0, requestAmt - actualAmt);
+
+                        return (
+                            <div key={item.id} onClick={() => toggleExpansion(item)} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col gap-3 relative overflow-hidden">
+                                {status.overdue && <div className="absolute top-0 right-0 px-2 py-0.5 bg-rose-500 text-white text-[8px] font-black uppercase">Quá hạn</div>}
+                                <div className="flex justify-between items-start">
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] font-black font-mono text-blue-600 uppercase">#{item.projects?.internal_code || item.projects?.code}</span>
+                                        <span className="text-[11px] font-bold text-slate-800 line-clamp-1">{item.stage_name}</span>
+                                    </div>
+                                    <div className={`px-2 py-1 rounded-full text-[8px] font-black border ${status.overdue ? 'bg-rose-50 border-rose-100 text-rose-600' : (status.isFullyPaid ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-blue-50 border-blue-100 text-blue-600')}`}>
+                                        {status.label}
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100/50">
+                                    <div>
+                                        <span className="text-[8px] font-black text-slate-400 uppercase block mb-0.5">Xuất HĐ</span>
+                                        <span className="text-[11px] font-black text-slate-700 tabular-nums">{fmt(invoiceAmt)}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[8px] font-black text-slate-400 uppercase block mb-0.5">Thực thu</span>
+                                        <span className="text-[11px] font-black text-emerald-600 tabular-nums">{fmt(actualAmt)}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[8px] font-black text-slate-400 uppercase block mb-0.5">Còn nợ</span>
+                                        <span className={`text-[11px] font-black tabular-nums ${remaining > 0 ? 'text-rose-600' : 'text-slate-400'}`}>{fmt(remaining)}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[8px] font-black text-slate-400 uppercase block mb-0.5">Hạn TT</span>
+                                        <span className={`text-[11px] font-bold tabular-nums ${status.overdue ? 'text-rose-600' : 'text-slate-500'}`}>{item.due_date ? new Date(item.due_date).toLocaleDateString('vi-VN') : '—'}</span>
+                                    </div>
+                                </div>
+
+                                {expandedId === item.id && (
+                                    <div className="border-t border-slate-100 pt-3 mt-1 animate-slide-down">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-[10px] font-black text-slate-500">LỊCH SỬ THANH TOÁN</span>
+                                            <div className="flex gap-1">
+                                                {hasPermission('edit_payments') && (
+                                                    <button onClick={(e) => { e.stopPropagation(); handleEdit(item); }} className="p-1.5 rounded-lg bg-blue-50 text-blue-600"><span className="material-symbols-outlined text-[16px]">edit</span></button>
+                                                )}
+                                                {hasPermission('delete_payments') && (
+                                                    <button onClick={(e) => { e.stopPropagation(); setItemToDelete(item); setShowDeleteConfirm(true); }} className="p-1.5 rounded-lg bg-rose-50 text-rose-600"><span className="material-symbols-outlined text-[16px]">delete</span></button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {historyLoading ? (
+                                            <div className="text-[10px] text-slate-400 italic">Đang tải lịch sử...</div>
+                                        ) : paymentHistory.length === 0 ? (
+                                            <div className="text-[10px] text-slate-400 italic">Chưa có lịch sử thanh toán</div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {paymentHistory.map(h => (
+                                                    <div key={h.id} className="flex justify-between items-center text-[10px] font-medium p-2 bg-slate-50/50 rounded-lg">
+                                                        <span className="text-slate-500">{new Date(h.payment_date).toLocaleDateString('vi-VN')}</span>
+                                                        <span className="text-emerald-600 font-bold">{fmt(h.amount)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden lg:block overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50 border-b border-slate-100 text-[12px] font-bold text-slate-500 uppercase tracking-tight">

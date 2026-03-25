@@ -304,13 +304,13 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
         <div className="pb-10 animate-fade-in font-sans">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                 <div>
-                    <h2 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight flex items-center gap-3">
-                        <span className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-sm">
-                            <span className="material-symbols-outlined notranslate text-[24px]" translate="no">folder_open</span>
+                    <h2 className="text-xl md:text-3xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2 md:gap-3">
+                        <span className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-sm flex-shrink-0">
+                            <span className="material-symbols-outlined notranslate text-[20px] md:text-[24px]" translate="no">folder_open</span>
                         </span>
                         Quản lý Hợp đồng & Dự án
                     </h2>
-                    <p className="text-slate-500 text-xs md:text-sm mt-2 ml-[52px]">{projects.length} hợp đồng đang theo dõi · Dữ liệu thời gian thực</p>
+                    <p className="text-slate-500 text-[10px] md:text-sm mt-1 ml-10 md:ml-[52px]">{projects.length} hợp đồng đang theo dõi</p>
                 </div>
                 <div className="flex gap-2 md:gap-3 w-full md:w-auto">
                     {hasPermission('create_contracts') && (
@@ -359,14 +359,14 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
             <div className="glass-panel p-0 shadow-sm border border-slate-200/60 bg-white/70 overflow-visible">
                 {/* Toolbar */}
                 <div className="p-4 border-b border-slate-200/60 flex flex-wrap gap-4 items-center bg-slate-50/50">
-                    <div className="relative flex-1 min-w-[280px]">
-                        <span className="material-symbols-outlined notranslate absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]" translate="no">search</span>
+                    <div className="relative flex-1 min-w-full sm:min-w-[280px]">
+                        <span className="material-symbols-outlined notranslate absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-[18px] md:text-[20px]" translate="no">search</span>
                         <input
                             type="text"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Tìm tên Dự án, mã Hợp đồng, Chủ đầu tư..."
-                            className="w-full pl-11 pr-10 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-slate-700 shadow-sm outline-none transition-all"
+                            placeholder="Tìm dự án, hợp đồng..."
+                            className="w-full pl-10 md:pl-11 pr-10 py-2 md:py-2.5 rounded-xl border border-slate-200 bg-white text-xs md:text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-slate-700 shadow-sm outline-none transition-all"
                         />
                         {searchTerm && (
                             <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
@@ -375,45 +375,44 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                         )}
                     </div>
                     
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 w-full md:w-auto -mx-1 px-1 scrollbar-none">
                         <select 
                             value={filterMonth}
                             onChange={(e) => setFilterMonth(e.target.value)}
-                            className="pl-4 pr-10 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_10px_center] bg-[size:16px]"
+                            className="pl-3 pr-8 py-2 md:py-2.5 rounded-xl border border-slate-200 text-[10px] md:text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_8px_center] bg-[size:14px]"
                         >
-                            <option value="all">Tất cả tháng</option>
+                            <option value="all">Tháng</option>
                             {Array.from({length: 12}, (_, i) => (
-                                <option key={i+1} value={(i+1).toString()}>Tháng {i+1}</option>
+                                <option key={i+1} value={(i+1).toString()}>{i+1}</option>
                             ))}
                         </select>
 
                         <select 
                             value={filterYear}
                             onChange={(e) => setFilterYear(e.target.value)}
-                            className="pl-4 pr-10 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_10px_center] bg-[size:16px]"
+                            className="pl-3 pr-8 py-2 md:py-2.5 rounded-xl border border-slate-200 text-[10px] md:text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_8px_center] bg-[size:14px]"
                         >
-                            <option value="all">Tất cả năm</option>
                             {['2024', '2025', '2026'].map(y => (
-                                <option key={y} value={y}>Năm {y}</option>
+                                <option key={y} value={y}>{y}</option>
                             ))}
                         </select>
 
                         <select 
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="pl-4 pr-10 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm max-w-[160px] truncate appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_10px_center] bg-[size:16px]"
+                            className="pl-3 pr-8 py-2 md:py-2.5 rounded-xl border border-slate-200 text-[10px] md:text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm max-w-[120px] truncate appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_8px_center] bg-[size:14px]"
                         >
-                            <option value="All">Tất cả trạng thái</option>
+                            <option value="All">Trạng thái</option>
                             {statusOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
-                    </div>
 
-                    <button 
-                        onClick={fetchProjects}
-                        className="p-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 transition-all shadow-sm active:scale-95"
-                    >
-                        <span className="material-symbols-outlined notranslate block" translate="no">refresh</span>
-                    </button>
+                        <button 
+                            onClick={fetchProjects}
+                            className="p-2 md:p-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 transition-all shadow-sm active:scale-95 flex-shrink-0"
+                        >
+                            <span className="material-symbols-outlined notranslate block text-[18px] md:text-[24px]" translate="no">refresh</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
