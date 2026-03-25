@@ -19,17 +19,30 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Initial session check
+        // Initial session check with SAFETY TIMEOUT
         const initSession = async () => {
-            const { data: { session }, error } = await supabase.auth.getSession();
-            if (error) {
-                console.error("Auth session error:", error);
+            const timeout = setTimeout(() => {
+                if (loading) {
+                    console.warn("Auth initialization timed out, setting loading to false");
+                    setLoading(false);
+                }
+            }, 5000); // 5 seconds safety net
+
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) {
+                    console.error("Auth session error:", error);
+                }
+                if (session?.user) {
+                    setUser(session.user);
+                    await fetchUserProfileAndPermissions(session.user.id);
+                }
+            } catch (err) {
+                console.error("Auth init fatal error:", err);
+            } finally {
+                clearTimeout(timeout);
+                setLoading(false);
             }
-            if (session?.user) {
-                setUser(session.user);
-                await fetchUserProfileAndPermissions(session.user.id);
-            }
-            setLoading(false);
         };
 
         initSession();
