@@ -21,36 +21,33 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         let isMounted = true;
 
-        const initSession = async () => {
-            try {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session?.user && isMounted) {
-                    setUser(session.user);
-                    await fetchUserProfileAndPermissions(session.user.id);
-                }
-            } catch (err) {
-                console.error("Auth init error:", err);
-            } finally {
-                if (isMounted) setLoading(false);
-            }
-        };
-
-        initSession();
-
+        // Listen for auth changes - Supabase v2 triggers this on start as well
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_IN' && session?.user && isMounted) {
+            if (!isMounted) return;
+
+            if (session?.user) {
                 setUser(session.user);
                 await fetchUserProfileAndPermissions(session.user.id);
-            } else if (event === 'SIGNED_OUT' && isMounted) {
+                if (isMounted) setLoading(false);
+            } else {
                 setUser(null);
                 setProfile(null);
                 setPermissions([]);
+                if (isMounted) setLoading(false);
             }
         });
+
+        // Add a safety fallback after 10s if nothing happens
+        const fallback = setTimeout(() => {
+            if (isMounted && loading) {
+                setLoading(false);
+            }
+        }, 10000);
 
         return () => {
             isMounted = false;
             subscription.unsubscribe();
+            clearTimeout(fallback);
         };
     }, []);
 
