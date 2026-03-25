@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { logAudit } from '../lib/auditLog';
 import { useNotification } from './NotificationContext';
+import { useAuth } from './AuthContext';
 
 const InventoryContext = createContext();
 
@@ -12,6 +13,7 @@ export const useInventory = () => {
 };
 
 export const InventoryProvider = ({ children }) => {
+    const { user } = useAuth();
     const { sendNotification } = useNotification();
     const [warehouses, setWarehouses] = useState([]);
     const [stocks, setStocks] = useState([]);
@@ -76,8 +78,9 @@ export const InventoryProvider = ({ children }) => {
     };
 
     useEffect(() => {
+        if (!user) return;
         fetchData();
-    }, []);
+    }, [user]);
 
     // Helper functions for transactions
     const createTransaction = async (receipt, items) => {

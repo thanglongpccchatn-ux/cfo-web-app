@@ -225,7 +225,11 @@ function AppContent() {
   if (loading || !themeLoaded) return <LoadingSpinner />;
   if (!user) return <Login />;
   
-  return <MainLayout />;
+  return (
+    <InventoryProvider>
+      <MainLayout />
+    </InventoryProvider>
+  );
 }
 
 function App() {
@@ -236,9 +240,7 @@ function App() {
           <AuthProvider>
             <NotificationProvider>
               <ToastProvider>
-                <InventoryProvider>
-                  <AppContent />
-                </InventoryProvider>
+                <AppContent />
               </ToastProvider>
             </NotificationProvider>
           </AuthProvider>
