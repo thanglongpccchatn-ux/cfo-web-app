@@ -22,8 +22,11 @@ export const InventoryProvider = ({ children }) => {
     const [categories, setCategories] = useState([]);
     const [purchaseOrders, setPurchaseOrders] = useState([]);
     const [loading, setLoading] = useState(true);
+    const isFetching = useRef(false);
 
     const fetchData = async () => {
+        if (isFetching.current) return;
+        isFetching.current = true;
         setLoading(true);
         try {
             // Helper to fetch and handle errors gracefully
@@ -74,6 +77,7 @@ export const InventoryProvider = ({ children }) => {
             console.error("Lỗi nghiêm trọng trong InventoryContext:", error);
         } finally {
             setLoading(false);
+            isFetching.current = false;
         }
     };
 

@@ -17,49 +17,12 @@ export const AuthProvider = ({ children }) => {
     const [profile, setProfile] = useState(null);
     const [permissions, setPermissions] = useState([]);
     const [loading, setLoading] = useState(true);
-    const lastFetchedUserId = useRef(null);
-
-    useEffect(() => {
-        let isMounted = true;
-
-        // Listen for auth changes - Supabase v2 triggers this on start as well
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (!isMounted) return;
-
-            if (session?.user) {
-                // Only fetch if it's a new user or different session state
-                if (lastFetchedUserId.current !== session.user.id) {
-                    lastFetchedUserId.current = session.user.id;
-                    setUser(session.user);
-                    await fetchUserProfileAndPermissions(session.user.id);
-                }
-                if (isMounted) setLoading(false);
-            } else {
-                lastFetchedUserId.current = null;
-                setUser(null);
-                setProfile(null);
-                setPermissions([]);
-                if (isMounted) setLoading(false);
-            }
-        });
-
-        // Add a safety fallback after 10s if nothing happens
-        const fallback = setTimeout(() => {
-            if (isMounted && loading) {
-                setLoading(false);
-            }
-        }, 10000);
-
-        return () => {
-            isMounted = false;
-            subscription.unsubscribe();
-            clearTimeout(fallback);
-        };
-    }, []);
+    const isFetchingProfile = useRef(false);
 
     async function fetchUserProfileAndPermissions(userId) {
+        if (isFetchingProfile.current) return;
+        isFetchingProfile.current = true;
         try {
-            // Fetch Profile
             const { data: profileData, error: profileError } = await supabase
                 .from('profiles')
                 .select('*, roles:role_code(name)')
@@ -67,72 +30,59 @@ export const AuthProvider = ({ children }) => {
                 .single();
             
             if (profileError) {
-                console.warn("Could not fetch profile (might not exist yet):", profileError);
-                // Fallback basic profile
                 setProfile({ id: userId, full_name: 'No Profile', role_code: 'GUEST', status: 'Hoạt động' });
             } else {
                 if (profileData.status === 'Khóa') {
-                    // Force logout if blocked
                     await supabase.auth.signOut();
                     setUser(null);
                     setProfile(null);
                     setPermissions([]);
-                    alert("Tài khoản của bạn đã bị khóa. Vui lòng liên hệ Quản trị viên.");
+                    alert("Tài khoản của bạn đã bị khóa.");
                     return;
                 }
                 setProfile(profileData);
             }
 
-            // Fetch Permissions via RPC
-            const { data: permData, error: permError } = await supabase
-                .rpc('get_user_permissions', { p_user_id: userId });
-
-            if (permError) {
-                console.warn("Could not fetch permissions (RPC might be missing):", permError);
-                setPermissions([]);
-            } else {
-                // permData is an array of { permission_code: '...' }
-                setPermissions(permData ? permData.map(p => p.permission_code) : []);
-            }
+            const { data: permData } = await supabase.rpc('get_user_permissions', { p_user_id: userId });
+            setPermissions(permData ? permData.map(p => p.permission_code) : []);
         } catch (error) {
-            console.error("Error fetching user details:", error);
+            console.error("Auth init fetch error:", error);
+        } finally {
+            isFetchingProfile.current = false;
         }
     };
 
-    // eslint-disable-next-line
-    const login = async (email, password) => {
-        return await supabase.auth.signInWithPassword({ email, password });
-    };
+    useEffect(() => {
+        let isMounted = true;
+        
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (!isMounted) return;
 
-    const logout = async () => {
-        return await supabase.auth.signOut();
-    };
+            if (session?.user) {
+                setUser(session.user);
+                await fetchUserProfileAndPermissions(session.user.id);
+                if (isMounted) setLoading(false);
+            } else if (event === 'SIGNED_OUT' || !session) {
+                setUser(null);
+                setProfile(null);
+                setPermissions([]);
+                if (isMounted) setLoading(false);
+            }
+        });
 
-    const refreshProfile = async () => {
-        if (user) {
-            await fetchUserProfileAndPermissions(user.id);
-        }
-    };
+        return () => {
+            isMounted = false;
+            subscription.unsubscribe();
+        };
+    }, []);
 
-    const hasPermission = (permCode) => {
-        // If Admin role (ROLE01 or custom admin code), optionally bypass. 
-        // For now, rely on strictly mapped permissions.
-        return permissions.includes(permCode);
-    };
-
-    const value = {
-        user,
-        profile,
-        permissions,
-        loading,
-        login,
-        logout,
-        hasPermission,
-        refreshProfile
-    };
+    const login = (email, password) => supabase.auth.signInWithPassword({ email, password });
+    const logout = () => supabase.auth.signOut();
+    const hasPermission = (p) => permissions.includes(p);
+    const refreshProfile = () => user && fetchUserProfileAndPermissions(user.id);
 
     return (
-        <AuthContext.Provider value={value}>
+        <AuthContext.Provider value={{ user, profile, permissions, loading, login, logout, hasPermission, refreshProfile }}>
             {children}
         </AuthContext.Provider>
     );
