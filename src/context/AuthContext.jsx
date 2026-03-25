@@ -20,8 +20,14 @@ export const AuthProvider = ({ children }) => {
     const isFetchingProfile = useRef(false);
 
     async function fetchUserProfileAndPermissions(userId) {
-        if (isFetchingProfile.current) return;
+        if (!userId || isFetchingProfile.current) return;
         isFetchingProfile.current = true;
+        
+        // Safety timeout for fetching
+        const fetchTimeout = setTimeout(() => {
+            isFetchingProfile.current = false;
+        }, 10000);
+
         try {
             const { data: profileData, error: profileError } = await supabase
                 .from('profiles')
@@ -30,14 +36,13 @@ export const AuthProvider = ({ children }) => {
                 .single();
             
             if (profileError) {
-                setProfile({ id: userId, full_name: 'No Profile', role_code: 'GUEST', status: 'Hoạt động' });
+                setProfile({ id: userId, full_name: 'Người dùng mới', role_code: 'GUEST', status: 'Hoạt động' });
             } else {
                 if (profileData.status === 'Khóa') {
                     await supabase.auth.signOut();
                     setUser(null);
                     setProfile(null);
                     setPermissions([]);
-                    alert("Tài khoản của bạn đã bị khóa.");
                     return;
                 }
                 setProfile(profileData);
@@ -48,6 +53,7 @@ export const AuthProvider = ({ children }) => {
         } catch (error) {
             console.error("Auth init fetch error:", error);
         } finally {
+            clearTimeout(fetchTimeout);
             isFetchingProfile.current = false;
         }
     };
@@ -55,18 +61,33 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         let isMounted = true;
         
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        // Initial session check
+        const checkSession = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (isMounted && session?.user) {
+                    setUser(session.user);
+                    await fetchUserProfileAndPermissions(session.user.id);
+                }
+            } catch (e) {
+                console.error("Session check error:", e);
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        };
+        checkSession();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             if (!isMounted) return;
 
             if (session?.user) {
                 setUser(session.user);
-                await fetchUserProfileAndPermissions(session.user.id);
-                if (isMounted) setLoading(false);
+                // Non-blocking fetch to avoid locking the event loop
+                fetchUserProfileAndPermissions(session.user.id);
             } else if (event === 'SIGNED_OUT' || !session) {
                 setUser(null);
                 setProfile(null);
                 setPermissions([]);
-                if (isMounted) setLoading(false);
             }
         });
 
