@@ -202,16 +202,25 @@ function AppContent() {
 
   useEffect(() => {
     const loadTheme = async () => {
+      // Safety timeout for theme loading (6 seconds)
+      const themeTimeout = setTimeout(() => {
+        applyBrandTheme(null);
+        setThemeLoaded(true);
+      }, 6000);
+
       try {
         const { data } = await supabase.from('theme_settings').select('*').limit(1).maybeSingle();
         applyBrandTheme(data || null);
       } catch (err) {
         applyBrandTheme(null);
+      } finally {
+        clearTimeout(themeTimeout);
+        setThemeLoaded(true);
       }
-      setThemeLoaded(true);
     };
+
     loadTheme();
-  }, []);
+  }, []); // Run only once on mount
 
   if (loading || !themeLoaded) return <LoadingSpinner />;
   if (!user) return <Login />;
