@@ -260,6 +260,21 @@ export default function DashboardOverview() {
                 </div>
             </div>
 
+            {/* Quick Actions (Mobile-First) */}
+            <div className="md:hidden grid grid-cols-1 gap-4">
+                <a href="/site_diary" className="bg-gradient-to-r from-blue-600 to-indigo-700 p-5 rounded-3xl shadow-lg shadow-blue-200 flex items-center justify-between text-white active:scale-95 transition-all">
+                    <div className="flex items-center gap-4">
+                        <div className="bg-white/20 p-3 rounded-2xl">
+                            <span className="material-symbols-outlined text-3xl">edit_calendar</span>
+                        </div>
+                        <div>
+                            <h4 className="font-black text-lg leading-tight tracking-tight">NHẬT KÝ HIỆN TRƯỜNG</h4>
+                            <p className="text-blue-100 text-xs font-bold opacity-80 uppercase tracking-widest mt-0.5">3 cú chạm để báo cáo &rarr;</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
             {/* Strategic Analysis Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Chart 1: Cash Flow Trend */}

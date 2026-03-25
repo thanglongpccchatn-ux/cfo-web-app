@@ -27,6 +27,7 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
         { id: 'subcontractors', icon: 'groups', label: 'Nhà thầu phụ / Tổ đội', perms: ['view_partners', 'manage_partners'] },
         { id: 'planning_hub', icon: 'analytics', label: 'Kế hoạch & Báo cáo', perms: ['view_planning', 'manage_planning'] },
         { id: 'inventory', icon: 'warehouse', label: 'Kho vật tư', perms: ['view_inventory', 'import_inventory', 'export_inventory', 'manage_materials'] },
+        { id: 'site_diary', icon: 'edit_calendar', label: 'Nhật ký hiện trường', perms: [] },
         { id: 'construction', icon: 'engineering', label: 'Thi công', perms: ['view_construction', 'manage_construction'] },
     ].filter(tab => canView(tab.perms));
 

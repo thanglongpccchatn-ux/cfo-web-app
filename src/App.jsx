@@ -35,6 +35,7 @@ const PlanningModule = lazy(() => import('./components/PlanningModule'));
 const InventoryManager = lazy(() => import('./components/Inventory/InventoryManager'));
 const Settings = lazy(() => import('./components/Settings'));
 const UserProfile = lazy(() => import('./components/UserProfile'));
+const SiteDiary = lazy(() => import('./components/SiteDiary'));
 
 const queryClient = new QueryClient();
 
@@ -114,6 +115,7 @@ function MainLayout() {
       case 'permissions': return { title: 'Phân quyền rủi ro', subtitle: 'Cấu hình quyền hệ thống' };
       case 'users': return { title: 'Quản lý Người dùng', subtitle: 'Quản lý và kích hoạt tài khoản' };
       case 'profile': return { title: 'Trang cá nhân', subtitle: 'Thông tin hồ sơ và mật khẩu' };
+      case 'site_diary': return { title: 'Nhật ký hiện trường', subtitle: 'Báo cáo hoạt động thi công hàng ngày' };
       default: return { title: 'Hệ thống Quản trị', subtitle: `${currentTheme.company_name}` };
     }
   };
@@ -166,6 +168,7 @@ function MainLayout() {
             <Route path="/contracts" element={<ProtectedRoute requiredPerms={['view_contracts']}><ContractMasterDetail onOpenFullscreen={(type, data) => setFullscreenView({ type, data })} /></ProtectedRoute>} />
             <Route path="/doc_tracking" element={<ProtectedRoute requiredPerms={['view_payments']}><DocumentTrackingModule /></ProtectedRoute>} />
             <Route path="/payment_receipts" element={<ProtectedRoute requiredPerms={['view_payments']}><PaymentReceiptsModule /></ProtectedRoute>} />
+            <Route path="/site_diary" element={<ProtectedRoute><SiteDiary /></ProtectedRoute>} />
             <Route path="/warranty_tracking" element={<ProtectedRoute requiredPerms={['view_contracts']}><WarrantyTracking /></ProtectedRoute>} />
             
             {/* Financial & Inventory Modules */}
