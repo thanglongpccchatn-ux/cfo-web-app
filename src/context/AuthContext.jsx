@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext({});
@@ -17,6 +17,7 @@ export const AuthProvider = ({ children }) => {
     const [profile, setProfile] = useState(null);
     const [permissions, setPermissions] = useState([]);
     const [loading, setLoading] = useState(true);
+    const lastFetchedUserId = useRef(null);
 
     useEffect(() => {
         let isMounted = true;
@@ -26,10 +27,15 @@ export const AuthProvider = ({ children }) => {
             if (!isMounted) return;
 
             if (session?.user) {
-                setUser(session.user);
-                await fetchUserProfileAndPermissions(session.user.id);
+                // Only fetch if it's a new user or different session state
+                if (lastFetchedUserId.current !== session.user.id) {
+                    lastFetchedUserId.current = session.user.id;
+                    setUser(session.user);
+                    await fetchUserProfileAndPermissions(session.user.id);
+                }
                 if (isMounted) setLoading(false);
             } else {
+                lastFetchedUserId.current = null;
                 setUser(null);
                 setProfile(null);
                 setPermissions([]);
