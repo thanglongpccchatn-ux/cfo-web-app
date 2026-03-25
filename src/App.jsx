@@ -226,9 +226,13 @@ function AppContent() {
   if (!user) return <Login />;
   
   return (
-    <InventoryProvider>
-      <MainLayout />
-    </InventoryProvider>
+    <NotificationProvider>
+      <ToastProvider>
+        <InventoryProvider>
+          <MainLayout />
+        </InventoryProvider>
+      </ToastProvider>
+    </NotificationProvider>
   );
 }
 
@@ -238,11 +242,7 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <AuthProvider>
-            <NotificationProvider>
-              <ToastProvider>
-                <AppContent />
-              </ToastProvider>
-            </NotificationProvider>
+            <AppContent />
           </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>
