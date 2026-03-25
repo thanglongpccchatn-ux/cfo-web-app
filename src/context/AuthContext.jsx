@@ -19,47 +19,39 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Initial session check with SAFETY TIMEOUT
-        const initSession = async () => {
-            const timeout = setTimeout(() => {
-                if (loading) {
-                    console.warn("Auth initialization timed out, setting loading to false");
-                    setLoading(false);
-                }
-            }, 5000); // 5 seconds safety net
+        let isMounted = true;
 
+        const initSession = async () => {
             try {
-                const { data: { session }, error } = await supabase.auth.getSession();
-                if (error) {
-                    console.error("Auth session error:", error);
-                }
-                if (session?.user) {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user && isMounted) {
                     setUser(session.user);
                     await fetchUserProfileAndPermissions(session.user.id);
                 }
             } catch (err) {
-                console.error("Auth init fatal error:", err);
+                console.error("Auth init error:", err);
             } finally {
-                clearTimeout(timeout);
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
         };
 
         initSession();
 
-        // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_IN' && session?.user) {
+            if (event === 'SIGNED_IN' && session?.user && isMounted) {
                 setUser(session.user);
                 await fetchUserProfileAndPermissions(session.user.id);
-            } else if (event === 'SIGNED_OUT') {
+            } else if (event === 'SIGNED_OUT' && isMounted) {
                 setUser(null);
                 setProfile(null);
                 setPermissions([]);
             }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            isMounted = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
     async function fetchUserProfileAndPermissions(userId) {

@@ -9,7 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
-        storage: window.sessionStorage, // Fixes the Vite HMR multiple-tab lock deadlock and improves security
+        storage: window.localStorage, 
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true
