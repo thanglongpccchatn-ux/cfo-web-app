@@ -104,12 +104,12 @@ export default function AddendaCreate({ project, onBack }) {
                                     <span className="font-bold text-red-600">{formatCurrency(satecoAddendaValue)}</span>
                                 </div>
                                 <div className="flex justify-between text-xs">
-                                    <span>Tiền VAT Sateco (8%):</span>
-                                    <span>{formatCurrency(satecoAddendaValue * 0.08)}</span>
+                                    <span>Tiền VAT Sateco ({vat}%):</span>
+                                    <span>{formatCurrency(satecoAddendaValue * (vat / 100))}</span>
                                 </div>
                                 <div className="flex justify-between pt-2 border-t border-red-200 mt-2 font-bold text-md text-red-700">
                                     <span>Tổng phát sinh Sateco ghi nhận:</span>
-                                    <span>{formatCurrency(satecoAddendaValue * 1.08)}</span>
+                                    <span>{formatCurrency(satecoAddendaValue * (1 + vat / 100))}</span>
                                 </div>
                             </div>
                         </div>

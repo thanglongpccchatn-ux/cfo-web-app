@@ -120,7 +120,7 @@ export default function PartnerManagement() {
         }
     };
 
-    const fetchPartners = async () => {
+    async function fetchPartners() {
         setIsLoading(true);
         try {
             const { data, error } = await supabase

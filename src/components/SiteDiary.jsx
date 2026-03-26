@@ -16,7 +16,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-const SiteDiary = () => {
+function SiteDiary() {
     const { user } = useAuth();
     const { addToast } = useToast();
     const [projects, setProjects] = useState([]);
@@ -38,7 +38,7 @@ const SiteDiary = () => {
         fetchProjects();
     }, []);
 
-    const fetchProjects = async () => {
+    async function fetchProjects() {
         setLoading(true);
         try {
             const { data, error } = await supabase

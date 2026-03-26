@@ -30,20 +30,7 @@ export default function VariationsManagement() {
     const [historyLogs, setHistoryLogs] = useState([]);
     const [selectedVarName, setSelectedVarName] = useState('');
 
-    useEffect(() => {
-        fetchData();
-        // Set up real-time subscription for variations
-        const subscription = supabase
-            .channel('public:contract_variations')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'contract_variations' }, payload => {
-                fetchData();
-            })
-            .subscribe();
-
-        return () => supabase.removeChannel(subscription);
-    }, []);
-
-    const fetchData = async () => {
+    const fetchData = React.useCallback(async () => {
         setLoading(true);
         try {
             const { data: projData, error: projError } = await supabase.from('projects').select('id, name, code, internal_code, vat_percentage').order('created_at', { ascending: false });
@@ -59,7 +46,20 @@ export default function VariationsManagement() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchData();
+        // Set up real-time subscription for variations
+        const subscription = supabase
+            .channel('public:contract_variations')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'contract_variations' }, payload => {
+                fetchData();
+            })
+            .subscribe();
+
+        return () => supabase.removeChannel(subscription);
+    }, [fetchData]);
 
     const handleProjectSelection = (e) => {
         const pId = e.target.value;
@@ -339,75 +339,140 @@ export default function VariationsManagement() {
                     </div>
                 </div>
 
-                <div className="overflow-auto max-h-[calc(100vh-320px)]">
-                    <table className="w-full text-left border-collapse min-w-[1000px]">
-                        <thead className="sticky top-0 z-20 bg-slate-50 backdrop-blur-md shadow-sm">
-                            <tr className="text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-200">
-                                <th className="px-4 py-3 w-12 text-center">STT</th>
-                                <th className="px-4 py-3 max-w-[200px]">Dự án</th>
-                                <th className="px-4 py-3">Số PLHĐ / Nội dung</th>
-                                <th className="px-4 py-3 text-right">Đề nghị</th>
-                                <th className="px-4 py-3 text-right text-emerald-700">CĐT Chốt</th>
-                                <th className="px-4 py-3 text-center">Trạng thái</th>
-                                <th className="px-4 py-3">Ngày duyệt</th>
-                                <th className="px-4 py-3 text-center">Tác vụ</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 bg-white/50">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan="8" className="p-8 text-center text-slate-400">Đang tải dữ liệu...</td>
+                <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden mt-0">
+                    {/* Mobile Card View */}
+                    <div className="block lg:hidden p-3 space-y-3 max-h-[calc(100vh-320px)] overflow-y-auto bg-slate-50/50">
+                        {loading ? (
+                            <div className="p-8 text-center text-slate-400">Đang tải dữ liệu...</div>
+                        ) : filteredVariations.length === 0 ? (
+                            <div className="p-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                <span className="material-symbols-outlined text-4xl mb-2 text-slate-200 block mx-auto">receipt_long</span>
+                                Chưa có khoản phát sinh nào.
+                            </div>
+                        ) : (
+                            filteredVariations.map((v, index) => (
+                                <div key={v.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative group">
+                                    <div className="absolute -top-2 left-4 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-md text-[9px] font-black text-slate-500">
+                                        #{index + 1}
+                                    </div>
+                                    <div className="flex justify-between items-start mb-2 mt-1">
+                                        <div className="flex-1 pr-2">
+                                            <div className="font-bold text-sm text-blue-700 leading-tight block">{v.name}</div>
+                                            {v.variation_no && <span className="inline-block mt-1.5 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-mono border border-slate-200">{v.variation_no}</span>}
+                                        </div>
+                                        <div className="flex gap-1 shrink-0">
+                                            <button onClick={() => handleOpenHistory(v)} className="w-8 h-8 rounded-lg bg-slate-50 text-slate-500 hover:text-blue-600 flex items-center justify-center border border-slate-200 shadow-sm">
+                                                <span className="material-symbols-outlined text-[18px]">history</span>
+                                            </button>
+                                            <button onClick={() => handleOpenForm(v)} className="w-8 h-8 rounded-lg bg-slate-50 text-slate-500 hover:text-orange-600 flex items-center justify-center border border-slate-200 shadow-sm">
+                                                <span className="material-symbols-outlined text-[18px]">edit_note</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mb-3 space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-100 mt-3">
+                                        <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-1 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">account_tree</span> Dự án</div>
+                                        <div className="text-sm font-bold text-slate-800 line-clamp-2 leading-tight">{v.projects?.name || '-'}</div>
+                                        <div className="text-[10px] text-slate-500 font-mono mt-0.5 bg-white px-1.5 py-0.5 rounded border border-slate-200 w-fit">{v.projects?.internal_code || v.projects?.code || '-'}</div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2 mb-3">
+                                        <div className="bg-white p-2.5 rounded-lg border border-slate-100 shadow-sm">
+                                             <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Đề nghị</div>
+                                             <div className="text-[13px] font-black text-slate-700">{formatBillion(v.proposed_value)}</div>
+                                        </div>
+                                        <div className="bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-100/50 shadow-sm">
+                                             <div className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mb-1">CĐT Chốt</div>
+                                             <div className="text-[13px] font-black text-emerald-700 mt-0.5 block">
+                                                 {v.status === 'Đã duyệt' ? formatBillion(v.approved_value) : <span className="text-emerald-500/70 font-normal italic pr-2 text-[10px]">Chưa chốt</span>}
+                                             </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-between items-center text-xs border-t border-slate-100 pt-3">
+                                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border ${getStatusColor(v.status)}`}>
+                                            {v.status}
+                                         </span>
+                                         <div className="text-right text-slate-500 text-[11px] font-medium flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+                                             <span className="material-symbols-outlined text-[13px]">event_available</span> {formatDate(v.approval_date)}
+                                         </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    {/* Desktop Table View */}
+                    <div className="hidden xl:block overflow-auto max-h-[calc(100vh-320px)]">
+                        <table className="w-full text-left border-collapse min-w-[1000px]">
+                            <thead className="sticky top-0 z-20 bg-slate-50 backdrop-blur-md shadow-sm">
+                                <tr className="text-[10px] uppercase tracking-widest text-slate-500 font-black border-b border-slate-200">
+                                    <th className="px-4 py-3 w-12 text-center">STT</th>
+                                    <th className="px-4 py-3 max-w-[200px]">Dự án</th>
+                                    <th className="px-4 py-3">Số PLHĐ / Nội dung</th>
+                                    <th className="px-4 py-3 text-right">Đề nghị</th>
+                                    <th className="px-4 py-3 text-right text-emerald-700">CĐT Chốt</th>
+                                    <th className="px-4 py-3 text-center">Trạng thái</th>
+                                    <th className="px-4 py-3">Ngày duyệt</th>
+                                    <th className="px-4 py-3 text-center">Tác vụ</th>
                                 </tr>
-                            ) : filteredVariations.length === 0 ? (
-                                <tr>
-                                    <td colSpan="8" className="p-10 text-center text-slate-400 flex flex-col items-center">
-                                        <span className="material-symbols-outlined text-4xl mb-2 text-slate-200">receipt_long</span>
-                                        Chưa có khoản phát sinh nào.
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredVariations.map((v, index) => (
-                                    <tr key={v.id} className="hover:bg-slate-50 transition-colors group">
-                                        <td className="px-4 py-3 text-center text-xs text-slate-400 font-medium">{index + 1}</td>
-                                        <td className="px-4 py-3">
-                                            <div className="font-bold text-xs text-slate-800 line-clamp-2" title={v.projects?.name}>
-                                                {v.projects?.name || '-'}
-                                            </div>
-                                            <div className="text-[10px] text-slate-500 mt-0.5">{v.projects?.internal_code || v.projects?.code || '-'}</div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="font-bold text-sm text-blue-700">{v.name}</div>
-                                            {v.variation_no && <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-mono">{v.variation_no}</span>}
-                                        </td>
-                                        <td className="px-4 py-3 text-right font-medium text-slate-600 border-l border-slate-50">
-                                            {formatBillion(v.proposed_value)}
-                                        </td>
-                                        <td className="px-4 py-3 text-right font-bold text-emerald-600 bg-emerald-50/30">
-                                            {v.status === 'Đã duyệt' ? formatBillion(v.approved_value) : <span className="text-slate-300 font-normal italic pr-2">Chưa chốt</span>}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${getStatusColor(v.status)}`}>
-                                                {v.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-xs text-slate-500 font-medium text-center">
-                                            {formatDate(v.approval_date)}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => handleOpenHistory(v)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Lịch sử thay đổi">
-                                                    <span className="material-symbols-outlined text-[16px]">history</span>
-                                                </button>
-                                                <button onClick={() => handleOpenForm(v)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-orange-600 hover:bg-orange-50 transition-colors" title="Sửa">
-                                                    <span className="material-symbols-outlined text-[16px]">edit_note</span>
-                                                </button>
-                                            </div>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white/50">
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan="8" className="p-8 text-center text-slate-400">Đang tải dữ liệu...</td>
+                                    </tr>
+                                ) : filteredVariations.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="8" className="p-10 text-center text-slate-400 flex flex-col items-center">
+                                            <span className="material-symbols-outlined text-4xl mb-2 text-slate-200">receipt_long</span>
+                                            Chưa có khoản phát sinh nào.
                                         </td>
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                                ) : (
+                                    filteredVariations.map((v, index) => (
+                                        <tr key={v.id} className="hover:bg-slate-50 transition-colors group">
+                                            <td className="px-4 py-3 text-center text-xs text-slate-400 font-medium">{index + 1}</td>
+                                            <td className="px-4 py-3">
+                                                <div className="font-bold text-xs text-slate-800 line-clamp-2" title={v.projects?.name}>
+                                                    {v.projects?.name || '-'}
+                                                </div>
+                                                <div className="text-[10px] text-slate-500 mt-0.5">{v.projects?.internal_code || v.projects?.code || '-'}</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="font-bold text-sm text-blue-700">{v.name}</div>
+                                                {v.variation_no && <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-mono">{v.variation_no}</span>}
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-medium text-slate-600 border-l border-slate-50">
+                                                {formatBillion(v.proposed_value)}
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-bold text-emerald-600 bg-emerald-50/30">
+                                                {v.status === 'Đã duyệt' ? formatBillion(v.approved_value) : <span className="text-slate-300 font-normal italic pr-2">Chưa chốt</span>}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${getStatusColor(v.status)}`}>
+                                                    {v.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-xs text-slate-500 font-medium text-center">
+                                                {formatDate(v.approval_date)}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => handleOpenHistory(v)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Lịch sử thay đổi">
+                                                        <span className="material-symbols-outlined text-[16px]">history</span>
+                                                    </button>
+                                                    <button onClick={() => handleOpenForm(v)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-orange-600 hover:bg-orange-50 transition-colors" title="Sửa">
+                                                        <span className="material-symbols-outlined text-[16px]">edit_note</span>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 

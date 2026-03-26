@@ -10,15 +10,17 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
     
     // Admin always has full access to all tabs. Otherwise, check permissions.
     const canView = (perms) => {
-        if (!perms || perms.length === 0) return true; // Public tab
         // If user is Admin, they can see everything
         if (profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN') return true;
+        // Tab without any permission requirement -> hidden for non-admin
+        if (!perms || perms.length === 0) return false;
         
         return perms.some(p => hasPermission(p));
     };
 
     const tabs = [
         { id: 'dashboard', icon: 'grid_view', label: 'Tổng quan', perms: ['view_dashboard'] },
+        { id: 'bidding', icon: 'assignment_turned_in', label: 'Đấu thầu', perms: ['view_bids'] },
         { id: 'contracts', icon: 'description', label: 'Hợp đồng', perms: ['view_contracts', 'create_contracts', 'edit_contracts', 'delete_contracts'] },
         { id: 'variations', icon: 'playlist_add', label: 'Phát sinh', perms: ['view_contracts'] },
         { id: 'doc_tracking', icon: 'folder_managed', label: 'Hồ sơ & Thanh toán', perms: ['view_payments', 'create_payments', 'edit_payments', 'delete_payments'] },
@@ -29,7 +31,7 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
         { id: 'subcontractors', icon: 'groups', label: 'Nhà thầu phụ / Tổ đội', perms: ['view_partners', 'manage_partners'] },
         { id: 'planning_hub', icon: 'analytics', label: 'Kế hoạch & Báo cáo', perms: ['view_planning', 'manage_planning'] },
         { id: 'inventory', icon: 'warehouse', label: 'Kho vật tư', perms: ['view_inventory', 'import_inventory', 'export_inventory', 'manage_materials'] },
-        { id: 'site_diary', icon: 'edit_calendar', label: 'Nhật ký hiện trường', perms: [] },
+        { id: 'site_diary', icon: 'edit_calendar', label: 'Nhật ký hiện trường', perms: ['view_construction', 'manage_construction'] },
         { id: 'construction', icon: 'engineering', label: 'Thi công', perms: ['view_construction', 'manage_construction'] },
     ].filter(tab => canView(tab.perms));
 

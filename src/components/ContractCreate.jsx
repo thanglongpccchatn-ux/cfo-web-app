@@ -5,7 +5,7 @@ import { logAudit } from '../lib/auditLog';
 import { useNotification } from '../context/NotificationContext';
 import { useToast } from '../context/ToastContext';
 import {
-    formatInputNumber, parseFormattedNumber, labelBase, navItems, companyEntities, defaultPartnerForm,
+    formatInputNumber, parseFormattedNumber, navItems, defaultPartnerForm,
     calculateAllocations
 } from './contract/contractHelpers';
 
@@ -67,7 +67,6 @@ export default function ContractCreate({ onBack, project }) {
     ]);
 
     const [editingBank, setEditingBank] = useState(false);
-    const [bankLoaded, setBankLoaded] = useState(false);
     const [bankProfiles, setBankProfiles] = useState([]);
     const [selectedBankProfile, setSelectedBankProfile] = useState('');
 
@@ -137,13 +136,12 @@ export default function ContractCreate({ onBack, project }) {
             setTlBank({ account: project.tl_bank_account || '', name: project.tl_bank_name || '', branch: project.tl_bank_branch || '', holder: project.tl_account_holder || '' });
             setTpBank({ account: project.tp_bank_account || '', name: project.tp_bank_name || '', branch: project.tp_bank_branch || '', holder: project.tp_account_holder || '' });
             setStBank({ account: project.st_bank_account || '', name: project.st_bank_name || '', branch: project.st_bank_branch || '', holder: project.st_account_holder || '' });
-            setBankLoaded(true);
         } else {
             fetchCompanySettings();
         }
-    }, [project]);
+    }, [project, fetchCompanySettings, fetchPartners, fetchBankProfiles]);
 
-    const addMilestone = () => {
+    function addMilestone() {
         setPaymentSchedule([...paymentSchedule, {
             id: 'ms-' + Date.now(),
             name: `Thanh toán đợt ${paymentSchedule.length + 1}`,
@@ -185,14 +183,14 @@ export default function ContractCreate({ onBack, project }) {
         })));
     }, [totalValue, tl_postVat, milestoneBase]);
 
-    const fetchPartners = async () => {
+    const fetchPartners = React.useCallback(async () => {
         setIsLoadingPartners(true);
         const { data } = await supabase.from('partners').select('*').eq('type', 'Client').order('name');
         setPartners(data || []);
         setIsLoadingPartners(false);
-    };
+    }, []);
 
-    const fetchCompanySettings = async () => {
+    const fetchCompanySettings = React.useCallback(async () => {
         const { data } = await supabase.from('company_settings').select('*');
         if (data) {
             setAllCompanies(data);
@@ -205,14 +203,13 @@ export default function ContractCreate({ onBack, project }) {
                 if (st) setStBank({ account: st.bank_account || '', name: st.bank_name || '', branch: st.bank_branch || '', holder: st.account_holder || '' });
                 if (tp) setTpBank({ account: tp.bank_account || '', name: tp.bank_name || '', branch: tp.bank_branch || '', holder: tp.account_holder || '' });
             }
-            setBankLoaded(true);
         }
-    };
+    }, [project]);
 
-    const fetchBankProfiles = async () => {
+    const fetchBankProfiles = React.useCallback(async () => {
         const { data } = await supabase.from('company_bank_profiles').select('*').order('label');
         setBankProfiles(data || []);
-    };
+    }, []);
 
     const handleBankProfileSelect = (profileId) => {
         setSelectedBankProfile(profileId);
@@ -253,7 +250,7 @@ export default function ContractCreate({ onBack, project }) {
         setTotalValueDisplay(formatInputNumber(preVatNum));
     };
 
-    const handleValueBlur = () => {
+    function handleValueBlur() {
         if (totalValue > 0) {
             setTotalValueDisplay(formatInputNumber(totalValue));
             setPostVatDisplay(formatInputNumber(Math.round(totalValue * (1 + vat / 100))));
@@ -263,7 +260,7 @@ export default function ContractCreate({ onBack, project }) {
         }
     };
 
-    const handlePostVatBlur = () => {
+    function handlePostVatBlur() {
         const num = parseFormattedNumber(postVatDisplay);
         if (num > 0) {
             setPostVatDisplay(formatInputNumber(num));
@@ -297,7 +294,7 @@ export default function ContractCreate({ onBack, project }) {
         }
     };
 
-    const handleSave = async () => {
+    async function handleSave() {
         if (!name || !code || !partnerId) {
             toast.warning('Vui lòng điền đủ Tên hợp đồng, Mã và chọn Đối tác!');
             return;

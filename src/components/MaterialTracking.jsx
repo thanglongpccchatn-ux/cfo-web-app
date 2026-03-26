@@ -30,13 +30,8 @@ export default function MaterialTracking({ project, onBack, embedded }) {
         ['2025-01-20', 'Vật tư phụ', 'Cửa hàng Sắt Thép Minh Hùng', 'Thép phi 12 CB240T', 'Kg', 2000, 18000, 8, 38880000, 0, '']
     ];
 
-    useEffect(() => {
-        if (project) {
-            fetchMaterials();
-        }
-    }, [project]);
-
-    const fetchMaterials = async () => {
+    const fetchMaterials = React.useCallback(async () => {
+        if (!project) return;
         setLoading(true);
         const { data, error } = await supabase
             .from('expense_materials')
@@ -48,9 +43,13 @@ export default function MaterialTracking({ project, onBack, embedded }) {
             setMaterials(data);
         }
         setLoading(false);
-    };
+    }, [project]);
 
-    const handleAddRow = () => {
+    useEffect(() => {
+        fetchMaterials();
+    }, [fetchMaterials]);
+
+    function handleAddRow() {
         const newRow = {
             id: 'temp-' + Date.now(),
             isNew: true,
@@ -100,7 +99,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
         });
     };
 
-    const handleSaveEdit = async () => {
+    async function handleSaveEdit() {
         if (!editForm.product_name || !editForm.expense_date) {
             alert('Vui lòng nhập Tên sản phẩm và Ngày tháng.');
             return;
@@ -318,9 +317,71 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                         </div>
                     </div>
                 ) : (
-                    // EXCEL-LIKE GRID
                     <div className={`bg-white ${embedded ? '' : 'rounded-xl shadow-sm border border-slate-200'} min-w-[max-content] pb-20 ring-1 ring-slate-200/50`}>
-                        <div className="overflow-x-auto">
+                        {/* Mobile Card View */}
+                        <div className="block xl:hidden space-y-3 p-4 bg-slate-50/30">
+                            {materials.length === 0 ? (
+                                <div className="py-10 text-center text-slate-400 font-medium bg-white rounded-xl border border-slate-200 shadow-sm">
+                                    Chưa có dữ liệu vật tư
+                                </div>
+                            ) : materials.map((mat) => {
+                                if (editingId === mat.id) return null;
+                                return (
+                                    <div key={mat.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative group animate-slide-up">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="flex-1 pr-2">
+                                                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1 flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[12px]">calendar_today</span>
+                                                    {formatDate(mat.expense_date)}
+                                                </div>
+                                                <div className="font-bold text-slate-800 leading-tight text-sm">{mat.product_name}</div>
+                                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                                    <span className="px-2 py-0.5 rounded bg-orange-50 text-orange-700 text-[10px] font-bold border border-orange-100 uppercase">{mat.item_group}</span>
+                                                    <span className="px-2 py-0.5 rounded bg-slate-50 text-slate-500 text-[10px] font-bold border border-slate-200 truncate max-w-[120px]">{mat.supplier_name}</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-1 shrink-0">
+                                                <button onClick={() => handleEditClick(mat)} className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-100 shadow-sm active:scale-95 transition-transform">
+                                                    <span className="material-symbols-outlined text-[18px]">edit</span>
+                                                </button>
+                                                <button onClick={() => handleDelete(mat.id)} className="w-8 h-8 rounded-lg bg-slate-50 text-rose-500 flex items-center justify-center border border-slate-200 shadow-sm active:scale-95 transition-transform">
+                                                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3 mb-3 border-t border-slate-50 pt-3">
+                                            <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                                                <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Số lượng</div>
+                                                <div className="text-sm font-black text-slate-700">{mat.quantity} <span className="text-[10px] font-medium text-slate-400">{mat.unit}</span></div>
+                                            </div>
+                                            <div className="p-2 rounded-xl bg-orange-50/50 border border-orange-100">
+                                                <div className="text-[9px] font-black text-orange-600 uppercase tracking-widest mb-0.5 text-right">Thành tiền</div>
+                                                <div className="text-sm font-black text-orange-700 text-right tabular-nums">{formatCurrency(mat.total_amount)}</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-between items-center text-[10px] bg-emerald-50/50 p-2 rounded-lg border border-emerald-100">
+                                            <div className="font-bold text-emerald-800 flex items-center gap-1">
+                                                <span className="material-symbols-outlined text-[14px]">payments</span>
+                                                Sateco Chi: {formatCurrency(mat.paid_amount)}
+                                            </div>
+                                            <div className={`font-black ${mat.total_amount - mat.paid_amount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                Nợ: {formatCurrency(mat.total_amount - mat.paid_amount)}
+                                            </div>
+                                        </div>
+
+                                        {mat.notes && (
+                                            <p className="mt-3 text-[11px] text-slate-500 italic line-clamp-1 border-t border-slate-50 pt-2 pl-1">
+                                                "{mat.notes}"
+                                            </p>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <div className="hidden xl:block overflow-x-auto">
                             <table className="w-full text-xs text-left whitespace-nowrap border-collapse">
                                 <thead className="bg-[#f8f9fa] text-slate-600 font-bold sticky top-0 z-10 shadow-sm border-b-2 border-slate-300 uppercase tracking-wider text-[10px]">
                                     <tr>

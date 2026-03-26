@@ -31,12 +31,7 @@ export default function ExpenseTracking() {
         description: ''
     });
 
-    useEffect(() => {
-        fetchData();
-        fetchProjects();
-    }, []);
-
-    const fetchData = async () => {
+    const fetchData = React.useCallback(async () => {
         setLoading(true);
         const { data, error } = await supabase
             .from('expenses')
@@ -45,12 +40,17 @@ export default function ExpenseTracking() {
         if (error) toast.error('Lỗi tải dữ liệu');
         else setExpenses(data || []);
         setLoading(false);
-    };
+    }, [toast]);
 
-    const fetchProjects = async () => {
+    const fetchProjects = React.useCallback(async () => {
         const { data } = await supabase.from('projects').select('id, name, code');
         setProjects(data || []);
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchData();
+        fetchProjects();
+    }, [fetchData, fetchProjects]);
 
     const handleNumChange = (field, value) => {
         const clean = value.replace(/[^0-9]/g, '');
@@ -120,7 +120,78 @@ export default function ExpenseTracking() {
                     </select>
                 </div>
 
-                <div className="overflow-x-auto">
+                {/* Mobile Card View */}
+                <div className="block xl:hidden space-y-3 p-4 bg-slate-50/30">
+                    {loading ? (
+                        <div className="py-10 text-center text-slate-400 font-medium bg-white rounded-xl border border-slate-200">Đang tải...</div>
+                    ) : filtered.length === 0 ? (
+                        <div className="py-10 text-center text-slate-400 font-medium bg-white rounded-xl border border-slate-200">Chưa có dữ liệu chi phí</div>
+                    ) : filtered.map((item) => (
+                        <div key={item.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative group animate-slide-up">
+                            <div className="flex justify-between items-start mb-3">
+                                <div className="flex-1 pr-2">
+                                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[12px]">calendar_today</span>
+                                        {new Date(item.expense_date).toLocaleDateString('vi-VN')}
+                                    </div>
+                                    <div className="font-bold text-slate-800 leading-tight line-clamp-2">{item.projects?.name}</div>
+                                    <div className="text-[10px] text-slate-400 uppercase font-bold mt-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 w-fit">{item.projects?.code}</div>
+                                </div>
+                                <div className="flex gap-1 shrink-0">
+                                    <button 
+                                        onClick={() => {
+                                            setEditingId(item.id);
+                                            setIsEditing(true);
+                                            setForm({
+                                                projectId: item.project_id,
+                                                expenseType: item.expense_type,
+                                                amount: String(item.amount),
+                                                paidAmount: String(item.paid_amount),
+                                                expenseDate: item.expense_date,
+                                                paidDate: item.paid_date || item.expense_date,
+                                                description: item.description || ''
+                                            });
+                                            setShowModal(true);
+                                        }}
+                                        className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shadow-sm active:scale-95 transition-transform"
+                                    >
+                                        <span className="material-symbols-outlined text-[18px]">edit</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2 mb-3">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200">
+                                    {item.expense_type}
+                                </span>
+                                {item.paid_amount > 0 && (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                        Đã chi: {new Date(item.paid_date).toLocaleDateString('vi-VN')}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 pb-3 border-b border-slate-50">
+                                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Kế hoạch</div>
+                                    <div className="text-sm font-black text-slate-700 tabular-nums">{fmt(item.amount)}</div>
+                                </div>
+                                <div className="p-2.5 rounded-xl bg-orange-50/50 border border-orange-100">
+                                    <div className="text-[9px] font-black text-orange-600 uppercase tracking-widest mb-1">Thực chi</div>
+                                    <div className="text-sm font-black text-orange-700 tabular-nums">{fmt(item.paid_amount)}</div>
+                                </div>
+                            </div>
+
+                            {item.description && (
+                                <p className="mt-3 text-[11px] text-slate-500 italic line-clamp-2 leading-relaxed">
+                                    "{item.description}"
+                                </p>
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                <div className="hidden xl:block overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead className="bg-slate-50 text-slate-400 font-bold text-[10px] uppercase tracking-wider">
                             <tr>
@@ -135,9 +206,9 @@ export default function ExpenseTracking() {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {loading ? (
-                                <tr><td colSpan={6} className="py-10 text-center text-slate-400 font-medium">Đang tải...</td></tr>
+                                <tr><td colSpan={7} className="py-10 text-center text-slate-400 font-medium">Đang tải...</td></tr>
                             ) : filtered.length === 0 ? (
-                                <tr><td colSpan={6} className="py-10 text-center text-slate-400 font-medium">Chưa có dữ liệu chi phí</td></tr>
+                                <tr><td colSpan={7} className="py-10 text-center text-slate-400 font-medium">Chưa có dữ liệu chi phí</td></tr>
                             ) : filtered.map(item => (
                                 <tr key={item.id} className="hover:bg-slate-50/50 group transition-colors">
                                     <td className="px-6 py-4 font-medium text-slate-600 font-mono text-xs">{new Date(item.expense_date).toLocaleDateString('vi-VN')}</td>

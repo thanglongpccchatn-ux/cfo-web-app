@@ -55,17 +55,17 @@ export default function SuppliersMaster() {
         fetchMaterialsCatalog();
     }, []);
 
-    const fetchProjects = async () => {
+    async function fetchProjects() {
         const { data } = await supabase.from('projects').select('id, name, code, internal_code').order('created_at', { ascending: false });
         setProjects(data || []);
     };
 
-    const fetchMaterialsCatalog = async () => {
+    async function fetchMaterialsCatalog() {
         const { data } = await supabase.from('materials').select('id, code, name, unit, base_price, category_code, brand').order('name');
         setMaterialsCatalog(data || []);
     };
 
-    const fetchSuppliersData = async () => {
+    async function fetchSuppliersData() {
         setLoading(true);
         // 1. Tải danh mục NCC
         const { data: suppliers, error: supError } = await supabase
@@ -157,7 +157,7 @@ export default function SuppliersMaster() {
     const orderTotal = purchaseLines.reduce((s, l) => s + calcLineTotal(l), 0);
 
     // --- Add NCC inline ---
-    const handleAddSupplierInline = async () => {
+    async function handleAddSupplierInline() {
         if (!newSupplier.name) { toast.error('Nhập tên NCC'); return; }
         const code = newSupplier.code || newSupplier.name.split(' ').map(w => w[0]).join('').toUpperCase();
         const { data, error } = await supabase.from('suppliers').insert([{ code, name: newSupplier.name, phone: newSupplier.phone }]).select().single();
@@ -241,7 +241,7 @@ export default function SuppliersMaster() {
     };
 
     // --- Submit Receive Goods ---
-    const handleReceiveSubmit = async () => {
+    async function handleReceiveSubmit() {
         const toReceive = receiveLines.filter(l => Number(l.receiveQty) > 0);
         if (!toReceive.length) { toast.error('Nhập SL nhận > 0'); return; }
         setSubmitting(true);

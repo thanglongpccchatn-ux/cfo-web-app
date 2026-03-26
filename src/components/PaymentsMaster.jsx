@@ -41,7 +41,7 @@ export default function PaymentsMaster() {
         fetchAll();
     }, []);
 
-    const fetchAll = async () => {
+    async function fetchAll() {
         setLoading(true);
         // Fetch all projects to map IDs to project codes/names
         const { data: projs } = await supabase.from('projects').select('id, code, name');

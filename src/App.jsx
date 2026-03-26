@@ -38,6 +38,7 @@ const UserProfile = lazy(() => import('./components/UserProfile'));
 const SiteDiary = lazy(() => import('./components/SiteDiary'));
 const SettlementManagement = lazy(() => import('./components/SettlementManagement'));
 const VariationsManagement = lazy(() => import('./components/VariationsManagement'));
+const BiddingManagement = lazy(() => import('./components/BiddingManagement'));
 
 const queryClient = new QueryClient();
 
@@ -119,6 +120,7 @@ function MainLayout() {
       case 'profile': return { title: 'Trang cá nhân', subtitle: 'Thông tin hồ sơ và mật khẩu' };
       case 'site_diary': return { title: 'Nhật ký hiện trường', subtitle: 'Báo cáo hoạt động thi công hàng ngày' };
       case 'settlement': return { title: 'Quản lý Quyết Toán', subtitle: 'Theo dõi quyết toán, công nợ và hồ sơ pháp lý' };
+      case 'bidding': return { title: 'Theo dõi Báo giá / Đấu thầu', subtitle: 'Quản lý vòng đời đấu thầu và phiên bản báo giá' };
       default: return { title: 'Hệ thống Quản trị', subtitle: `${currentTheme.company_name}` };
     }
   };
@@ -169,6 +171,7 @@ function MainLayout() {
             {/* Core Modules */}
             <Route path="/dashboard" element={<ProtectedRoute requiredPerms={['view_dashboard']}><DashboardOverview /></ProtectedRoute>} />
             <Route path="/contracts" element={<ProtectedRoute requiredPerms={['view_contracts']}><ContractMasterDetail onOpenFullscreen={(type, data) => setFullscreenView({ type, data })} /></ProtectedRoute>} />
+            <Route path="/bidding" element={<ProtectedRoute requiredPerms={['view_bids']}><BiddingManagement /></ProtectedRoute>} />
             <Route path="/variations" element={<ProtectedRoute requiredPerms={['view_contracts']}><VariationsManagement /></ProtectedRoute>} />
             <Route path="/doc_tracking" element={<ProtectedRoute requiredPerms={['view_payments']}><DocumentTrackingModule /></ProtectedRoute>} />
             <Route path="/payment_receipts" element={<ProtectedRoute requiredPerms={['view_payments']}><PaymentReceiptsModule /></ProtectedRoute>} />
@@ -205,8 +208,20 @@ function MainLayout() {
 }
 
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const [themeLoaded, setThemeLoaded] = useState(false);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+
+  useEffect(() => {
+    // 12-second global loading timeout
+    const timer = setTimeout(() => {
+      if (loading || !themeLoaded) {
+        setLoadingTimeout(true);
+      }
+    }, 12000);
+
+    return () => clearTimeout(timer);
+  }, [loading, themeLoaded]);
 
   useEffect(() => {
     const loadTheme = async () => {
@@ -219,7 +234,7 @@ function AppContent() {
       try {
         const { data } = await supabase.from('theme_settings').select('*').limit(1).maybeSingle();
         applyBrandTheme(data || null);
-      } catch (err) {
+      } catch {
         applyBrandTheme(null);
       } finally {
         clearTimeout(themeTimeout);
@@ -229,6 +244,34 @@ function AppContent() {
 
     loadTheme();
   }, []); // Run only once on mount
+
+  if (loadingTimeout) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-900 p-6 text-center">
+        <div className="w-20 h-20 bg-rose-100 dark:bg-rose-900/30 rounded-full flex items-center justify-center text-rose-600 mb-6">
+          <span className="material-symbols-outlined text-4xl">cloud_off</span>
+        </div>
+        <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Kết nối quá lâu</h2>
+        <p className="text-slate-500 dark:text-slate-400 max-w-md mb-8">
+          Ứng dụng đang mất nhiều thời gian hơn dự kiến để khởi tạo. Điều này có thể do kết nối mạng hoặc cấu hình hệ thống.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all"
+          >
+            Thử tải lại trang
+          </button>
+          <button 
+            onClick={logout} 
+            className="px-6 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-50 transition-all"
+          >
+            Đăng xuất & Xóa Cache
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || !themeLoaded) return <LoadingSpinner />;
   if (!user) return <Login />;

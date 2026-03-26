@@ -66,15 +66,8 @@ export default function PaymentTracking({ project, onBack, embedded }) {
     const fmt = (v) => v ? Number(Math.round(v)).toLocaleString('vi-VN') : '0';
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '—';
 
-    useEffect(() => { 
-        if (project) {
-            fetchAll(); 
-            // Auto-suggest logic for new payment
-            suggestNextStage();
-        }
-    }, [project]);
-
-    const suggestNextStage = () => {
+    const suggestNextStage = React.useCallback(() => {
+        if (!project) return;
         const prjCode = project.internal_code || project.code;
         if (!stages || stages.length === 0) {
             setForm(f => ({ 
@@ -96,7 +89,7 @@ export default function PaymentTracking({ project, onBack, embedded }) {
             type: 'Nghiệm thu',
             paymentCode: `${prjCode}-${nextIPC}`
         }));
-    };
+    }, [project, stages]);
 
     const handleInvoiceDateChange = (date) => {
         if (!date) return;
@@ -106,7 +99,8 @@ export default function PaymentTracking({ project, onBack, embedded }) {
         setForm(f => ({ ...f, invoiceDate: date, dueDate: due }));
     };
 
-    const fetchAll = async () => {
+    const fetchAll = React.useCallback(async () => {
+        if (!project) return;
         setLoading(true);
         const { data } = await supabase.from('payments').select('*').eq('project_id', project.id).order('created_at', { ascending: true });
         setStages(data || []);
@@ -118,9 +112,16 @@ export default function PaymentTracking({ project, onBack, embedded }) {
             setLastPayDates(map);
         }
         setLoading(false);
-    };
+    }, [project]);
 
-    const handleAddStage = async () => {
+    useEffect(() => { 
+        if (project) {
+            fetchAll(); 
+            suggestNextStage();
+        }
+    }, [project, fetchAll, suggestNextStage]);
+
+    async function handleAddStage() {
         if (!form.name || !form.expected) {
             alert('Vui lòng nhập tên đợt và giá trị dự kiến');
             return;
@@ -184,7 +185,7 @@ export default function PaymentTracking({ project, onBack, embedded }) {
         setCdtHistory(data || []); setLoadingCdt(false);
     };
 
-    const handleAddCdtPayment = async () => {
+    async function handleAddCdtPayment() {
         if (!cdtForm.date || !cdtForm.amount) return;
         const amount = Number(cdtForm.amount);
         const { data: insertedData } = await supabase.from('external_payment_history').insert([{ payment_stage_id: cdtModal.id, payment_date: cdtForm.date, amount, description: cdtForm.notes }]).select().single();
@@ -241,7 +242,7 @@ export default function PaymentTracking({ project, onBack, embedded }) {
         setTlSatecoHistory(data || []); setLoadingTlSateco(false);
     };
 
-    const handleAddTlSatecoPayment = async () => {
+    async function handleAddTlSatecoPayment() {
         if (!tlSatecoForm.date || !tlSatecoForm.amount) return;
         const amount = Number(tlSatecoForm.amount);
         const { data: insertedData } = await supabase.from('internal_payment_history').insert([{ payment_stage_id: tlSatecoModal.id, payment_date: tlSatecoForm.date, amount, description: tlSatecoForm.notes }]).select().single();

@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { CashFlowChart, PortfolioChart, ReceivablesAgingChart, TopProfitChart } from './DashboardCharts';
+import AIFinanceInsights from './AIFinanceInsights';
+import LiquidityGauge from './LiquidityGauge';
+import SkeletonLoader from './common/SkeletonLoader';
 
 const formatVND = (v) => v ? Number(Math.round(v)).toLocaleString('vi-VN') : '0';
 
-export default function DashboardOverview() {
+const DashboardOverview = () => {
     const { data: dashboardData, refetch: refetchDashboard, isLoading: loading } = useQuery({
         queryKey: ['dashboard-overview-data'],
         staleTime: 1000 * 60 * 5, // 5 minutes cache
@@ -19,7 +22,7 @@ export default function DashboardOverview() {
             // 2. Performance & Financial Metrics
             const { data: projs } = await supabase.from('projects').select('*, partners!projects_partner_id_fkey(name, code, short_name)');
             const { data: pmts } = await supabase.from('payments').select('*, projects!inner(code, internal_code, name)');
-            const { data: adds } = await supabase.from('addendas').select('*').eq('status', 'Đã duyệt');
+            await supabase.from('addendas').select('*').eq('status', 'Đã duyệt');
             const { data: extHist } = await supabase.from('external_payment_history').select('*');
             const { data: intHist } = await supabase.from('internal_payment_history').select('*');
 
@@ -54,9 +57,8 @@ export default function DashboardOverview() {
                     const baseTotalValuePostVat = p.total_value_post_vat || (baseTotalValuePreVat + baseVatAmount);
 
                     const approvedVariationsPreVat = parseFloat(p.total_approved_variations) || 0;
-                    const totalValuePreVat = baseTotalValuePreVat + approvedVariationsPreVat;
+
                     const totalValuePostVat = baseTotalValuePostVat + approvedVariationsPreVat * (1 + (p.vat_percentage ?? 8) / 100);
-                    const vatAmount = totalValuePostVat - totalValuePreVat;
 
                     const totalIncomeFromHistory = projExtHist.reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
                     const totalIncomeFromPayments = projPmts.reduce((sum, pm) => sum + (parseFloat(pm.external_income) || 0), 0);
@@ -180,7 +182,7 @@ export default function DashboardOverview() {
         projectDetails: [], unsignedProjects: [], unsettledProjects: [], pendingPaymentsList: []
     };
 
-    const [targetModal, setTargetModal] = React.useState({ isOpen: false, target: 0, isSaving: false });
+    const [targetModal, setTargetModal] = useState({ isOpen: false, target: 0, isSaving: false });
 
     // Revenue Plan Calculations
     const currentYear = new Date().getFullYear();
@@ -230,8 +232,8 @@ export default function DashboardOverview() {
         return (val / 1000000000).toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
     };
 
-    const [detailModal, setDetailModal] = React.useState({ isOpen: false, type: null, data: [] });
-    const [expandedProject, setExpandedProject] = React.useState(null);
+    const [detailModal, setDetailModal] = useState({ isOpen: false, type: null, data: [] });
+    const [expandedProject, setExpandedProject] = useState(null);
 
     const handleOpenDetail = (type) => {
         let data = [];
@@ -537,6 +539,14 @@ export default function DashboardOverview() {
                     </div>
                 </a>
             </div>
+
+            {/* AI Financial Insights Section */}
+            <AIFinanceInsights 
+                financials={financials} 
+                performance={performance} 
+                planData={planData} 
+                dashboardData={dashboardData} 
+            />
 
             {/* Strategic Analysis Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -899,4 +909,6 @@ export default function DashboardOverview() {
             )}
         </div>
     );
-}
+};
+
+export default DashboardOverview;

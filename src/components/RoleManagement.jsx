@@ -18,18 +18,16 @@ export default function RoleManagement() {
     const [rolePermissions, setRolePermissions] = useState([]); // array of permission_code
     const [isSavingPerms, setIsSavingPerms] = useState(false);
 
-    // Default hardcoded counts for styling based on the user's screenshot
-    const [roleCounts] = useState({
-        'ROLE01': 1, 'ROLE02': 1, 'ROLE03': 2, 'ROLE04': 2, 'ROLE05': 2,
-        'ROLE06': 2, 'ROLE07': 5, 'ROLE08': 10, 'ROLE09': 5, 'ROLE10': 1, 'ROLE11': 3
-    });
+    // Dynamic counts fetched from profiles
+    const [roleCounts, setRoleCounts] = useState({});
 
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const [rolesRes, permsRes] = await Promise.all([
+            const [rolesRes, permsRes, profilesRes] = await Promise.all([
                 supabase.from('roles').select('*').order('code', { ascending: true }),
-                supabase.from('permissions').select('*').order('module', { ascending: true })
+                supabase.from('permissions').select('*').order('module', { ascending: true }),
+                supabase.from('profiles').select('role_code')
             ]);
 
             if (rolesRes.error) throw rolesRes.error;
@@ -40,6 +38,13 @@ export default function RoleManagement() {
             } else {
                 setAllPermissions(permsRes.data || []);
             }
+
+            // Đếm số user theo role_code
+            const counts = {};
+            (profilesRes.data || []).forEach(p => {
+                if (p.role_code) counts[p.role_code] = (counts[p.role_code] || 0) + 1;
+            });
+            setRoleCounts(counts);
         } catch (error) {
             console.error('Error fetching data:', error);
             alert('Không thể tải dữ liệu vai trò/quyền hạn.');

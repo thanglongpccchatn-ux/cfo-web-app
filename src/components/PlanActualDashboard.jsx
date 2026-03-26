@@ -20,7 +20,7 @@ function AllProjectsSummary({ onSelect }) {
 
     useEffect(() => { loadAll(); }, []);
 
-    const loadAll = async () => {
+    async function loadAll() {
         setLoading(true);
         // Load projects with partner
         const { data: projects } = await supabase
@@ -258,7 +258,7 @@ function ProjectDetail({ project, onBack }) {
 
     useEffect(() => { loadDetail(); }, [project.id]);
 
-    const loadDetail = async () => {
+    async function loadDetail() {
         setLoading(true);
         const [stagesRes, matsRes, laborsRes, expsRes] = await Promise.all([
             supabase.from('payments').select('*').eq('project_id', project.id).order('created_at'),

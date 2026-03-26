@@ -40,18 +40,18 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
     };
 
     const handleDeleteProject = async (projId, projName) => {
-        console.log('Finalizing deletion for project:', projId, projName);
+        
         setDeleteConfirm(null); // Close modal
         
         try {
             toast.info('Đang thực hiện xóa...');
-            console.log('Cleaning up inventory records...');
+            
             // Manual cleanup for tables missing ON DELETE CASCADE
             const { data: receipts } = await supabase.from('inventory_receipts').select('id').eq('project_id', projId);
             const receiptIds = receipts?.map(r => r.id) || [];
             
             if (receiptIds.length > 0) {
-                console.log('Deleting receipt items for receipts:', receiptIds);
+                
                 await supabase.from('inventory_receipt_items').delete().in('receipt_id', receiptIds);
                 await supabase.from('inventory_receipts').delete().in('id', receiptIds);
             }
@@ -60,12 +60,12 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
             const requestIds = requests?.map(r => r.id) || [];
             
             if (requestIds.length > 0) {
-                console.log('Deleting request items for requests:', requestIds);
+                
                 await supabase.from('inventory_request_items').delete().in('request_id', requestIds);
                 await supabase.from('inventory_requests').delete().in('id', requestIds);
             }
 
-            console.log('Deleting main project record...');
+            
             // Finally delete the project (other tables like addendas, payments, expenses have CASCADE)
             const { error } = await supabase
                 .from('projects')
@@ -74,7 +74,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
 
             if (error) throw error;
 
-            console.log('Project deleted successfully');
+            
             setProjects(projects.filter(p => p.id !== projId));
             toast.success('Đã xóa hợp đồng thành công.');
             // Audit log (non-blocking)
@@ -175,7 +175,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
         setPartnerModal({ code: partnerCode, name: partnerName, projects: partnerProjects });
     };
 
-    const formatDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '-';
+
 
     const statusOptionsList = ['Đang thi công', 'Đã hoàn thành', 'Bảo hành', 'Tạm dừng', 'Chưa thi công'];
 
@@ -319,18 +319,13 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
         return 0;
     });
 
-    // Sateco Specific Totals for Sateco Tab
-    const totalSatecoRevenueAll = filteredProjects.reduce((s, p) => s + (p.satecoInternalRevenue || 0), 0);
-    const totalSatecoCashInAll = filteredProjects.reduce((s, p) => s + (p.acting_entity_key === 'sateco' ? p.totalIncome : (p.internal_paid || 0)), 0);
-    const totalSatecoDueFromTL = filteredProjects.filter(p => (p.acting_entity_key || '').toLowerCase() === 'thanglong').reduce((s, p) => s + (p.satecoInternalRevenue - (p.internal_paid || 0)), 0);
-    const totalSatecoDueFromTP = filteredProjects.filter(p => (p.acting_entity_key || '').toLowerCase() === 'thanhphat').reduce((s, p) => s + (p.satecoInternalRevenue - (p.internal_paid || 0)), 0);
+
 
     const totalValueAll = filteredProjects.reduce((s, p) => s + p.totalValuePostVat, 0);
     const totalIncomeAll = filteredProjects.reduce((s, p) => s + (p.totalIncome || 0), 0);
     const totalInvoiceAll = filteredProjects.reduce((s, p) => s + (p.totalInvoice || 0), 0);
     const totalRequestedAll = filteredProjects.reduce((s, p) => s + (p.totalRequested || 0), 0);
     const totalDebtInvoiceAll = filteredProjects.reduce((s, p) => s + (p.debtInvoice || 0), 0);
-    const totalDebtPaymentAll = filteredProjects.reduce((s, p) => s + (p.debtPayment || 0), 0);
     const statusOptions = [...new Set(projects.map(p => p.status).filter(Boolean))];
     const signatureOptions = ['Đã ký', 'Chưa ký'];
     const settlementOptions = ['Đã quyết toán', 'Đang quyết toán', 'Chưa quyết toán'];
@@ -781,7 +776,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        console.log('Delete button clicked for:', proj.name);
+                                                                        
                                                                         setDeleteConfirm({ id: proj.id, name: proj.name });
                                                                     }}
                                                                     className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"

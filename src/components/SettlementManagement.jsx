@@ -237,7 +237,7 @@ export default function SettlementManagement() {
                 {[
                     { label: 'DA Chờ QT', value: kpi.totalUnsettled, suffix: ' DA', color: 'indigo', icon: 'pending_actions' },
                     { label: 'Giá trị chờ QT', value: fmtB(kpi.totalUnsettledValue), suffix: ' Tỷ', color: 'blue', icon: 'account_balance' },
-                    { label: 'Tổng Còn đòi', value: fmtB(kpi.totalDebt), suffix: ' Tỷ', color: 'rose', icon: 'money_off' },
+                    { label: 'Tổng Còn nợ', value: fmtB(kpi.totalDebt), suffix: ' Tỷ', color: 'rose', icon: 'money_off' },
                     { label: 'HĐ chưa xuất', value: fmtB(kpi.totalInvoiceRemaining), suffix: ' Tỷ', color: 'amber', icon: 'receipt_long' },
                     { label: 'BH đang giữ lại', value: fmtB(kpi.totalWarrantyHeld), suffix: ' Tỷ', color: 'purple', icon: 'security' },
                     { label: 'Hồ sơ đầy đủ', value: kpi.docsProgress, suffix: '%', color: 'emerald', icon: 'fact_check' },
@@ -269,7 +269,7 @@ export default function SettlementManagement() {
                                 <th className="px-4 py-3.5 whitespace-nowrap text-right text-blue-600">CĐT duyệt</th>
                                 <th className="px-4 py-3.5 whitespace-nowrap text-right">Đã xuất HĐ</th>
                                 <th className="px-4 py-3.5 whitespace-nowrap text-right text-emerald-600">Đã thu</th>
-                                <th className="px-4 py-3.5 whitespace-nowrap text-right text-rose-600">Còn đòi</th>
+                                <th className="px-4 py-3.5 whitespace-nowrap text-right text-rose-600">Còn nợ</th>
                                 <th className="px-4 py-3.5 whitespace-nowrap text-center">Hồ sơ</th>
                                 <th className="px-4 py-3.5 whitespace-nowrap text-center">Ngày chờ</th>
                                 <th className="px-4 py-3.5 whitespace-nowrap text-center">Trạng thái</th>
@@ -348,7 +348,7 @@ export default function SettlementManagement() {
                                             {/* Đã thu */}
                                             <td className="px-4 py-3.5 text-right text-xs font-black text-emerald-600 tabular-nums whitespace-nowrap">{fmt(p.totalIncome)}</td>
 
-                                            {/* Còn đòi */}
+                                            {/* Còn nợ */}
                                             <td className="px-4 py-3.5 text-right">
                                                 <span className={`text-xs font-black tabular-nums whitespace-nowrap ${p.debtRemaining > 0 ? 'text-rose-600' : 'text-emerald-500'}`}>
                                                     {p.debtRemaining > 0 ? fmt(p.debtRemaining) : '✓ Đủ'}
@@ -477,7 +477,7 @@ export default function SettlementManagement() {
                                                                         {p.warrantyCollected ? (
                                                                             <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">✓ Đã thu hồi</span>
                                                                         ) : p.warrantyDaysRemaining <= 0 ? (
-                                                                            <span className="text-[10px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200 animate-pulse">CẦN ĐÒI NGAY</span>
+                                                                            <span className="text-[10px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200 animate-pulse">NỢ QUÁ HẠN</span>
                                                                         ) : (
                                                                             <span className="text-[10px] font-bold text-amber-600">Còn {p.warrantyDaysRemaining} ngày</span>
                                                                         )}
@@ -518,7 +518,7 @@ export default function SettlementManagement() {
                                                                                 <span className="font-black text-emerald-700">{fmt(p.totalIncome)} ₫</span>
                                                                             </div>
                                                                             <div className="flex justify-between text-xs border-t border-blue-100 pt-1.5 mt-1.5">
-                                                                                <span className="text-rose-600 font-bold">Còn phải đòi</span>
+                                                                                <span className="text-rose-600 font-bold">Còn phải thu</span>
                                                                                 <span className="font-black text-rose-700">{fmt(p.debtRemaining)} ₫</span>
                                                                             </div>
                                                                         </div>

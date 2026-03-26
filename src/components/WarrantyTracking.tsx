@@ -255,7 +255,7 @@ export default function WarrantyTracking() {
                 {[
                     { id: 'all', label: 'Tất cả Dự án', icon: 'format_list_bulleted' },
                     { id: 'pending', label: 'Đang bảo hành', icon: 'timelapse' },
-                    { id: 'expired', label: 'Quá hạn thu (Cần đòi tiền)', icon: 'notification_important' },
+                    { id: 'expired', label: 'Quá hạn thu (Còn nợ)', icon: 'notification_important' },
                     { id: 'collected', label: 'Đã hoàn tất thu', icon: 'task' },
                 ].map(tab => (
                     <button 

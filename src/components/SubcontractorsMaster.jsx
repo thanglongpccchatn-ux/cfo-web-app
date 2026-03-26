@@ -41,12 +41,12 @@ export default function SubcontractorsMaster() {
         fetchProjects();
     }, []);
 
-    const fetchProjects = async () => {
+    async function fetchProjects() {
         const { data } = await supabase.from('projects').select('id, name, code, internal_code').order('created_at', { ascending: false });
         setProjects(data || []);
     };
 
-    const fetchData = async () => {
+    async function fetchData() {
         setLoading(true);
 
         // Lấy danh mục Thầu phụ gốc

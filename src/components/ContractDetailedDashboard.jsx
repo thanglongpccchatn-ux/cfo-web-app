@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import PaymentTracking from './PaymentTracking';
+import SkeletonLoader from './common/SkeletonLoader';
 import MaterialTracking from './MaterialTracking';
 import LaborTracking from './LaborTracking';
 import * as drive from '../lib/googleDrive';
@@ -43,9 +44,9 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
                 fetchSubfolders();
             }
         }
-    }, [project, activeTab]);
+    }, [project, activeTab, fetchDashboardData, fetchSubfolders]);
 
-    const fetchSubfolders = async () => {
+    const fetchSubfolders = React.useCallback(async () => {
         try {
             const folders = await drive.getSubfolders(project.google_drive_folder_id);
             setSubfolders(folders);
@@ -55,9 +56,9 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
         } catch (err) {
             console.error('Error fetching subfolders:', err);
         }
-    };
+    }, [project.google_drive_folder_id, selectedSubfolder]);
 
-    const fetchDashboardData = async () => {
+    const fetchDashboardData = React.useCallback(async () => {
         setLoading(true);
         const [{ data: adds }, { data: pays }, { data: exps }, { data: expMats }, { data: expLabor }] = await Promise.all([
             supabase.from('addendas').select('*').eq('project_id', project.id).order('created_at', { ascending: false }),
@@ -72,9 +73,9 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
         if (expMats) setExpenseMaterials(expMats);
         if (expLabor) setExpenseLabor(expLabor);
         setLoading(false);
-    };
+    }, [project.id]);
 
-    const handleAddExpense = async () => {
+    async function handleAddExpense() {
         if (!newExpenseDate || !newExpenseAmount) return;
         const { error } = await supabase.from('expenses').insert([{
             project_id: project.id,
@@ -103,20 +104,7 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
     };
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '-';
 
-    const getWarrantyStageDates = (startDate, months) => {
-        if (!startDate) return { target: null, windowStart: null, windowEnd: null };
-        const d = new Date(startDate);
-        d.setMonth(d.getMonth() + months);
-        const target = new Date(d);
-        
-        // Window is 15th-20th of the NEXT month
-        const nextMonth = new Date(d);
-        nextMonth.setMonth(nextMonth.getMonth() + 1);
-        const windowStart = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 15);
-        const windowEnd = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 20);
-        
-        return { target, windowStart, windowEnd };
-    };
+
 
     // === Calculations (Defensive) ===
     if (!project) return null;
@@ -129,21 +117,12 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
     // Sateco Allocations based on dual ratios
     const contractValueSateco = totalContractValueThangLong * SATECO_CONTRACT_RATIO; // Doanh thu nội bộ Sateco xuất HĐ
     const actualValueSateco = totalContractValueThangLong * SATECO_ACTUAL_RATIO; // Chi phí tiền mặt thực tế Sateco được giữ
-    const internalRefundToThangLong = contractValueSateco - actualValueSateco; // Tiền mặt Sateco phải trả lại Thăng Long
-
-    const satecoInternalActualDebt = payments?.reduce((s, p) => s + Number(p.internal_debt_actual || 0), 0) || 0;
     const satecoInternalPaid = payments?.reduce((s, p) => s + Number(p.internal_paid || 0), 0) || 0;
-    const satecoRemainingDebt = satecoInternalActualDebt - satecoInternalPaid; // Thăng Long còn nợ Sateco bao nhiêu (Tiền mặt thực)
-    const satecoPaidPercentage = actualValueSateco > 0 ? (satecoInternalPaid / actualValueSateco) * 100 : 0;
-
     const raw_cdtTotalInvoiced = payments?.reduce((s, p) => s + Number(p.invoice_amount || 0), 0) || 0;
     const cdtTotalInvoiced = isInternalView ? (payments?.reduce((s, p) => s + Number(p.internal_invoiced_amount || 0), 0) || (raw_cdtTotalInvoiced * SATECO_CONTRACT_RATIO)) : raw_cdtTotalInvoiced;
-    const cdtTotalRequested = payments?.reduce((s, p) => s + Number(p.payment_request_amount || 0), 0) || 0;
     const raw_cdtTotalIncome = payments?.reduce((s, p) => s + Number(p.external_income || 0), 0) || 0;
     const cdtTotalIncome = isInternalView ? satecoInternalPaid : raw_cdtTotalIncome; 
     const cdtRemainingDebt = isInternalView ? (contractValueSateco - satecoInternalPaid) : (totalContractValueThangLong - raw_cdtTotalIncome);
-    
-    const payInvoiceRatio = cdtTotalInvoiced > 0 ? (cdtTotalIncome / cdtTotalInvoiced) * 100 : 0;
     const cdtPaymentPercentage = (isInternalView ? contractValueSateco : totalContractValueThangLong) > 0 
         ? (cdtTotalIncome / (isInternalView ? contractValueSateco : totalContractValueThangLong)) * 100 : 0;
     

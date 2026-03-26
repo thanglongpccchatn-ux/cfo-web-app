@@ -30,13 +30,8 @@ export default function LaborTracking({ project, onBack, embedded }) {
         ['Đội Cơ Điện Minh Khoa', 'Nghiệm thu', 200000000, '2025-02-05', 50, 80, 60000000, 58000000, '', 0, 'Cao', 'Đang chờ nghiệm thu']
     ];
 
-    useEffect(() => {
-        if (project) {
-            fetchLabors();
-        }
-    }, [project]);
-
-    const fetchLabors = async () => {
+    const fetchLabors = React.useCallback(async () => {
+        if (!project) return;
         setLoading(true);
         const { data, error } = await supabase
             .from('expense_labor')
@@ -48,9 +43,13 @@ export default function LaborTracking({ project, onBack, embedded }) {
             setLabors(data);
         }
         setLoading(false);
-    };
+    }, [project]);
 
-    const handleAddRow = () => {
+    useEffect(() => {
+        fetchLabors();
+    }, [fetchLabors]);
+
+    function handleAddRow() {
         const newRow = {
             id: 'temp-' + Date.now(),
             isNew: true,
@@ -89,7 +88,7 @@ export default function LaborTracking({ project, onBack, embedded }) {
         setEditForm(prev => ({ ...prev, [field]: value }));
     };
 
-    const handleSaveEdit = async () => {
+    async function handleSaveEdit() {
         if (!editForm.team_name || !editForm.payment_stage) {
             alert('Vui lòng nhập Tên Thầu phụ/Tổ đội và Đợt thanh toán.');
             return;
@@ -202,8 +201,79 @@ export default function LaborTracking({ project, onBack, embedded }) {
             </div>
 
             {/* Main Area: Excel-like Grid Layout */}
-            <div className={`flex-1 overflow-auto bg-slate-50/50 ${embedded ? 'p-0 relative' : 'p-6'}`}>
-                <div className={`bg-white ${embedded ? '' : 'rounded-xl shadow-sm border border-slate-200'} min-w-[max-content] pb-20 ring-1 ring-slate-200/50`}>
+            <div className={`flex-1 overflow-auto bg-slate-50/50 ${embedded ? 'p-0 relative' : 'p-6 gap-4'}`}>
+                {/* Mobile Card View */}
+                <div className="block xl:hidden space-y-3 pb-20">
+                    {labors.length === 0 ? (
+                        <div className="py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm font-medium">
+                            Chưa có dữ liệu thanh toán thầu phụ
+                        </div>
+                    ) : labors.map((labor, index) => {
+                        const isEditing = editingId === labor.id;
+                        if (isEditing) return null; // We'll focus edit on desktop or a simpler mobile edit later if needed
+
+                        return (
+                            <div key={labor.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative group animate-slide-up">
+                                <div className="absolute -top-2 left-4 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-md text-[9px] font-black text-slate-500">
+                                    #{index + 1}
+                                </div>
+                                
+                                <div className="flex justify-between items-start mb-3 mt-1">
+                                    <div className="flex-1 pr-2">
+                                        <div className="font-bold text-sm text-slate-800 leading-tight">{labor.team_name}</div>
+                                        <div className="flex flex-wrap gap-1.5 mt-2">
+                                            <span className="px-2 py-0.5 rounded bg-purple-50 text-purple-700 text-[10px] font-bold border border-purple-100 uppercase">{labor.payment_stage}</span>
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${
+                                                labor.priority === 'Khẩn cấp' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                                labor.priority === 'Cao' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                                'bg-slate-50 text-slate-600 border-slate-200'
+                                            }`}>
+                                                {labor.priority}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-1 shrink-0">
+                                        <button onClick={() => handleEditClick(labor)} className="w-8 h-8 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-200 shadow-sm active:scale-95 transition-transform">
+                                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                                        </button>
+                                        <button onClick={() => handleDelete(labor.id)} className="w-8 h-8 rounded-lg bg-slate-50 text-rose-500 flex items-center justify-center border border-slate-200 shadow-sm active:scale-95 transition-transform">
+                                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3 mb-3 border-t border-slate-50 pt-3">
+                                    <div>
+                                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Duyệt Chốt</div>
+                                        <div className="text-[14px] font-black text-blue-700 tabular-nums">{formatCurrency(labor.approved_amount)}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 text-right">Đã Thanh Toán</div>
+                                        <div className="text-[14px] font-black text-emerald-700 text-right tabular-nums">{formatCurrency(labor.paid_amount)}</div>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between items-center text-[10px] bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                    <div className="flex items-center gap-1.5 text-slate-500">
+                                        <span className="material-symbols-outlined text-[14px]">calendar_today</span>
+                                        {formatDate(labor.request_date)}
+                                    </div>
+                                    <div className="font-bold text-rose-600">
+                                        Nợ: {formatCurrency(labor.approved_amount - labor.paid_amount)}
+                                    </div>
+                                </div>
+
+                                {labor.notes && (
+                                    <p className="mt-3 text-[11px] text-slate-500 italic line-clamp-1 border-t border-slate-50 pt-2 pl-1">
+                                        "{labor.notes}"
+                                    </p>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div className={`hidden xl:block bg-white ${embedded ? '' : 'rounded-xl shadow-sm border border-slate-200'} min-w-[max-content] pb-20 ring-1 ring-slate-200/50`}>
                     <div className="overflow-x-auto">
                         <table className="w-full text-xs text-left whitespace-nowrap border-collapse">
                             <thead className="bg-[#f8f9fa] text-slate-600 font-bold sticky top-0 z-10 shadow-sm border-b-2 border-slate-300 uppercase tracking-wider text-[10px]">
