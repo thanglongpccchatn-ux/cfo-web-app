@@ -106,10 +106,15 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                 const addendaValue = projAdds.reduce((s, a) => s + Number(a.requested_value), 0);
                 const projPmts = (pmts || []).filter(pm => pm.project_id === p.id);
                 
-                // Calculations for Financial Columns
-                const totalValuePreVat = Number(p.original_value) || 0;
-                const vatAmount = p.vat_amount || (totalValuePreVat * (p.vat_percentage ?? 8) / 100);
-                const totalValuePostVat = p.total_value_post_vat || (totalValuePreVat + vatAmount);
+                // Calculations for Financial Columns (including variations)
+                const baseTotalValuePreVat = Number(p.original_value) || 0;
+                const baseVatAmount = p.vat_amount || (baseTotalValuePreVat * (p.vat_percentage ?? 8) / 100);
+                const baseTotalValuePostVat = p.total_value_post_vat || (baseTotalValuePreVat + baseVatAmount);
+                
+                const approvedVariationsPreVat = Number(p.total_approved_variations) || 0;
+                const totalValuePreVat = baseTotalValuePreVat + approvedVariationsPreVat;
+                const totalValuePostVat = baseTotalValuePostVat + approvedVariationsPreVat * (1 + (p.vat_percentage ?? 8) / 100);
+                const vatAmount = totalValuePostVat - totalValuePreVat;
                 
                 const totalInvoice = projPmts.reduce((s, pm) => s + Number(pm.invoice_amount || 0), 0);
                 const totalRequested = projPmts.reduce((s, pm) => s + Number(pm.payment_request_amount || 0), 0);
@@ -350,9 +355,9 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
 
     const Th = ({ label, sortKey, align = 'left', extraClass = '' }) => (
         <th 
-            className={`px-2 py-3 cursor-pointer hover:bg-slate-200/50 transition-colors select-none group relative ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'} ${extraClass}`}
+            className={`px-1.5 py-2.5 cursor-pointer hover:bg-slate-200/50 transition-colors select-none group relative ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'} ${extraClass}`}
             onClick={() => handleSort(sortKey)}
-            style={{ resize: 'horizontal', overflow: 'hidden', minWidth: '80px', maxWidth: '500px' }}
+            style={{ resize: 'horizontal', overflow: 'hidden', minWidth: '60px', maxWidth: '300px' }}
             title="Kéo góc phụ bên phải để co giãn cột"
         >
             <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : ''}`}>
@@ -423,7 +428,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
             <div className="glass-panel p-0 shadow-sm border border-slate-200/60 bg-white/70 overflow-visible">
                 {/* Toolbar */}
                 <div className="p-4 border-b border-slate-200/60 flex flex-wrap gap-4 items-center bg-slate-50/50">
-                    <div className="relative flex-1 min-w-full sm:min-w-[280px]">
+                    <div className="relative w-full md:w-[280px] lg:w-[360px] flex-shrink-0">
                         <span className="material-symbols-outlined notranslate absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-[18px] md:text-[20px]" translate="no">search</span>
                         <input
                             type="text"
@@ -464,7 +469,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                         <select 
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="pl-3 pr-8 py-2 md:py-2.5 rounded-xl border border-slate-200 text-[10px] md:text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm max-w-[120px] truncate appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_8px_center] bg-[size:14px]"
+                            className="pl-3 pr-8 py-2 md:py-2.5 rounded-xl border border-slate-200 text-[10px] md:text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_8px_center] bg-[size:14px]"
                         >
                             <option value="All">Trạng thái (TT)</option>
                             {statusOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -473,18 +478,18 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                         <select 
                             value={signatureFilter}
                             onChange={(e) => setSignatureFilter(e.target.value)}
-                            className="pl-3 pr-8 py-2 md:py-2.5 rounded-xl border border-slate-200 text-[10px] md:text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm max-w-[120px] truncate appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_8px_center] bg-[size:14px]"
+                            className="pl-3 pr-8 py-2 md:py-2.5 rounded-xl border border-slate-200 text-[10px] md:text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_8px_center] bg-[size:14px]"
                         >
-                            <option value="All">Tình trạng Ký (TTK)</option>
+                            <option value="All">Tình trạng Ký</option>
                             {signatureOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
 
                         <select 
                             value={settlementFilter}
                             onChange={(e) => setSettlementFilter(e.target.value)}
-                            className="pl-3 pr-8 py-2 md:py-2.5 rounded-xl border border-slate-200 text-[10px] md:text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm max-w-[120px] truncate appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_8px_center] bg-[size:14px]"
+                            className="pl-3 pr-8 py-2 md:py-2.5 rounded-xl border border-slate-200 text-[10px] md:text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_8px_center] bg-[size:14px]"
                         >
-                            <option value="All">Quyết toán (QT)</option>
+                            <option value="All">Quyết toán</option>
                             {settlementOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
 
@@ -629,23 +634,23 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                 </div>
 
                                 {/* Desktop Table View */}
-                                <div className="hidden lg:block">
-                                    <table className="w-full text-[13px] text-left border-separate border-spacing-0 whitespace-nowrap">
+                                <div className="hidden xl:block">
+                                    <table className="w-full text-[12px] text-left border-separate border-spacing-0 whitespace-nowrap">
                                         <thead className="bg-slate-50 text-slate-500 uppercase tracking-widest text-[9px] font-black sticky top-0 z-20 shadow-sm border-b border-slate-200">
                                             <tr>
-                                                <Th label="Mã DA/HĐ" sortKey="code" extraClass="px-3" />
+                                                <Th label="Mã DA/HĐ" sortKey="code" extraClass="px-2" />
                                                 <Th label="HĐ Trước VAT" sortKey="preVat" align="right" extraClass="border-l border-slate-100 bg-blue-50/30" />
-                                                <Th label="VAT (%)" sortKey="vatPercent" align="right" extraClass="bg-blue-50/30 text-blue-400" />
+                                                <Th label="VAT (%)" sortKey="vatPercent" align="center" extraClass="bg-blue-50/30 text-blue-400" />
                                                 <Th label="Giá trị Sau VAT" sortKey="postVat" align="right" extraClass="font-black text-blue-700 bg-blue-50/30" />
                                                 <Th label="Tổng Xuất HĐ" sortKey="totalInvoice" align="right" extraClass="border-l border-slate-100" />
                                                 <Th label="Tổng Đề nghị" sortKey="totalRequested" align="right" />
                                                 <Th label="Tổng Thanh toán" sortKey="totalIncome" align="right" />
                                                 <Th label="Công nợ HĐ" sortKey="debtInvoice" align="right" extraClass="border-l border-rose-50 font-black text-rose-600" />
                                                 <Th label="Công nợ ĐN" sortKey="debtPayment" align="right" extraClass="font-black text-amber-700" />
-                                                <Th label="Tình trạng Ký" sortKey="signature_status" align="center" extraClass="px-3" />
-                                                <Th label="Quyết toán" sortKey="settlement_status" align="center" extraClass="px-3" />
-                                                <Th label="TT Thi công" sortKey="status" align="center" extraClass="px-3" />
-                                                <th className="px-3 py-3 text-center">Tác vụ</th>
+                                                <Th label="Tình trạng Ký" sortKey="signature_status" align="center" extraClass="px-1.5" />
+                                                <Th label="Quyết toán" sortKey="settlement_status" align="center" extraClass="px-1.5" />
+                                                <Th label="TT Thi công" sortKey="status" align="center" extraClass="px-1.5" />
+                                                <th className="px-1.5 py-2.5 text-center">Tác vụ</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 bg-white">
@@ -655,8 +660,8 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                     onClick={() => handleViewDetail(proj)}
                                                     className={`hover:bg-blue-50/50 transition-colors cursor-pointer group ${proj.vat_percentage === 0 ? 'bg-yellow-50/50' : ''}`}
                                                 >
-                                                    <td className="px-3 py-2.5">
-                                                        <div className="flex items-center gap-2">
+                                                    <td className="px-2 py-2">
+                                                        <div className="flex items-center gap-1.5">
                                                             <div className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter ${
                                                                 activeEntity === 'sateco' ? 'bg-emerald-100 text-emerald-700' :
                                                                 (proj.acting_entity_key || '').toLowerCase() === 'thanhphat' ? 'bg-amber-100 text-amber-700' : 
@@ -693,17 +698,17 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                             )}
                                                         </div>
                                                     </td>
-                                                    <td className="px-2 py-2.5 text-right text-slate-500 border-l border-slate-50">
+                                                    <td className="px-1.5 py-1.5 text-right text-slate-500 border-l border-slate-50">
                                                         {formatBillion(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue / (1 + (proj.internal_vat_percentage ?? 8) / 100) : proj.totalValuePreVat)}
                                                     </td>
-                                                    <td className="px-2 py-2.5 text-right">
+                                                    <td className="px-1.5 py-1.5 text-right">
                                                         {activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? (
                                                             <span className="text-slate-400 italic">
                                                                 {proj.internal_vat_percentage ?? 8}%
                                                             </span>
                                                         ) : (
                                                             proj.vat_percentage === 0 ? (
-                                                                <span className="px-1.5 py-0.5 rounded bg-yellow-400 text-slate-900 text-[10px] font-black border border-yellow-500 shadow-sm uppercase tracking-tighter">
+                                                                <span className="px-1 py-0.5 rounded bg-yellow-400 text-slate-900 text-[9px] font-black border border-yellow-500 shadow-sm uppercase tracking-tighter">
                                                                     0% VAT
                                                                 </span>
                                                             ) : (
@@ -713,54 +718,54 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                             )
                                                         )}
                                                     </td>
-                                                    <td className="px-2 py-2.5 text-right font-medium text-blue-700 bg-blue-50/10">
+                                                    <td className="px-1.5 py-1.5 text-right font-medium text-blue-700 bg-blue-50/10" title={proj.total_approved_variations ? `Gốc: ${formatBillion(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.totalValuePostVat * (proj.sateco_contract_ratio||98)/100 - ((proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100))*(proj.sateco_contract_ratio||98)/100) : proj.totalValuePostVat - (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)))} + PS: ${formatBillion(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)) * (proj.sateco_contract_ratio||98)/100 : (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)))}` : ''}>
                                                         {formatBillion(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue : proj.totalValuePostVat)}
                                                     </td>
-                                                    <td className="px-2 py-2.5 text-right text-slate-600 border-l border-slate-50">
+                                                    <td className="px-1.5 py-1.5 text-right text-slate-600 border-l border-slate-50">
                                                         {formatBillion(proj.totalInvoice)}
                                                     </td>
-                                                    <td className="px-2 py-2.5 text-right text-slate-600">
+                                                    <td className="px-1.5 py-1.5 text-right text-slate-600">
                                                         {formatBillion(proj.totalRequested)}
                                                     </td>
-                                                    <td className="px-2 py-2.5 text-right font-medium text-emerald-600">
+                                                    <td className="px-1.5 py-1.5 text-right font-medium text-emerald-600">
                                                         {formatBillion(proj.totalIncome)}
                                                     </td>
-                                                    <td className={`px-2 py-2.5 text-right font-medium border-l border-rose-50/50 ${proj.debtInvoice > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                    <td className={`px-1.5 py-1.5 text-right font-medium border-l border-rose-50/50 ${proj.debtInvoice > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                                                         {formatBillion(proj.debtInvoice)}
                                                     </td>
-                                                    <td className={`px-2 py-2.5 text-right font-medium ${(proj.totalRequested - proj.totalIncome) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                                                    <td className={`px-1.5 py-1.5 text-right font-medium ${(proj.totalRequested - proj.totalIncome) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
                                                         {formatBillion(proj.totalRequested - proj.totalIncome)}
                                                     </td>
-                                                    <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                                    <td className="px-1.5 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                                                         <select
                                                             value={proj.signature_status || 'Chưa ký'}
                                                             onChange={(e) => handleSignatureStatusChange(proj.id, e.target.value, e)}
                                                             onClick={(e) => e.stopPropagation()}
-                                                            className={`appearance-none cursor-pointer inline-flex items-center px-2 py-0.5 rounded-full text-[10px] uppercase tracking-widest font-black border outline-none transition-all hover:shadow-sm focus:ring-2 focus:ring-blue-500/20 ${(proj.signature_status || 'Chưa ký') === 'Đã ký' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-rose-100 text-rose-700 border-rose-200'}`}
+                                                            className={`appearance-none cursor-pointer inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] uppercase tracking-widest font-black border outline-none transition-all hover:shadow-sm focus:ring-2 focus:ring-blue-500/20 ${(proj.signature_status || 'Chưa ký') === 'Đã ký' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-rose-100 text-rose-700 border-rose-200'}`}
                                                         >
                                                             {signatureOptions.map(opt => (
                                                                 <option key={opt} value={opt} className="bg-white text-slate-700 font-medium">{opt}</option>
                                                             ))}
                                                         </select>
                                                     </td>
-                                                    <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                                    <td className="px-1.5 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                                                         <select
                                                             value={proj.settlement_status || 'Chưa quyết toán'}
                                                             onChange={(e) => handleSettlementStatusChange(proj.id, e.target.value, e)}
                                                             onClick={(e) => e.stopPropagation()}
-                                                            className={`appearance-none cursor-pointer inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border outline-none transition-all hover:shadow-sm focus:ring-2 focus:ring-blue-500/20 ${(proj.settlement_status || 'Chưa quyết toán') === 'Đã quyết toán' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : (proj.settlement_status || 'Chưa quyết toán') === 'Đang quyết toán' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-700 border-slate-200'}`}
+                                                            className={`appearance-none cursor-pointer inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black border outline-none transition-all hover:shadow-sm focus:ring-2 focus:ring-blue-500/20 ${(proj.settlement_status || 'Chưa quyết toán') === 'Đã quyết toán' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : (proj.settlement_status || 'Chưa quyết toán') === 'Đang quyết toán' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-700 border-slate-200'}`}
                                                         >
                                                             {settlementOptions.map(opt => (
                                                                 <option key={opt} value={opt} className="bg-white text-slate-700 font-medium">{opt}</option>
                                                             ))}
                                                         </select>
                                                     </td>
-                                                    <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                                    <td className="px-1.5 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                                                         <select
                                                             value={proj.status || 'Chưa thi công'}
                                                             onChange={(e) => handleStatusChange(proj.id, e.target.value, e)}
                                                             onClick={(e) => e.stopPropagation()}
-                                                            className={`appearance-none cursor-pointer inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border outline-none transition-all hover:shadow-sm focus:ring-2 focus:ring-blue-500/20 ${getStatusColor(proj.status)}`}
+                                                            className={`appearance-none cursor-pointer inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black border outline-none transition-all hover:shadow-sm focus:ring-2 focus:ring-blue-500/20 ${getStatusColor(proj.status)}`}
                                                         >
                                                             {statusOptionsList.map(opt => (
                                                                 <option key={opt} value={opt} className="bg-white text-slate-700 font-medium">
@@ -769,7 +774,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                             ))}
                                                         </select>
                                                     </td>
-                                                    <td className="px-3 py-2.5 text-center">
+                                                    <td className="px-1.5 py-1.5 text-center">
                                                         <div className="flex items-center justify-center gap-1">
                                                             {hasPermission('edit_contracts') && (<button onClick={(e) => { e.stopPropagation(); onOpenFullscreen('contract_form', proj); }} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Sửa"><span className="material-symbols-outlined notranslate text-[18px]" translate="no">edit_note</span></button>)}
                                                             {hasPermission('delete_contracts') && (
@@ -792,28 +797,28 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                         </tbody>
                                         <tfoot className="bg-slate-50 border-t-2 border-slate-300 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] relative z-10">
                                             <tr className="divide-x divide-slate-200">
-                                                <td colSpan={2} className="px-3 py-4 text-slate-500 uppercase tracking-widest text-[9px] font-black italic bg-slate-100/50">
+                                                <td colSpan={3} className="px-2 py-3 text-right pr-4 text-slate-500 uppercase tracking-widest text-[9px] font-black italic bg-slate-100/50">
                                                     TỔNG HỢP TOÀN BỘ ({filteredProjects.length} DA)
                                                 </td>
-                                                <td colSpan={3} className="px-2 py-4 text-right text-blue-700 text-[14px] font-black bg-blue-50/30">
+                                                <td className="px-1.5 py-3 text-right text-blue-700 text-[14px] font-black bg-blue-50/30">
                                                     {formatBillion(totalValueAll)}
                                                 </td>
-                                                <td className="px-2 py-4 text-right text-slate-700 text-[14px] font-black">
+                                                <td className="px-1.5 py-3 text-right text-slate-600 text-[14px] font-black border-l border-slate-100">
                                                     {formatBillion(totalInvoiceAll)}
                                                 </td>
-                                                <td className="px-2 py-4 text-right text-slate-600 text-[14px] font-black bg-slate-50">
+                                                <td className="px-1.5 py-3 text-right text-slate-600 text-[14px] font-black">
                                                     {formatBillion(totalRequestedAll)}
                                                 </td>
-                                                <td className="px-2 py-4 text-right text-emerald-700 text-[14px] font-black bg-emerald-50/30">
+                                                <td className="px-1.5 py-3 text-right text-emerald-600 text-[14px] font-black">
                                                     {formatBillion(totalIncomeAll)}
                                                 </td>
-                                                <td className={`px-2 py-4 text-right text-[14px] font-black ${totalDebtInvoiceAll > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                <td className={`px-1.5 py-3 text-right text-[14px] font-black border-l border-rose-50 ${totalDebtInvoiceAll > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                                                     {formatBillion(totalDebtInvoiceAll)}
                                                 </td>
-                                                <td className={`px-2 py-4 text-right text-[14px] font-black bg-amber-50/20 ${(totalRequestedAll - totalIncomeAll) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                                                <td className={`px-1.5 py-3 text-right text-[14px] font-black bg-amber-50/20 ${(totalRequestedAll - totalIncomeAll) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
                                                     {formatBillion(totalRequestedAll - totalIncomeAll)}
                                                 </td>
-                                                <td colSpan={2} className="bg-slate-100/30"></td>
+                                                <td colSpan={4} className="bg-slate-50"></td>
                                             </tr>
                                         </tfoot>
                                     </table>

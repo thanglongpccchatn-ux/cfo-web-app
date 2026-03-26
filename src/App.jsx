@@ -37,6 +37,7 @@ const Settings = lazy(() => import('./components/Settings'));
 const UserProfile = lazy(() => import('./components/UserProfile'));
 const SiteDiary = lazy(() => import('./components/SiteDiary'));
 const SettlementManagement = lazy(() => import('./components/SettlementManagement'));
+const VariationsManagement = lazy(() => import('./components/VariationsManagement'));
 
 const queryClient = new QueryClient();
 
@@ -168,6 +169,7 @@ function MainLayout() {
             {/* Core Modules */}
             <Route path="/dashboard" element={<ProtectedRoute requiredPerms={['view_dashboard']}><DashboardOverview /></ProtectedRoute>} />
             <Route path="/contracts" element={<ProtectedRoute requiredPerms={['view_contracts']}><ContractMasterDetail onOpenFullscreen={(type, data) => setFullscreenView({ type, data })} /></ProtectedRoute>} />
+            <Route path="/variations" element={<ProtectedRoute requiredPerms={['view_contracts']}><VariationsManagement /></ProtectedRoute>} />
             <Route path="/doc_tracking" element={<ProtectedRoute requiredPerms={['view_payments']}><DocumentTrackingModule /></ProtectedRoute>} />
             <Route path="/payment_receipts" element={<ProtectedRoute requiredPerms={['view_payments']}><PaymentReceiptsModule /></ProtectedRoute>} />
             <Route path="/site_diary" element={<ProtectedRoute><SiteDiary /></ProtectedRoute>} />

@@ -20,6 +20,7 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
     const tabs = [
         { id: 'dashboard', icon: 'grid_view', label: 'Tổng quan', perms: ['view_dashboard'] },
         { id: 'contracts', icon: 'description', label: 'Hợp đồng', perms: ['view_contracts', 'create_contracts', 'edit_contracts', 'delete_contracts'] },
+        { id: 'variations', icon: 'playlist_add', label: 'Phát sinh', perms: ['view_contracts'] },
         { id: 'doc_tracking', icon: 'folder_managed', label: 'Hồ sơ & Thanh toán', perms: ['view_payments', 'create_payments', 'edit_payments', 'delete_payments'] },
         { id: 'payment_receipts', icon: 'receipt_long', label: 'Lịch sử thu tiền', perms: ['view_payments'] },
         { id: 'warranty_tracking', icon: 'security', label: 'Theo dõi Bảo hành', perms: ['view_contracts'] },

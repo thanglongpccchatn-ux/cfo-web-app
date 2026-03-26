@@ -49,9 +49,14 @@ export default function DashboardOverview() {
                     const projExtHist = (extHist || []).filter(h => h.project_id === p.id);
                     const projIntHist = (intHist || []).filter(h => h.project_id === p.id);
 
-                    const totalValuePreVat = parseFloat(p.original_value) || 0;
-                    const vatAmount = p.vat_amount || (totalValuePreVat * (p.vat_percentage ?? 8) / 100);
-                    const totalValuePostVat = p.total_value_post_vat || (totalValuePreVat + vatAmount);
+                    const baseTotalValuePreVat = parseFloat(p.original_value) || 0;
+                    const baseVatAmount = p.vat_amount || (baseTotalValuePreVat * (p.vat_percentage ?? 8) / 100);
+                    const baseTotalValuePostVat = p.total_value_post_vat || (baseTotalValuePreVat + baseVatAmount);
+
+                    const approvedVariationsPreVat = parseFloat(p.total_approved_variations) || 0;
+                    const totalValuePreVat = baseTotalValuePreVat + approvedVariationsPreVat;
+                    const totalValuePostVat = baseTotalValuePostVat + approvedVariationsPreVat * (1 + (p.vat_percentage ?? 8) / 100);
+                    const vatAmount = totalValuePostVat - totalValuePreVat;
 
                     const totalIncomeFromHistory = projExtHist.reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
                     const totalIncomeFromPayments = projPmts.reduce((sum, pm) => sum + (parseFloat(pm.external_income) || 0), 0);

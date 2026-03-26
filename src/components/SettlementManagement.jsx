@@ -48,7 +48,8 @@ export default function SettlementManagement() {
                 const projDocs = (docs || []).filter(d => d.project_id === p.id);
 
                 // Values
-                const tvh = parseFloat(p.total_value_post_vat) || (parseFloat(p.original_value || 0) * 1.08);
+                const baseTvh = parseFloat(p.total_value_post_vat) || (parseFloat(p.original_value || 0) * (1 + (p.vat_percentage ?? 8) / 100));
+                const tvh = baseTvh + (parseFloat(p.total_approved_variations) || 0) * (1 + (p.vat_percentage ?? 8) / 100);
                 const totalAddenda = projAdds.reduce((s, a) => s + (parseFloat(a.requested_value) || 0), 0);
                 const proposedValue = parseFloat(p.settlement_proposed_value) || 0;
                 const approvedValue = parseFloat(p.settlement_approved_value) || 0;
