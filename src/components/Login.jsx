@@ -114,7 +114,7 @@ export default function Login() {
                 <div className="bg-slate-50 dark:bg-slate-800/50 p-6 text-center border-t border-slate-100 dark:border-slate-800">
                     <div className="text-xs text-slate-400 font-medium tracking-tight">
                         &copy; 2026 {currentTheme.company_name}. All rights reserved. <br/>
-                        Core System by Sateco Software.
+                        Core System by <span className="font-semibold">Trịnh Ngọc Hà</span> — Sateco Software.
                     </div>
                 </div>
             </div>

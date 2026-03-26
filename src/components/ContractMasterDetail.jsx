@@ -23,6 +23,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name }
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+    const [partnerModal, setPartnerModal] = useState(null); // { code, name, projects }
     const toast = useToast();
 
     const projectMapping = {
@@ -151,6 +152,24 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
         setView('detail');
     };
 
+    const handleOpenPartnerDetail = (proj) => {
+        const partnerCode = proj.partners?.code || proj.partners?.short_name || proj.client || '';
+        const partnerName = proj.partners?.name || proj.client || '';
+        const partnerId = proj.partner_id;
+
+        // Find all projects with same partner
+        const partnerProjects = projects.filter(p => {
+            if (partnerId) return p.partner_id === partnerId;
+            return (p.partners?.code || p.client) === partnerCode;
+        }).map(p => ({
+            ...p,
+            computedTotalInvoice: p.totalInvoice || 0,
+            computedTotalIncome: p.totalIncome || 0,
+        }));
+
+        setPartnerModal({ code: partnerCode, name: partnerName, projects: partnerProjects });
+    };
+
     const formatDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '-';
 
     const statusOptionsList = ['Đang thi công', 'Đã hoàn thành', 'Bảo hành', 'Tạm dừng', 'Chưa thi công'];
@@ -184,11 +203,50 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
         }
     };
 
+    const handleSignatureStatusChange = async (projectId, newStatus, e) => {
+        if (e) e.stopPropagation();
+        try {
+            const { error } = await supabase
+                .from('projects')
+                .update({ signature_status: newStatus })
+                .eq('id', projectId);
+            
+            if (error) throw error;
+            
+            setProjects(projects.map(p => p.id === projectId ? { ...p, signature_status: newStatus } : p));
+            toast.success(`Đã cập nhật tình trạng ký sang "${newStatus}"`);
+        } catch (error) {
+            console.error('Error updating signature status:', error);
+            toast.error('Lỗi khi cập nhật tình trạng ký: ' + error.message);
+        }
+    };
+
+    const handleSettlementStatusChange = async (projectId, newStatus, e) => {
+        if (e) e.stopPropagation();
+        try {
+            const { error } = await supabase
+                .from('projects')
+                .update({ settlement_status: newStatus })
+                .eq('id', projectId);
+            
+            if (error) throw error;
+            
+            setProjects(projects.map(p => p.id === projectId ? { ...p, settlement_status: newStatus } : p));
+            toast.success(`Đã cập nhật quyết toán sang "${newStatus}"`);
+        } catch (error) {
+            console.error('Error updating settlement status:', error);
+            toast.error('Lỗi khi cập nhật quyết toán: ' + error.message);
+        }
+    };
+
     const handleImportSuccess = (count) => {
         toast.success(`Đã import thành công ${count} dự án!`);
         fetchProjects();
     };
 
+    const [signatureFilter, setSignatureFilter] = useState('All');
+    const [settlementFilter, setSettlementFilter] = useState('All');
+    
     const filteredProjects = projects.filter(p => {
         const q = searchTerm.toLowerCase();
         const matchSearch = !q || 
@@ -197,6 +255,8 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
             p.internal_code?.toLowerCase().includes(q) ||
             p.client?.toLowerCase().includes(q);
         const matchStatus = statusFilter === 'All' || p.status === statusFilter;
+        const matchSignature = signatureFilter === 'All' || (p.signature_status || 'Chưa ký') === signatureFilter;
+        const matchSettlement = settlementFilter === 'All' || (p.settlement_status || 'Chưa quyết toán') === settlementFilter;
         
         // Date Filter (CEO Logic: Filter by Contract Month/Year based on created_at)
         let matchDate = true;
@@ -212,7 +272,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
         // Sateco Core tab sees everything (as internal contracts)
         const matchEntity = activeEntity === 'all' || activeEntity === 'sateco' || p.acting_entity_key === activeEntity;
         
-        return matchSearch && matchStatus && matchEntity && matchDate;
+        return matchSearch && matchStatus && matchSignature && matchSettlement && matchEntity && matchDate;
     });
 
     const handleSort = (key) => {
@@ -267,6 +327,8 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
     const totalDebtInvoiceAll = filteredProjects.reduce((s, p) => s + (p.debtInvoice || 0), 0);
     const totalDebtPaymentAll = filteredProjects.reduce((s, p) => s + (p.debtPayment || 0), 0);
     const statusOptions = [...new Set(projects.map(p => p.status).filter(Boolean))];
+    const signatureOptions = ['Đã ký', 'Chưa ký'];
+    const settlementOptions = ['Đã quyết toán', 'Đang quyết toán', 'Chưa quyết toán'];
 
     if (view === 'detail' && selectedProject) {
         const isInternalView = activeEntity === 'sateco' && selectedProject.acting_entity_key !== 'sateco';
@@ -283,17 +345,19 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
     // Helper functions
     const formatBillion = (val) => {
         if (!val) return '0';
-        return (val / 1000000000).toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+        return Math.round(Number(val)).toLocaleString('vi-VN');
     };
 
     const Th = ({ label, sortKey, align = 'left', extraClass = '' }) => (
         <th 
-            className={`px-2 py-3 cursor-pointer hover:bg-slate-200/50 transition-colors select-none group ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'} ${extraClass}`}
+            className={`px-2 py-3 cursor-pointer hover:bg-slate-200/50 transition-colors select-none group relative ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'} ${extraClass}`}
             onClick={() => handleSort(sortKey)}
+            style={{ resize: 'horizontal', overflow: 'hidden', minWidth: '80px', maxWidth: '500px' }}
+            title="Kéo góc phụ bên phải để co giãn cột"
         >
             <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : ''}`}>
-                {label}
-                <span className={`material-symbols-outlined text-[14px] transition-opacity ${sortConfig.key === sortKey ? 'opacity-100 text-blue-600' : 'opacity-0 group-hover:opacity-40'}`}>
+                <span className="truncate">{label}</span>
+                <span className={`material-symbols-outlined shrink-0 text-[14px] transition-opacity ${sortConfig.key === sortKey ? 'opacity-100 text-blue-600' : 'opacity-0 group-hover:opacity-40'}`}>
                     {sortConfig.key === sortKey ? (sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'swap_vert'}
                 </span>
             </div>
@@ -402,8 +466,26 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                             onChange={(e) => setStatusFilter(e.target.value)}
                             className="pl-3 pr-8 py-2 md:py-2.5 rounded-xl border border-slate-200 text-[10px] md:text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm max-w-[120px] truncate appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_8px_center] bg-[size:14px]"
                         >
-                            <option value="All">Trạng thái</option>
+                            <option value="All">Trạng thái (TT)</option>
                             {statusOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+
+                        <select 
+                            value={signatureFilter}
+                            onChange={(e) => setSignatureFilter(e.target.value)}
+                            className="pl-3 pr-8 py-2 md:py-2.5 rounded-xl border border-slate-200 text-[10px] md:text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm max-w-[120px] truncate appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_8px_center] bg-[size:14px]"
+                        >
+                            <option value="All">Tình trạng Ký (TTK)</option>
+                            {signatureOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+
+                        <select 
+                            value={settlementFilter}
+                            onChange={(e) => setSettlementFilter(e.target.value)}
+                            className="pl-3 pr-8 py-2 md:py-2.5 rounded-xl border border-slate-200 text-[10px] md:text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm max-w-[120px] truncate appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_8px_center] bg-[size:14px]"
+                        >
+                            <option value="All">Quyết toán (QT)</option>
+                            {settlementOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
 
                         <button 
@@ -472,18 +554,34 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                     </div>
                                                     <span className="font-mono text-sm font-bold text-blue-600">{proj.internal_code || proj.code}</span>
                                                 </div>
-                                                <select
-                                                    value={proj.status || 'Chưa thi công'}
-                                                    onChange={(e) => handleStatusChange(proj.id, e.target.value, e)}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className={`appearance-none cursor-pointer px-2 py-1 rounded-md text-[10px] font-bold border outline-none ${getStatusColor(proj.status)}`}
-                                                >
-                                                    {statusOptionsList.map(opt => (
-                                                        <option key={opt} value={opt} className="bg-white text-slate-700 font-medium">
-                                                            {opt}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <select
+                                                        value={proj.signature_status || 'Chưa ký'}
+                                                        onChange={(e) => handleSignatureStatusChange(proj.id, e.target.value, e)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className={`appearance-none cursor-pointer px-2 py-0.5 rounded-full text-[9px] uppercase font-black border outline-none ${(proj.signature_status || 'Chưa ký') === 'Đã ký' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}
+                                                    >
+                                                        {signatureOptions.map(opt => <option key={opt} value={opt} className="bg-white text-slate-700">{opt}</option>)}
+                                                    </select>
+                                                    <select
+                                                        value={proj.settlement_status || 'Chưa quyết toán'}
+                                                        onChange={(e) => handleSettlementStatusChange(proj.id, e.target.value, e)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className={`appearance-none cursor-pointer px-2 py-0.5 rounded text-[10px] font-bold border outline-none ${(proj.settlement_status || 'Chưa quyết toán') === 'Đã quyết toán' ? 'bg-emerald-50 text-emerald-700' : (proj.settlement_status || 'Chưa quyết toán') === 'Đang quyết toán' ? 'bg-amber-50 text-amber-700' : 'bg-slate-50 text-slate-700'}`}
+                                                    >
+                                                        {settlementOptions.map(opt => <option key={opt} value={opt} className="bg-white text-slate-700">{opt}</option>)}
+                                                    </select>
+                                                    <select
+                                                        value={proj.status || 'Chưa thi công'}
+                                                        onChange={(e) => handleStatusChange(proj.id, e.target.value, e)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className={`appearance-none cursor-pointer px-2 py-0.5 rounded text-[10px] font-bold border outline-none ${getStatusColor(proj.status)}`}
+                                                    >
+                                                        {statusOptionsList.map(opt => (
+                                                            <option key={opt} value={opt} className="bg-white text-slate-700 font-medium">{opt}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
                                             </div>
 
                                             <div className="mb-4">
@@ -498,19 +596,19 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                             <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl mb-3 border border-slate-100">
                                                 <div>
                                                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Giá trị HĐ (Sau VAT)</p>
-                                                    <p className="text-sm font-black text-blue-700">{formatBillion(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue : proj.totalValuePostVat)} Tỷ</p>
+                                                    <p className="text-sm font-black text-blue-700">{formatBillion(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue : proj.totalValuePostVat)}</p>
                                                 </div>
                                                 <div>
                                                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Đã Thu</p>
-                                                    <p className="text-sm font-black text-emerald-600">{formatBillion(proj.totalIncome)} Tỷ</p>
+                                                    <p className="text-sm font-black text-emerald-600">{formatBillion(proj.totalIncome)}</p>
                                                 </div>
                                                 <div>
                                                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Công nợ Hóa Đơn</p>
-                                                    <p className={`text-sm font-black ${proj.debtInvoice > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{formatBillion(proj.debtInvoice)} Tỷ</p>
+                                                    <p className={`text-sm font-black ${proj.debtInvoice > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{formatBillion(proj.debtInvoice)}</p>
                                                 </div>
                                                 <div>
                                                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Công nợ Đề Nghị</p>
-                                                    <p className={`text-sm font-black ${(proj.totalRequested - proj.totalIncome) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{formatBillion(proj.totalRequested - proj.totalIncome)} Tỷ</p>
+                                                    <p className={`text-sm font-black ${(proj.totalRequested - proj.totalIncome) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{formatBillion(proj.totalRequested - proj.totalIncome)}</p>
                                                 </div>
                                             </div>
 
@@ -536,7 +634,6 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                         <thead className="bg-slate-50 text-slate-500 uppercase tracking-widest text-[9px] font-black sticky top-0 z-20 shadow-sm border-b border-slate-200">
                                             <tr>
                                                 <Th label="Mã DA/HĐ" sortKey="code" extraClass="px-3" />
-                                                <Th label="Mã Đối tác" sortKey="partnerCode" extraClass="px-3" />
                                                 <Th label="HĐ Trước VAT" sortKey="preVat" align="right" extraClass="border-l border-slate-100 bg-blue-50/30" />
                                                 <Th label="VAT (%)" sortKey="vatPercent" align="right" extraClass="bg-blue-50/30 text-blue-400" />
                                                 <Th label="Giá trị Sau VAT" sortKey="postVat" align="right" extraClass="font-black text-blue-700 bg-blue-50/30" />
@@ -545,7 +642,9 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                 <Th label="Tổng Thanh toán" sortKey="totalIncome" align="right" />
                                                 <Th label="Công nợ HĐ" sortKey="debtInvoice" align="right" extraClass="border-l border-rose-50 font-black text-rose-600" />
                                                 <Th label="Công nợ ĐN" sortKey="debtPayment" align="right" extraClass="font-black text-amber-700" />
-                                                <Th label="Trạng thái" sortKey="status" align="center" extraClass="px-3" />
+                                                <Th label="Tình trạng Ký" sortKey="signature_status" align="center" extraClass="px-3" />
+                                                <Th label="Quyết toán" sortKey="settlement_status" align="center" extraClass="px-3" />
+                                                <Th label="TT Thi công" sortKey="status" align="center" extraClass="px-3" />
                                                 <th className="px-3 py-3 text-center">Tác vụ</th>
                                             </tr>
                                         </thead>
@@ -568,27 +667,30 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                                  (proj.acting_entity_key || '').toLowerCase() === 'thanhphat' ? 'TP' : 
                                                                  (proj.acting_entity_key || '').toLowerCase() === 'sateco' ? 'ST' : 'TL'}
                                                             </div>
-                                                            <div className="font-mono text-[12px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded inline-block border border-blue-100">
-                                                                {proj.internal_code || proj.code}
+                                                            <div>
+                                                                <div className="font-mono text-[12px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded inline-block border border-blue-100">
+                                                                    {proj.internal_code || proj.code}
+                                                                </div>
+                                                                {proj.internal_code && proj.code && (
+                                                                    <div className="text-[10px] text-slate-400 mt-0.5 font-medium">#{proj.code}</div>
+                                                                )}
                                                             </div>
                                                         </div>
-                                                        {proj.internal_code && proj.code && (
-                                                            <div className="text-[11px] text-slate-400 mt-0.5 font-medium">#{proj.code}</div>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-3 py-2.5">
-                                                        <div className="font-bold text-slate-700 truncate uppercase" title={proj.partners?.name || proj.client}>
+                                                        <div className="mt-1">
                                                             {activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? (
-                                                                <span className="flex items-center gap-1.5 text-slate-700">
-                                                                    <span className="material-symbols-outlined text-[16px] text-emerald-600">sync_alt</span>
-                                                                    {proj.acting_entity_key === 'thanhphat' ? 'THÀNH PHÁT (Nội bộ)' : 'THĂNG LONG (Nội bộ)'}
+                                                                <span className="flex items-center gap-1 text-[11px] font-bold text-slate-600">
+                                                                    <span className="material-symbols-outlined text-[13px] text-emerald-600">sync_alt</span>
+                                                                    {proj.acting_entity_key === 'thanhphat' ? 'THÀNH PHÁT (NB)' : 'THĂNG LONG (NB)'}
                                                                 </span>
                                                             ) : (
-                                                                proj.partners?.code || proj.partners?.short_name || proj.client || '—'
+                                                                <span
+                                                                    onClick={(e) => { e.stopPropagation(); handleOpenPartnerDetail(proj); }}
+                                                                    className="font-mono text-[12px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded inline-block border border-emerald-100 cursor-pointer hover:bg-emerald-100 hover:text-emerald-700 transition-colors"
+                                                                    title={`Click xem chi tiết: ${proj.partners?.name || proj.client}`}
+                                                                >
+                                                                    {proj.partners?.code || proj.partners?.short_name || proj.client || '—'}
+                                                                </span>
                                                             )}
-                                                        </div>
-                                                        <div className="text-[11px] font-medium text-slate-400 mt-0.5 truncate max-w-[120px]">
-                                                            {activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.name : (proj.partners?.name || proj.client)}
                                                         </div>
                                                     </td>
                                                     <td className="px-2 py-2.5 text-right text-slate-500 border-l border-slate-50">
@@ -628,6 +730,30 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                     </td>
                                                     <td className={`px-2 py-2.5 text-right font-medium ${(proj.totalRequested - proj.totalIncome) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
                                                         {formatBillion(proj.totalRequested - proj.totalIncome)}
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                                        <select
+                                                            value={proj.signature_status || 'Chưa ký'}
+                                                            onChange={(e) => handleSignatureStatusChange(proj.id, e.target.value, e)}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className={`appearance-none cursor-pointer inline-flex items-center px-2 py-0.5 rounded-full text-[10px] uppercase tracking-widest font-black border outline-none transition-all hover:shadow-sm focus:ring-2 focus:ring-blue-500/20 ${(proj.signature_status || 'Chưa ký') === 'Đã ký' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-rose-100 text-rose-700 border-rose-200'}`}
+                                                        >
+                                                            {signatureOptions.map(opt => (
+                                                                <option key={opt} value={opt} className="bg-white text-slate-700 font-medium">{opt}</option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                                        <select
+                                                            value={proj.settlement_status || 'Chưa quyết toán'}
+                                                            onChange={(e) => handleSettlementStatusChange(proj.id, e.target.value, e)}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className={`appearance-none cursor-pointer inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border outline-none transition-all hover:shadow-sm focus:ring-2 focus:ring-blue-500/20 ${(proj.settlement_status || 'Chưa quyết toán') === 'Đã quyết toán' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : (proj.settlement_status || 'Chưa quyết toán') === 'Đang quyết toán' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-700 border-slate-200'}`}
+                                                        >
+                                                            {settlementOptions.map(opt => (
+                                                                <option key={opt} value={opt} className="bg-white text-slate-700 font-medium">{opt}</option>
+                                                            ))}
+                                                        </select>
                                                     </td>
                                                     <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
                                                         <select
@@ -736,6 +862,101 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                     Xác nhận Xóa
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Partner Detail Modal */}
+            {partnerModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" onClick={() => setPartnerModal(null)}>
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-emerald-50 to-white border-b border-slate-200">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
+                                    <span className="material-symbols-outlined text-[22px]">business</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-slate-800">{partnerModal.code}</h3>
+                                    <p className="text-xs font-medium text-slate-500">{partnerModal.name}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setPartnerModal(null)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+
+                        {/* KPI Summary */}
+                        <div className="grid grid-cols-4 gap-3 px-6 py-4 bg-slate-50 border-b border-slate-100">
+                            {[
+                                { label: 'Số HĐ', value: partnerModal.projects.length, color: 'blue', icon: 'description' },
+                                { label: 'Tổng giá trị HĐ', value: formatBillion(partnerModal.projects.reduce((s, p) => s + (p.total_value_post_vat || 0), 0)), color: 'indigo', icon: 'payments' },
+                                { label: 'Tổng đã thu', value: formatBillion(partnerModal.projects.reduce((s, p) => s + (p.computedTotalIncome || 0), 0)), color: 'emerald', icon: 'account_balance' },
+                                { label: 'Tổng công nợ', value: formatBillion(partnerModal.projects.reduce((s, p) => s + Math.max(0, (p.total_value_post_vat || 0) - (p.computedTotalIncome || 0)), 0)), color: 'rose', icon: 'money_off' },
+                            ].map((k, i) => (
+                                <div key={i} className="bg-white rounded-xl p-3 border border-slate-100 shadow-sm">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className={`material-symbols-outlined text-[16px] text-${k.color}-500`}>{k.icon}</span>
+                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{k.label}</span>
+                                    </div>
+                                    <span className={`text-lg font-black text-${k.color}-700`}>{k.value}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Projects Table */}
+                        <div className="flex-1 overflow-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="bg-slate-50 sticky top-0 z-10">
+                                    <tr className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                        <th className="px-4 py-3">Mã DA/HĐ</th>
+                                        <th className="px-4 py-3">Tên dự án</th>
+                                        <th className="px-4 py-3 text-right">Giá trị HĐ</th>
+                                        <th className="px-4 py-3 text-right">Đã xuất HĐ</th>
+                                        <th className="px-4 py-3 text-right text-emerald-600">Đã thu</th>
+                                        <th className="px-4 py-3 text-right text-rose-600">Công nợ</th>
+                                        <th className="px-4 py-3 text-center">TT Thi công</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {partnerModal.projects.map(p => {
+                                        const debt = Math.max(0, (p.total_value_post_vat || 0) - (p.computedTotalIncome || 0));
+                                        return (
+                                            <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-4 py-3">
+                                                    <span className="font-mono text-xs font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">{p.internal_code || p.code}</span>
+                                                </td>
+                                                <td className="px-4 py-3 text-xs font-medium text-slate-700 max-w-[200px] truncate">{p.name}</td>
+                                                <td className="px-4 py-3 text-right text-xs font-bold text-slate-600 tabular-nums">{formatBillion(p.total_value_post_vat || 0)}</td>
+                                                <td className="px-4 py-3 text-right text-xs font-bold text-slate-500 tabular-nums">{formatBillion(p.computedTotalInvoice || 0)}</td>
+                                                <td className="px-4 py-3 text-right text-xs font-black text-emerald-600 tabular-nums">{formatBillion(p.computedTotalIncome || 0)}</td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <span className={`text-xs font-black tabular-nums ${debt > 0 ? 'text-rose-600' : 'text-emerald-500'}`}>
+                                                        {debt > 0 ? formatBillion(debt) : '✓'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <span className={`text-[10px] font-black px-2 py-1 rounded-full ${
+                                                        p.status === 'Đã hoàn thành' ? 'bg-emerald-50 text-emerald-600' :
+                                                        p.status === 'Đang thi công' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'
+                                                    }`}>{p.status}</span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                                <tfoot className="bg-slate-50 border-t-2 border-slate-200">
+                                    <tr className="text-xs font-black">
+                                        <td className="px-4 py-3 text-slate-500 uppercase" colSpan={2}>TỔNG</td>
+                                        <td className="px-4 py-3 text-right text-slate-700 tabular-nums">{formatBillion(partnerModal.projects.reduce((s, p) => s + (p.total_value_post_vat || 0), 0))}</td>
+                                        <td className="px-4 py-3 text-right text-slate-700 tabular-nums">{formatBillion(partnerModal.projects.reduce((s, p) => s + (p.computedTotalInvoice || 0), 0))}</td>
+                                        <td className="px-4 py-3 text-right text-emerald-700 tabular-nums">{formatBillion(partnerModal.projects.reduce((s, p) => s + (p.computedTotalIncome || 0), 0))}</td>
+                                        <td className="px-4 py-3 text-right text-rose-700 tabular-nums">{formatBillion(partnerModal.projects.reduce((s, p) => s + Math.max(0, (p.total_value_post_vat || 0) - (p.computedTotalIncome || 0)), 0))}</td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
                         </div>
                     </div>
                 </div>

@@ -11,6 +11,10 @@ interface WarrantyProject extends Project {
     warranty_end_date: Date | null;
     days_remaining: number;
     warranty_status_badge: { label: string; color: string; icon: string };
+    warranty_duration_months?: number;
+    warranty_percentage?: number;
+    has_warranty_guarantee?: boolean;
+    handover_date?: string | null;
 }
 
 export default function WarrantyTracking() {
@@ -18,6 +22,10 @@ export default function WarrantyTracking() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'expired' | 'collected'>('all');
+    
+    // Inline editing states
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editForm, setEditForm] = useState({ handover_date: '', warranty_duration_months: '', warranty_percentage: '' });
     
     const toast = useToast();
 
@@ -105,6 +113,38 @@ export default function WarrantyTracking() {
             toast.error('Lỗi cập nhật: ' + err.message);
         }
     };
+
+    const startEdit = (item: WarrantyProject) => {
+        setEditingId(item.id);
+        const ltzOffset = (new Date()).getTimezoneOffset() * 60000;
+        setEditForm({
+            handover_date: item.handover_date ? new Date(new Date(item.handover_date).getTime() - ltzOffset).toISOString().split('T')[0] : '',
+            warranty_duration_months: item.warranty_duration_months?.toString() || '12',
+            warranty_percentage: item.warranty_percentage?.toString() || '5'
+        });
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingId) return;
+        try {
+            const { error } = await supabase
+                .from('projects')
+                .update({
+                    handover_date: editForm.handover_date || null,
+                    warranty_duration_months: Number(editForm.warranty_duration_months) || 0,
+                    warranty_percentage: Number(editForm.warranty_percentage) || 0
+                })
+                .eq('id', editingId);
+
+            if (error) throw error;
+            toast.success("Đã cập nhật thông số bảo hành");
+            setEditingId(null);
+            fetchWarrantyData();
+        } catch (err: any) {
+            toast.error("Lỗi lưu dữ liệu: " + err.message);
+        }
+    };
+
 
     const filtered = useMemo(() => {
         return projects.filter(p => {
@@ -277,16 +317,52 @@ export default function WarrantyTracking() {
                                             <span className="font-black text-slate-600 uppercase">{item.partners?.short_name || item.partners?.code || '---'}</span>
                                        </td>
                                        <td className="px-5 py-4">
-                                            <div className="flex flex-col gap-1">
-                                                <span className="text-xs text-slate-500 font-medium">Bắt đầu: <span className="font-bold text-slate-700">{item.handover_date ? new Date(item.handover_date).toLocaleDateString('vi-VN') : '---'}</span></span>
-                                                <span className="text-xs text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-md w-fit inline-flex items-center gap-1">
-                                                    Kết thúc: {item.warranty_end_date ? item.warranty_end_date.toLocaleDateString('vi-VN') : '---'}
-                                                    <span className="text-[10px] text-amber-600/70 ml-1">({item.warranty_duration_months}T)</span>
-                                                </span>
-                                            </div>
+                                            {editingId === item.id ? (
+                                                <div className="flex flex-col gap-2">
+                                                    <input 
+                                                        type="date" 
+                                                        value={editForm.handover_date} 
+                                                        onChange={e => setEditForm({...editForm, handover_date: e.target.value})}
+                                                        className="px-2 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-300 rounded shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                                                        title="Ngày bàn giao / Nghiệm thu"
+                                                    />
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[10px] text-slate-500 font-bold uppercase">Thời gian BH:</span>
+                                                        <input 
+                                                            type="number" 
+                                                            value={editForm.warranty_duration_months} 
+                                                            onChange={e => setEditForm({...editForm, warranty_duration_months: e.target.value})}
+                                                            placeholder="Tháng"
+                                                            className="px-2 py-1.5 text-xs font-bold text-center text-slate-700 bg-white border border-slate-300 rounded shadow-sm w-16 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                                                        />
+                                                        <span className="text-[10px] text-slate-500 font-bold uppercase">Tháng</span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-xs text-slate-500 font-medium">Bắt đầu: <span className="font-bold text-slate-700">{item.handover_date ? new Date(item.handover_date).toLocaleDateString('vi-VN') : '---'}</span></span>
+                                                    <span className="text-xs text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-md w-fit inline-flex items-center gap-1 border border-amber-100/50">
+                                                        Kết thúc: {item.warranty_end_date ? item.warranty_end_date.toLocaleDateString('vi-VN') : '---'}
+                                                        <span className="text-[10px] text-amber-600/70 ml-1">({item.warranty_duration_months}T)</span>
+                                                    </span>
+                                                </div>
+                                            )}
                                        </td>
                                        <td className="px-5 py-4 text-right">
-                                            <span className="text-sm font-black text-slate-700">{item.warranty_percentage}%</span>
+                                            {editingId === item.id ? (
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    <input 
+                                                        type="number" 
+                                                        step="0.1"
+                                                        value={editForm.warranty_percentage} 
+                                                        onChange={e => setEditForm({...editForm, warranty_percentage: e.target.value})}
+                                                        className="px-2 py-1.5 text-xs font-black text-slate-700 bg-white border border-slate-300 rounded shadow-sm w-16 text-right outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                                                    />
+                                                    <span className="text-xs font-black text-slate-500">%</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-sm font-black text-slate-700">{item.warranty_percentage}%</span>
+                                            )}
                                        </td>
                                        <td className="px-5 py-4 text-right">
                                            <span className="text-base font-black text-amber-600 tabular-nums select-all">{fmt(item.calculated_warranty_amount)}</span>
@@ -307,26 +383,42 @@ export default function WarrantyTracking() {
                                             )}
                                        </td>
                                        <td className="px-5 py-4 text-center">
-                                            <button 
-                                                onClick={() => handleMarkCollected(item.id, !!item.warranty_collected, item.internal_code || item.code)}
-                                                className={`px-4 py-2 rounded-xl text-xs font-black transition-all shadow-sm flex items-center justify-center gap-2 mx-auto ${
-                                                    item.warranty_collected 
-                                                    ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' 
-                                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200 hover:shadow-md'
-                                                }`}
-                                            >
-                                                {item.warranty_collected ? (
-                                                    <>
-                                                        <span className="material-symbols-outlined text-[16px]" translate="no">undo</span>
-                                                        Huỷ Thu
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <span className="material-symbols-outlined text-[16px]" translate="no">payments</span>
-                                                        Đã Thu Xong
-                                                    </>
-                                                )}
-                                            </button>
+                                            {editingId === item.id ? (
+                                                <div className="flex flex-col items-center justify-center gap-2">
+                                                    <button onClick={handleSaveEdit} className="w-full px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-bold text-xs flex items-center justify-center gap-1 shadow-sm shadow-blue-500/30 transition-all active:scale-95" title="Lưu thông số">
+                                                        <span className="material-symbols-outlined text-[16px]">save</span> Lưu
+                                                    </button>
+                                                    <button onClick={() => setEditingId(null)} className="w-full px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 font-bold text-xs flex items-center justify-center gap-1 transition-all active:scale-95" title="Hủy bỏ">
+                                                        <span className="material-symbols-outlined text-[16px]">close</span> Hủy
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center justify-center gap-3">
+                                                    <button onClick={() => startEdit(item)} className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Cập nhật Ngày bàn giao / Tỷ lệ BH">
+                                                        <span className="material-symbols-outlined text-[20px]" translate="no">edit</span>
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleMarkCollected(item.id, !!item.warranty_collected, item.internal_code || item.code)}
+                                                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all shadow-sm flex items-center justify-center gap-1.5 ${
+                                                            item.warranty_collected 
+                                                            ? 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700' 
+                                                            : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20 hover:shadow-md'
+                                                        }`}
+                                                    >
+                                                        {item.warranty_collected ? (
+                                                            <>
+                                                                <span className="material-symbols-outlined text-[16px]" translate="no">undo</span>
+                                                                Huỷ Thu
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span className="material-symbols-outlined text-[16px]" translate="no">payments</span>
+                                                                Đã Thu
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            )}
                                        </td>
                                   </tr>
                               ))}
@@ -337,7 +429,10 @@ export default function WarrantyTracking() {
                  <div className="p-4 bg-amber-50/50 border-t border-slate-100 flex items-start gap-3">
                      <span className="material-symbols-outlined text-amber-500" translate="no">info</span>
                      <div>
-                         <p className="text-xs font-medium text-slate-600 leading-relaxed mb-1">Dữ liệu trên phụ thuộc vào <span className="font-bold text-slate-800">Ngày Bàn giao</span> và <span className="font-bold text-slate-800">Thời gian BH</span> thiết lập trong hợp đồng. Mặc định là 5% tổng giá trị hợp đồng sau thuế.</p>
+                         <p className="text-xs font-medium text-slate-600 leading-relaxed mb-1">
+                             Dữ liệu trên phụ thuộc vào <span className="font-bold text-slate-800">Ngày Bàn giao</span>, <span className="font-bold text-slate-800">Thời gian BH</span> và <span className="font-bold text-slate-800">Tỷ lệ %</span>. 
+                             Bạn có thể click vào biểu tượng <span className="material-symbols-outlined text-[14px] align-middle text-blue-500 mx-0.5">edit</span> ở cột Thao tác để <strong>nhập và cập nhật nhanh</strong> các thông số này ngay tại đây.
+                         </p>
                      </div>
                  </div>
              </div>

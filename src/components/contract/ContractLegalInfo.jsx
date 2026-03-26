@@ -10,6 +10,8 @@ export default function ContractLegalInfo({
     location, setLocation,
     description, setDescription,
     actingEntityKey, setActingEntityKey,
+    signatureStatus, setSignatureStatus,
+    settlementStatus, setSettlementStatus,
 }) {
     return (
         <section id="general" className="glass-panel p-8 relative overflow-hidden">
@@ -100,6 +102,21 @@ export default function ContractLegalInfo({
                         <option>EPC (Thiết kế - Mua sắm - Thi công)</option>
                         <option>BOT / PPP</option>
                         <option>Khác</option>
+                    </select>
+                </div>
+                <div>
+                    <label className={labelBase}>Tình trạng Hợp đồng</label>
+                    <select value={signatureStatus} onChange={e => setSignatureStatus(e.target.value)} className={`${inputBase} appearance-none font-bold ${signatureStatus === 'Đã ký' ? 'text-emerald-700 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
+                        <option value="Chưa ký">Chưa ký</option>
+                        <option value="Đã ký">Đã ký</option>
+                    </select>
+                </div>
+                <div>
+                    <label className={labelBase}>Tình trạng Quyết toán</label>
+                    <select value={settlementStatus} onChange={e => setSettlementStatus(e.target.value)} className={`${inputBase} appearance-none font-bold ${settlementStatus === 'Đã quyết toán' ? 'text-emerald-700 bg-emerald-50' : settlementStatus === 'Đang quyết toán' ? 'text-amber-700 bg-amber-50' : 'text-slate-600 bg-slate-50'}`}>
+                        <option value="Chưa quyết toán">Chưa quyết toán</option>
+                        <option value="Đang quyết toán">Đang quyết toán</option>
+                        <option value="Đã quyết toán">Đã quyết toán</option>
                     </select>
                 </div>
                 <div className="md:col-span-2">

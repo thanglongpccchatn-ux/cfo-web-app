@@ -1,7 +1,7 @@
 export const DEFAULT_THEME = {
     company_name: "SATECO",
     sub_name: "Mechanical & Electrical",
-    logo_url: null,
+    logo_url: '/logo.png',
     logo_icon: 'apartment',
     primary_color: '#005faf',
     primary_hover_color: '#004786',

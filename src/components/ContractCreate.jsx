@@ -33,6 +33,8 @@ export default function ContractCreate({ onBack, project }) {
     const [description, setDescription] = useState('');
     const [paymentTerms, setPaymentTerms] = useState('');
     const [actingEntityKey, setActingEntityKey] = useState('thanglong');
+    const [signatureStatus, setSignatureStatus] = useState('Chưa ký');
+    const [settlementStatus, setSettlementStatus] = useState('Chưa quyết toán');
     const [allCompanies, setAllCompanies] = useState([]);
     
     // Banking States
@@ -114,6 +116,8 @@ export default function ContractCreate({ onBack, project }) {
             setStartDate(project.start_date || '');
             setEndDate(project.end_date || '');
             setActingEntityKey(project.acting_entity_key || 'thanglong');
+            setSignatureStatus(project.signature_status || 'Chưa ký');
+            setSettlementStatus(project.settlement_status || 'Chưa quyết toán');
             setWarrantyRatio(Number(project.warranty_percentage) || Number(project.warranty_ratio) || 5);
             setWarrantyPeriod(Number(project.warranty_duration_months) || Number(project.warranty_period_months) || 24);
             setHasWarrantyBond(!!project.has_warranty_guarantee || !!project.has_warranty_bond);
@@ -351,6 +355,8 @@ export default function ContractCreate({ onBack, project }) {
             vat_amount: tl_vatAmount,
             total_value_post_vat: tl_postVat,
             status: project?.status || 'Đang thi công',
+            signature_status: signatureStatus,
+            settlement_status: settlementStatus,
             acting_entity_key: (actingEntityKey || 'thanglong').toLowerCase().trim(),
             acting_entity_id: allCompanies.find(c => (c.company_key || '').toLowerCase() === (actingEntityKey || '').toLowerCase())?.id || null
         };
@@ -490,6 +496,8 @@ export default function ContractCreate({ onBack, project }) {
                             location={location} setLocation={setLocation}
                             description={description} setDescription={setDescription}
                             actingEntityKey={actingEntityKey} setActingEntityKey={setActingEntityKey}
+                            signatureStatus={signatureStatus} setSignatureStatus={setSignatureStatus}
+                            settlementStatus={settlementStatus} setSettlementStatus={setSettlementStatus}
                         />
 
                         <ContractPartner
