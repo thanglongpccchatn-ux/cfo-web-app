@@ -23,7 +23,6 @@ export default function MaterialTracking({ project, onBack, embedded }) {
         unit_price: 'Đơn Giá (VNĐ)',
         vat_rate: 'VAT (%)',
         total_amount: 'Thành Tiền (VAT)',
-        paid_amount: 'Đã Thanh Toán',
         notes: 'Ghi Chú'
     };
 
@@ -136,7 +135,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
             unit_price: Number(editForm.unit_price),
             vat_rate: Number(editForm.vat_rate),
             total_amount: Number(editForm.total_amount),
-            paid_amount: Number(editForm.paid_amount),
+            paid_amount: 0,
             notes: editForm.notes
         };
 
@@ -214,7 +213,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                              <span className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600 shadow-sm border border-orange-200/50">
                                 <span className="material-symbols-outlined notranslate text-[18px]" translate="no">inventory_2</span>
                             </span>
-                             Sateco: Vật Tư Hiện Trường
+                             Sateco: Bảng Kê Mua Vật Tư
                         </h2>
                         <div className="text-[11px] font-bold text-slate-500 tracking-widest uppercase mt-0.5 ml-10">
                             {project ? `Chi phí thi công vận hành thuộc ${project?.code}` : (
@@ -248,14 +247,6 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                             <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Giá trị Tổng (Gồm VAT)</div>
                             <div className="font-black text-slate-800 text-lg tabular-nums tracking-tight">{formatCurrency(totalMaterialsValue)}</div>
                         </div>
-                        <div className="px-5 py-2 hover:bg-white transition-colors bg-green-50/30">
-                            <div className="text-[10px] text-green-600 font-bold uppercase tracking-widest mb-0.5">Sateco Đã Chi Trả</div>
-                            <div className="font-black text-green-700 text-lg tabular-nums tracking-tight">{formatCurrency(totalPaidValue)}</div>
-                        </div>
-                        <div className="px-5 py-2 hover:bg-white transition-colors bg-rose-50/30">
-                            <div className="text-[10px] text-rose-500 font-bold uppercase tracking-widest mb-0.5">Sateco Nợ Nhà Cung Cấp</div>
-                            <div className="font-black text-rose-600 text-lg tabular-nums tracking-tight">{formatCurrency(totalDebtValue)}</div>
-                        </div>
                     </div>
 
                     <button onClick={handleAddRow} className="btn bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-md shadow-orange-500/20 px-5 flex items-center gap-2 h-12">
@@ -282,9 +273,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                         <tr>
                                             <th className="px-6 py-4">Nhóm vật tư / Hạng mục</th>
                                             <th className="px-6 py-4 text-right">Tổng giá trị (VAT)</th>
-                                            <th className="px-6 py-4 text-right text-green-600">Đã thanh toán</th>
-                                            <th className="px-6 py-4 text-right text-rose-500">Còn nợ NCC</th>
-                                            <th className="px-6 py-4 text-center w-48">Tỷ trọng Sateco chi trả</th>
+                                            <th className="px-6 py-4 text-center w-48">Tỷ trọng Cơ cấu</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -292,9 +281,8 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                             materials.reduce((acc, m) => {
                                                 if (m.isNew) return acc;
                                                 const group = m.item_group || 'Chưa phân loại';
-                                                if (!acc[group]) acc[group] = { total: 0, paid: 0 };
+                                                if (!acc[group]) acc[group] = { total: 0 };
                                                 acc[group].total += Number(m.total_amount);
-                                                acc[group].paid += Number(m.paid_amount);
                                                 return acc;
                                             }, {})
                                         ).sort((a, b) => b[1].total - a[1].total).map(([group, val]) => (
@@ -305,8 +293,6 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                                      </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-right font-black text-slate-800 text-[15px]">{formatCurrency(val.total)}</td>
-                                                <td className="px-6 py-4 text-right font-black text-green-600">{formatCurrency(val.paid)}</td>
-                                                <td className="px-6 py-4 text-right font-black text-rose-500">{formatCurrency(val.total - val.paid)}</td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
                                                          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden shadow-inner">
@@ -322,43 +308,34 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                             </div>
                         </div>
 
-                        {/* Supplier Summary */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden mt-6">
                             <div className="px-6 py-4 border-b border-slate-200/60 bg-slate-50/50 flex items-center gap-3">
                                  <span className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600">
                                      <span className="material-symbols-outlined notranslate text-[18px]" translate="no">local_shipping</span>
                                  </span>
-                                <h3 className="font-bold text-slate-800">Công nợ Nhà Cung cấp Vật tư (Sateco phải trả)</h3>
+                                <h3 className="font-bold text-slate-800">Giá trị Nhập Vật tư theo Nhà Cung cấp</h3>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-6 bg-slate-50/30">
                                 {Object.entries(
                                     materials.reduce((acc, m) => {
                                         if (m.isNew) return acc;
                                         const supplier = m.supplier_name || 'Không xác định';
-                                        if (!acc[supplier]) acc[supplier] = { total: 0, paid: 0 };
+                                        if (!acc[supplier]) acc[supplier] = { total: 0 };
                                         acc[supplier].total += Number(m.total_amount);
-                                        acc[supplier].paid += Number(m.paid_amount);
                                         return acc;
                                     }, {})
-                                ).sort((a, b) => (b[1].total - b[1].paid) - (a[1].total - a[1].paid)).map(([supplier, val]) => {
-                                    const debt = val.total - val.paid;
-                                     return (
+                                ).sort((a, b) => b[1].total - a[1].total).map(([supplier, val]) => (
                                         <div key={supplier} className="p-5 rounded-xl bg-white border border-slate-200 shadow-sm hover:border-indigo-300 transition-colors group relative overflow-hidden">
-                                            {debt > 0 && <div className="absolute top-0 right-0 w-16 h-16 bg-rose-100 rounded-full blur-[24px] opacity-50 group-hover:opacity-100 transition-opacity"></div>}
                                             <div className="flex justify-between items-start mb-3 relative z-10">
-                                                <span className="text-xs font-black text-slate-700 uppercase tracking-wide truncate max-w-[120px]">{supplier}</span>
-                                                <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-black tracking-widest border ${debt <= 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
-                                                    {debt <= 0 ? 'Hết nợ' : 'Còn nợ'}
-                                                </span>
+                                                <span className="text-xs font-black text-slate-700 uppercase tracking-wide truncate max-w-[150px]" title={supplier}>{supplier}</span>
                                             </div>
-                                            <div className={`text-xl font-black tabular-nums tracking-tight relative z-10 ${debt > 0 ? 'text-rose-600' : 'text-slate-800'}`}>{formatCurrency(debt)} <span className="text-xs font-bold opacity-50">₫</span></div>
+                                            <div className="text-xl font-black text-slate-800 tabular-nums tracking-tight relative z-10">{formatCurrency(val.total)} <span className="text-xs font-bold opacity-50">₫</span></div>
                                             <div className="text-[11px] font-medium text-slate-400 mt-2 relative z-10 flex justify-between">
-                                                 <span>Tổng mua:</span>
-                                                 <span className="font-bold text-slate-600">{formatCurrency(val.total)}</span>
+                                                 <span>Tỷ trọng nhập:</span>
+                                                 <span className="font-bold text-slate-600">{totalMaterialsValue > 0 ? ((val.total / totalMaterialsValue) * 100).toFixed(1) : 0}%</span>
                                             </div>
                                         </div>
-                                    )
-                                })}
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -407,16 +384,6 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                             </div>
                                         </div>
 
-                                        <div className="flex justify-between items-center text-[10px] bg-emerald-50/50 p-2 rounded-lg border border-emerald-100">
-                                            <div className="font-bold text-emerald-800 flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-[14px]">payments</span>
-                                                Sateco Chi: {formatCurrency(mat.paid_amount)}
-                                            </div>
-                                            <div className={`font-black ${mat.total_amount - mat.paid_amount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                                Nợ: {formatCurrency(mat.total_amount - mat.paid_amount)}
-                                            </div>
-                                        </div>
-
                                         {mat.notes && (
                                             <p className="mt-3 text-[11px] text-slate-500 italic line-clamp-1 border-t border-slate-50 pt-2 pl-1">
                                                 "{mat.notes}"
@@ -441,7 +408,6 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                         <th className="px-3 py-2.5 w-28 text-right border-r border-slate-200">Đơn Giá</th>
                                         <th className="px-3 py-2.5 w-16 text-center border-r border-slate-200 bg-yellow-50 text-yellow-700">VAT (%)</th>
                                         <th className="px-3 py-2.5 w-32 text-right border-r border-slate-200 bg-orange-50 text-orange-700">Thành Tiền (VAT)</th>
-                                        <th className="px-3 py-2.5 w-32 text-right border-r border-slate-200 bg-green-50 text-green-700">Sateco Đã Chi</th>
                                         <th className="px-3 py-2.5 w-48 border-r border-slate-200">Diễn giải</th>
                                         <th className="px-3 py-2.5 w-20 text-center bg-slate-100">Action</th>
                                     </tr>
@@ -481,9 +447,6 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                                     <td className="px-2 py-1 border-r border-slate-200 bg-orange-50">
                                                         <input type="number" value={editForm.total_amount === 0 ? '' : editForm.total_amount} onChange={(e) => handleEditChange('total_amount', e.target.value)} className="w-full bg-white border border-orange-500 rounded px-2 py-1.5 text-right font-black text-orange-700 shadow-inner outline-none text-xs" placeholder="0" />
                                                     </td>
-                                                    <td className="px-2 py-1 border-r border-slate-200 bg-green-50/50">
-                                                        <input type="number" value={editForm.paid_amount === 0 ? '' : editForm.paid_amount} onChange={(e) => handleEditChange('paid_amount', e.target.value)} className="w-full bg-white border border-green-400 rounded px-2 py-1.5 text-right font-bold text-green-700 outline-none focus:border-green-500 text-xs" placeholder="0" />
-                                                    </td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
                                                         <input type="text" value={editForm.notes || ''} onChange={(e) => handleEditChange('notes', e.target.value)} className="w-full bg-white border border-slate-300 rounded px-2 py-1.5 focus:border-orange-500 outline-none text-xs" placeholder="Ghi chú..." />
                                                     </td>
@@ -500,7 +463,6 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                                 </tr>
                                             );
                                         }
-
                                         return (
                                             <tr key={mat.id} className="hover:bg-orange-50/20 group transition-colors cursor-default">
                                                 <td className="px-3 py-2.5 text-center border-r border-slate-200 text-slate-400 font-medium">{index + 1}</td>
@@ -515,7 +477,6 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                                 <td className="px-3 py-2.5 border-r border-slate-200 text-right font-medium text-slate-700 tabular-nums">{formatCurrency(mat.unit_price)}</td>
                                                 <td className="px-3 py-2.5 border-r border-slate-200 text-center bg-yellow-50/30 text-yellow-700 font-bold">{mat.vat_rate}%</td>
                                                 <td className="px-3 py-2.5 border-r border-slate-200 text-right font-black text-orange-600 tabular-nums bg-orange-50/20">{formatCurrency(mat.total_amount)}</td>
-                                                <td className="px-3 py-2.5 border-r border-slate-200 text-right font-bold text-green-600 tabular-nums bg-green-50/20">{formatCurrency(mat.paid_amount)}</td>
                                                 <td className="px-3 py-2.5 border-r border-slate-200 text-slate-500 truncate max-w-[200px] text-[11px]" title={mat.notes}>{mat.notes}</td>
                                                 <td className="px-1.5 py-2.5 text-center border-l bg-slate-50/50">
                                                     <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
