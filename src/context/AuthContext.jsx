@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 const AuthContext = createContext({});
 
 // eslint-disable-next-line react-refresh/only-export-components
-export const useAuth = () => {
+export function useAuth() {
     const context = useContext(AuthContext);
     if (!context) {
         throw new Error('useAuth must be used within an AuthProvider');
@@ -62,7 +62,7 @@ export const AuthProvider = ({ children }) => {
         let isMounted = true;
         
         // Initial session check
-        const checkSession = async () => {
+        async function checkSession() {
             try {
                 const { data: { session } } = await supabase.auth.getSession();
                 if (isMounted && session?.user) {
@@ -80,14 +80,17 @@ export const AuthProvider = ({ children }) => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             if (!isMounted) return;
 
-            if (session?.user) {
-                setUser(session.user);
-                // Non-blocking fetch to avoid locking the event loop
-                fetchUserProfileAndPermissions(session.user.id);
-            } else if (event === 'SIGNED_OUT' || !session) {
+            if (event === 'SIGNED_OUT' || !session) {
                 setUser(null);
                 setProfile(null);
                 setPermissions([]);
+            } else if (session?.user) {
+                setUser(session.user);
+                
+                // Re-fetch profile on important auth events
+                if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+                    fetchUserProfileAndPermissions(session.user.id);
+                }
             }
         });
 

@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
 export default function VariationsManagement() {
-    const { profile, hasPermission } = useAuth();
+    const { profile, hasPermission: _hasPermission } = useAuth();
     const [projects, setProjects] = useState([]);
     const [variations, setVariations] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -53,7 +53,7 @@ export default function VariationsManagement() {
         // Set up real-time subscription for variations
         const subscription = supabase
             .channel('public:contract_variations')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'contract_variations' }, payload => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'contract_variations' }, _payload => {
                 fetchData();
             })
             .subscribe();
@@ -145,7 +145,7 @@ export default function VariationsManagement() {
                     return;
                 }
 
-                const { data, error } = await supabase.from('contract_variations').update(payload).eq('id', editingVar.id).select().single();
+                const { data: _data, error } = await supabase.from('contract_variations').update(payload).eq('id', editingVar.id).select().single();
                 if (error) throw error;
                 savedVarId = editingVar.id;
 

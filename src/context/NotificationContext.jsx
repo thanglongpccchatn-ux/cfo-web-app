@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 
 const NotificationContext = createContext({});
 
+ 
 export const NotificationProvider = ({ children }) => {
     const { user } = useAuth();
     const [notifications, setNotifications] = useState([]);
@@ -16,8 +17,8 @@ export const NotificationProvider = ({ children }) => {
             return;
         }
 
-        const fetchNotifications = async () => {
-            const { data, error } = await supabase
+        async function fetchNotifications() {
+            const { data, error: _error } = await supabase
                 .from('notifications')
                 .select('*')
                 .eq('user_id', user.id)
@@ -62,7 +63,7 @@ export const NotificationProvider = ({ children }) => {
         await supabase.from('notifications').update({ is_read: true }).eq('id', id);
     };
 
-    const markAllAsRead = async () => {
+    async function markAllAsRead() {
         setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
         await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false);
     };

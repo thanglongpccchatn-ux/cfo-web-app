@@ -40,6 +40,10 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
     };
 
     const handleDeleteProject = async (projId, projName) => {
+        if (!hasPermission('delete_contracts')) {
+            toast.error('Bạn không có quyền xóa hợp đồng.');
+            return;
+        }
         
         setDeleteConfirm(null); // Close modal
         
@@ -89,16 +93,20 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
 
     const fetchProjects = async () => {
         setLoading(true);
-        const { data: projs } = await supabase
-            .from('projects')
-            .select('*, partners!projects_partner_id_fkey(name, code, short_name)')
-            .order('created_at', { ascending: false });
-
-        const { data: adds } = await supabase.from('addendas')
-            .select('project_id, requested_value').eq('status', 'Đã duyệt');
-
-        const { data: pmts } = await supabase.from('payments')
-            .select('project_id, expected_amount, external_income, invoice_amount, payment_request_amount');
+        // All queries run in parallel for maximum speed
+        const [projRes, addRes, pmtRes] = await Promise.all([
+            supabase.from('projects')
+                .select('*, partners!projects_partner_id_fkey(name, code, short_name)')
+                .order('created_at', { ascending: false }),
+            supabase.from('addendas')
+                .select('project_id, requested_value').eq('status', 'Đã duyệt'),
+            supabase.from('payments')
+                .select('project_id, expected_amount, external_income, invoice_amount, payment_request_amount')
+        ]);
+        
+        const projs = projRes.data;
+        const adds = addRes.data;
+        const pmts = pmtRes.data;
 
         if (projs) {
             const enhanced = projs.map(p => {

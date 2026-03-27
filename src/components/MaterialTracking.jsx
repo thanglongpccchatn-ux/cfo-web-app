@@ -4,9 +4,11 @@ import ExcelImportModal from './ExcelImportModal';
 
 export default function MaterialTracking({ project, onBack, embedded }) {
     const [materials, setMaterials] = useState([]);
+    const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showSummary, setShowSummary] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
+    const [filterProjectId, setFilterProjectId] = useState('all');
 
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState({});
@@ -31,23 +33,37 @@ export default function MaterialTracking({ project, onBack, embedded }) {
     ];
 
     const fetchMaterials = React.useCallback(async () => {
-        if (!project) return;
-        setLoading(true);
-        const { data, error } = await supabase
+        let query = supabase
             .from('expense_materials')
-            .select('*')
-            .eq('project_id', project.id)
+            .select('*, projects(name, code)')
             .order('expense_date', { ascending: false });
 
+        if (project) {
+            query = query.eq('project_id', project.id);
+        } else if (filterProjectId !== 'all') {
+            query = query.eq('project_id', filterProjectId);
+        }
+
+        const { data, error } = await query;
         if (!error && data) {
             setMaterials(data);
         }
-        setLoading(false);
+    }, [project, filterProjectId]);
+
+    const fetchProjects = React.useCallback(async () => {
+        if (project) return;
+        const { data } = await supabase.from('projects').select('id, name, code').order('name');
+        if (data) setProjects(data);
     }, [project]);
 
     useEffect(() => {
-        fetchMaterials();
-    }, [fetchMaterials]);
+        const init = async () => {
+            setLoading(true);
+            await Promise.all([fetchMaterials(), fetchProjects()]);
+            setLoading(false);
+        };
+        init();
+    }, [fetchMaterials, fetchProjects]);
 
     function handleAddRow() {
         const newRow = {
@@ -64,8 +80,12 @@ export default function MaterialTracking({ project, onBack, embedded }) {
             total_amount: 0,
             paid_amount: 0,
             notes: '',
-            project_id: project.id
+            project_id: project ? project.id : (filterProjectId !== 'all' ? filterProjectId : null)
         };
+        if (!newRow.project_id) {
+            alert('Vui lòng chọn một dự án cụ thể để thêm vật tư.');
+            return;
+        }
         setMaterials([newRow, ...materials]);
         setEditingId(newRow.id);
         setEditForm(newRow);
@@ -148,9 +168,23 @@ export default function MaterialTracking({ project, onBack, embedded }) {
 
     if (loading && materials.length === 0) {
         return (
-            <div className="p-12 text-center text-slate-500 flex flex-col items-center justify-center space-y-4">
-                <div className="w-8 h-8 rounded-full border-4 border-orange-200 border-t-orange-500 animate-spin"></div>
-                <p className="font-medium text-sm">Đang tải dữ liệu vật tư Sateco...</p>
+            <div className="bg-white border border-slate-200/60 rounded-xl overflow-hidden shadow-sm">
+                <div className="p-4 border-b border-slate-100 flex items-center gap-3">
+                    <div className="h-6 w-32 bg-orange-100 rounded-full animate-pulse" />
+                    <div className="h-6 w-24 bg-slate-100 rounded-full animate-pulse" />
+                </div>
+                <div className="space-y-3 p-4">
+                    {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl animate-pulse">
+                            <div className="w-10 h-10 bg-slate-200 rounded-xl flex-shrink-0" />
+                            <div className="flex-1 space-y-2">
+                                <div className="h-3.5 bg-slate-200 rounded-full w-3/4" />
+                                <div className="h-2.5 bg-slate-100 rounded-full w-1/2" />
+                            </div>
+                            <div className="h-5 w-20 bg-orange-100 rounded-full" />
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     }
@@ -183,7 +217,19 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                              Sateco: Vật Tư Hiện Trường
                         </h2>
                         <div className="text-[11px] font-bold text-slate-500 tracking-widest uppercase mt-0.5 ml-10">
-                            Chi phí thi công vận hành thuộc {project?.code}
+                            {project ? `Chi phí thi công vận hành thuộc ${project?.code}` : (
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[14px] text-orange-500">inventory_2</span>
+                                    <select 
+                                        value={filterProjectId} 
+                                        onChange={(e) => setFilterProjectId(e.target.value)}
+                                        className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300 px-3 py-1 rounded-full text-[12px] font-black focus:ring-2 focus:ring-orange-500 outline-none transition-all cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/30"
+                                    >
+                                        <option value="all">Tất cả dự án (Toàn cục)</option>
+                                        {projects.map(p => <option key={p.id} value={p.id}>Dự án: {p.code}</option>)}
+                                    </select>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

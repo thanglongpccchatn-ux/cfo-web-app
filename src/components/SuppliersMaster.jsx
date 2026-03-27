@@ -80,12 +80,12 @@ export default function SuppliersMaster() {
         }
 
         // 2. Tải tất cả PO để tính "Tổng Mua (Kế hoạch/Đặt hàng)"
-        const { data: pos, error: poError } = await supabase
+        const { data: pos, error: _poError } = await supabase
             .from('purchase_orders')
             .select('supplier_id, total_amount, project_id');
         
         // 3. Tải tất cả Thực nhận & Thanh toán (expense_materials)
-        const { data: materials, error: matError } = await supabase
+        const { data: materials, error: _matError } = await supabase
             .from('expense_materials')
             .select('supplier_id, total_amount, paid_amount, project_id');
 

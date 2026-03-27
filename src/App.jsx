@@ -39,6 +39,8 @@ const SiteDiary = lazy(() => import('./components/SiteDiary'));
 const SettlementManagement = lazy(() => import('./components/SettlementManagement'));
 const VariationsManagement = lazy(() => import('./components/VariationsManagement'));
 const BiddingManagement = lazy(() => import('./components/BiddingManagement'));
+const ExpenseTracking = lazy(() => import('./components/ExpenseTracking'));
+const ConstructionModule = lazy(() => import('./components/ConstructionModule'));
 
 const queryClient = new QueryClient();
 
@@ -121,6 +123,9 @@ function MainLayout() {
       case 'site_diary': return { title: 'Nhật ký hiện trường', subtitle: 'Báo cáo hoạt động thi công hàng ngày' };
       case 'settlement': return { title: 'Quản lý Quyết Toán', subtitle: 'Theo dõi quyết toán, công nợ và hồ sơ pháp lý' };
       case 'bidding': return { title: 'Theo dõi Báo giá / Đấu thầu', subtitle: 'Quản lý vòng đời đấu thầu và phiên bản báo giá' };
+      case 'labor_tracking': return { title: 'Theo dõi Nhân công', subtitle: 'Chi phí thầu phụ và nhân công' };
+      case 'material_tracking': return { title: 'Theo dõi Vật tư', subtitle: 'Chi phí vật tư hiện trường' };
+      case 'expense_tracking': return { title: 'Chi phí Chung', subtitle: 'Quản lý chi phí vận hành & văn phòng' };
       default: return { title: 'Hệ thống Quản trị', subtitle: `${currentTheme.company_name}` };
     }
   };
@@ -178,6 +183,9 @@ function MainLayout() {
             <Route path="/site_diary" element={<ProtectedRoute><SiteDiary /></ProtectedRoute>} />
             <Route path="/warranty_tracking" element={<ProtectedRoute requiredPerms={['view_contracts']}><WarrantyTracking /></ProtectedRoute>} />
             <Route path="/settlement" element={<ProtectedRoute requiredPerms={['view_contracts']}><SettlementManagement /></ProtectedRoute>} />
+            <Route path="/labor_tracking" element={<ProtectedRoute requiredPerms={['view_payments']}><LaborTracking /></ProtectedRoute>} />
+            <Route path="/material_tracking" element={<ProtectedRoute requiredPerms={['view_payments']}><MaterialTracking /></ProtectedRoute>} />
+            <Route path="/expense_tracking" element={<ProtectedRoute requiredPerms={['view_payments']}><ExpenseTracking /></ProtectedRoute>} />
             
             {/* Financial & Inventory Modules */}
             <Route path="/payments" element={<ProtectedRoute requiredPerms={['view_payments']}><PaymentsMaster /></ProtectedRoute>} />
@@ -188,7 +196,7 @@ function MainLayout() {
             
             {/* Other Modules */}
             <Route path="/planning_hub" element={<ProtectedRoute><PlanningModule /></ProtectedRoute>} />
-            <Route path="/construction" element={<ProtectedRoute><ComingSoon title="Thi công" /></ProtectedRoute>} />
+            <Route path="/construction" element={<ProtectedRoute><ConstructionModule /></ProtectedRoute>} />
             <Route path="/partners" element={<ProtectedRoute><PartnerManagement /></ProtectedRoute>} />
             <Route path="/permissions" element={<ProtectedRoute><RoleManagement /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />

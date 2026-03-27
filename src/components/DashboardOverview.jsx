@@ -15,16 +15,21 @@ const DashboardOverview = () => {
         queryFn: async () => {
             const currentYear = new Date().getFullYear();
 
-            // 0. Fetch Revenue Plan
-            const { data: planItems } = await supabase.from('revenue_plan').select('*').eq('year', currentYear);
-            const planData = planItems?.[0] || { target_revenue: 0, year: currentYear };
+            // All queries run in parallel for maximum speed
+            const [planRes, projRes, pmtRes, , extHistRes, intHistRes] = await Promise.all([
+                supabase.from('revenue_plan').select('*').eq('year', currentYear),
+                supabase.from('projects').select('*, partners!projects_partner_id_fkey(name, code, short_name)'),
+                supabase.from('payments').select('*, projects!inner(code, internal_code, name)'),
+                supabase.from('addendas').select('*').eq('status', 'Đã duyệt'),
+                supabase.from('external_payment_history').select('*'),
+                supabase.from('internal_payment_history').select('*')
+            ]);
 
-            // 2. Performance & Financial Metrics
-            const { data: projs } = await supabase.from('projects').select('*, partners!projects_partner_id_fkey(name, code, short_name)');
-            const { data: pmts } = await supabase.from('payments').select('*, projects!inner(code, internal_code, name)');
-            await supabase.from('addendas').select('*').eq('status', 'Đã duyệt');
-            const { data: extHist } = await supabase.from('external_payment_history').select('*');
-            const { data: intHist } = await supabase.from('internal_payment_history').select('*');
+            const planData = planRes.data?.[0] || { target_revenue: 0, year: currentYear };
+            const projs = projRes.data;
+            const pmts = pmtRes.data;
+            const extHist = extHistRes.data;
+            const intHist = intHistRes.data;
 
             // 1. Basic Counts & Lists (from fetched data to avoid extra requests)
             const projCount = projs?.length || 0;

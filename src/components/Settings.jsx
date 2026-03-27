@@ -15,7 +15,7 @@ export default function Settings() {
 
     const fetchSettings = async () => {
         setLoading(true);
-        const { data, error } = await supabase.from('theme_settings').select('*').limit(1).maybeSingle();
+        const { data, error: _error } = await supabase.from('theme_settings').select('*').limit(1).maybeSingle();
         if (data) {
             setSettings(data);
         }

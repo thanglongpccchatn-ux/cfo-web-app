@@ -4,7 +4,7 @@ import { useToast } from '../context/ToastContext';
 import { logAudit } from '../lib/auditLog';
 
 // Refactored Sub-components
-import { getDocStatus, STANDARD_STAGES, parseNum, formatInput, fmt } from './documentTracking/dtkHelpers';
+import { getDocStatus, STANDARD_STAGES, parseNum, fmt } from './documentTracking/dtkHelpers';
 import SummaryCards from './documentTracking/SummaryCards';
 import PaymentHistoryRow from './documentTracking/PaymentHistoryRow';
 import DeleteConfirmModal from './documentTracking/DeleteConfirmModal';
@@ -434,7 +434,7 @@ export default function DocumentTrackingModule() {
                             className="pl-3 pr-8 py-2 md:py-2.5 rounded-xl border border-slate-200 text-[10px] md:text-xs font-bold text-slate-600 outline-none bg-white hover:border-blue-400 transition-colors cursor-pointer shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2Fc%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_8px_center] bg-[size:14px]"
                         >
                             <option value="all">Năm</option>
-                            {['2024', '2025', '2026'].map(y => (
+                            {Array.from({length: 5}, (_, i) => (new Date().getFullYear() - 2 + i).toString()).map(y => (
                                 <option key={y} value={y}>{y}</option>
                             ))}
                         </select>

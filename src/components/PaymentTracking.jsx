@@ -32,7 +32,7 @@ const STAGE_TYPES = ['Tạm ứng', 'Nghiệm thu', 'Quyết toán', 'Bảo hàn
 export default function PaymentTracking({ project, onBack, embedded }) {
     const [stages, setStages] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [isAdding, setIsAdding] = useState(false);
+    const [_isAdding, setIsAdding] = useState(false);
     const [expandedCard, setExpandedCard] = useState(null);
     const [editingStage, setEditingStage] = useState(null);
     const [lastPayDates, setLastPayDates] = useState({});
@@ -51,12 +51,12 @@ export default function PaymentTracking({ project, onBack, embedded }) {
     // Modals
     const [cdtModal, setCdtModal] = useState(null);
     const [cdtHistory, setCdtHistory] = useState([]);
-    const [loadingCdt, setLoadingCdt] = useState(false);
+    const [_loadingCdt, setLoadingCdt] = useState(false);
     const [cdtForm, setCdtForm] = useState({ date: '', amount: '', notes: '' });
 
     const [tlSatecoModal, setTlSatecoModal] = useState(null);
     const [tlSatecoHistory, setTlSatecoHistory] = useState([]);
-    const [loadingTlSateco, setLoadingTlSateco] = useState(false);
+    const [_loadingTlSateco, setLoadingTlSateco] = useState(false);
     const [tlSatecoForm, setTlSatecoForm] = useState({ date: '', amount: '', notes: '' });
 
     const contractRatio = project ? parseFloat(project.sateco_contract_ratio || 98) / 100 : 0.98;
@@ -91,7 +91,7 @@ export default function PaymentTracking({ project, onBack, embedded }) {
         }));
     }, [project, stages]);
 
-    const handleInvoiceDateChange = (date) => {
+    const _handleInvoiceDateChange = (date) => {
         if (!date) return;
         const d = new Date(date);
         d.setDate(d.getDate() + 30);
@@ -121,7 +121,7 @@ export default function PaymentTracking({ project, onBack, embedded }) {
         }
     }, [project, fetchAll, suggestNextStage]);
 
-    async function handleAddStage() {
+    async function _handleAddStage() {
         if (!form.name || !form.expected) {
             alert('Vui lòng nhập tên đợt và giá trị dự kiến');
             return;
@@ -224,11 +224,10 @@ export default function PaymentTracking({ project, onBack, embedded }) {
             metadata: { project_id: project.id }
         });
 
-        // Fetch-before-write: lấy giá trị mới nhất
-        const { data: freshStage } = await supabase.from('payments').select('external_income').eq('id', cdtModal.id).single();
-        const currentIncome = Number(freshStage?.external_income || 0);
-        const newIncome = Math.max(0, currentIncome - Number(record.amount));
-        await supabase.from('payments').update({ external_income: newIncome }).eq('id', cdtModal.id);
+        // SUM-based recalculation: tính lại tổng từ lịch sử thay vì phép trừ
+        const { data: remaining } = await supabase.from('external_payment_history').select('amount').eq('payment_stage_id', cdtModal.id);
+        const newIncome = (remaining || []).reduce((sum, r) => sum + Number(r.amount || 0), 0);
+        await supabase.from('payments').update({ external_income: newIncome, status: newIncome > 0 ? 'CĐT Đã thanh toán' : 'Chưa thanh toán' }).eq('id', cdtModal.id);
         fetchAll();
         const { data: updated } = await supabase.from('payments').select('*').eq('id', cdtModal.id).single();
         if (updated) setCdtModal(updated);
@@ -281,10 +280,9 @@ export default function PaymentTracking({ project, onBack, embedded }) {
             metadata: { project_id: project.id }
         });
 
-        // Fetch-before-write: lấy giá trị mới nhất
-        const { data: freshStage } = await supabase.from('payments').select('internal_paid').eq('id', tlSatecoModal.id).single();
-        const currentPaid = Number(freshStage?.internal_paid || 0);
-        const newPaid = Math.max(0, currentPaid - Number(record.amount));
+        // SUM-based recalculation: tính lại tổng từ lịch sử thay vì phép trừ
+        const { data: remaining } = await supabase.from('internal_payment_history').select('amount').eq('payment_stage_id', tlSatecoModal.id);
+        const newPaid = (remaining || []).reduce((sum, r) => sum + Number(r.amount || 0), 0);
         await supabase.from('payments').update({ internal_paid: newPaid }).eq('id', tlSatecoModal.id);
         fetchAll();
         const { data: updated } = await supabase.from('payments').select('*').eq('id', tlSatecoModal.id).single();
@@ -400,150 +398,17 @@ export default function PaymentTracking({ project, onBack, embedded }) {
                         </div>
                     </div>
 
-                    {/* Input now centralized in DocumentTrackingModule */}
-                    {false && (
-                        <div className="bg-white border border-emerald-200 shadow-xl rounded-2xl p-0 relative overflow-hidden animate-slide-in mb-8">
-                            <div className="bg-emerald-600 px-6 py-4 flex justify-between items-center">
-                                <h3 className="text-white font-black text-lg flex items-center gap-2">
-                                    <span className="material-symbols-outlined notranslate" translate="no">add_card</span>
-                                    Thêm Thanh toán Thăng Long
-                                </h3>
-                                <button onClick={() => setIsAdding(false)} className="text-emerald-100 hover:text-white">
-                                    <span className="material-symbols-outlined notranslate" translate="no">close</span>
-                                </button>
-                            </div>
-                            
-                            <div className="p-8">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                                    {/* Left Column */}
-                                    <div className="space-y-6">
-                                        <div className="relative">
-                                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                                Mã thanh toán Thăng Long <span className="text-emerald-500">*</span>
-                                            </label>
-                                            <input 
-                                                type="text" 
-                                                value={form.paymentCode} 
-                                                onChange={e => setForm(f => ({ ...f, paymentCode: e.target.value }))} 
-                                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all" 
-                                                placeholder="VD: DT-001-IPC01"
-                                            />
-                                        </div>
+                    {/* Input is now centralized in DocumentTrackingModule */}
 
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Đợt thanh toán *</label>
-                                                <input 
-                                                    type="text" 
-                                                    value={form.name} 
-                                                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))} 
-                                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 focus:border-emerald-500 outline-none" 
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Phân loại</label>
-                                                <select 
-                                                    value={form.type} 
-                                                    onChange={e => setForm(f => ({ ...f, type: e.target.value }))} 
-                                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 focus:border-emerald-500 outline-none"
-                                                >
-                                                    {STAGE_TYPES.map(t => <option key={t}>{t}</option>)}
-                                                </select>
-                                            </div>
-                                        </div>
 
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Ngày đề nghị / Xuất HĐ</label>
-                                                <input 
-                                                    type="date" 
-                                                    value={form.invoiceDate || ''} 
-                                                    onChange={e => handleInvoiceDateChange(e.target.value)} 
-                                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none" 
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Ngày trả dự kiến (+30 ngày)</label>
-                                                <input 
-                                                    type="date" 
-                                                    value={form.dueDate || ''} 
-                                                    onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} 
-                                                    className="w-full rounded-xl border border-slate-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-700 outline-none" 
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    {/* Right Column */}
-                                    <div className="space-y-6">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Giá trị ĐNTT (₫)</label>
-                                                <input 
-                                                    type="number" 
-                                                    value={form.expected} 
-                                                    onChange={e => setForm(f => ({ ...f, expected: e.target.value }))} 
-                                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-emerald-700 outline-none" 
-                                                    placeholder="0"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Giá trị HĐ Xuất (₫)</label>
-                                                <input 
-                                                    type="number" 
-                                                    value={form.invoiceAmount} 
-                                                    onChange={e => setForm(f => ({ ...f, invoiceAmount: e.target.value }))} 
-                                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-blue-700 outline-none" 
-                                                    placeholder="0"
-                                                />
-                                            </div>
-                                        </div>
 
-                                        <div>
-                                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Trạng thái hóa đơn</label>
-                                            <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
-                                                {['Chưa xuất', 'Đã xuất'].map(st => (
-                                                    <button 
-                                                        key={st}
-                                                        onClick={() => setForm(f => ({ ...f, invoiceStatus: st }))}
-                                                        className={`flex-1 py-2.5 rounded-lg text-xs font-black transition-all ${form.invoiceStatus === st ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
-                                                    >
-                                                        {st}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
 
-                                        <div>
-                                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Ghi chú</label>
-                                            <textarea 
-                                                value={form.notes} 
-                                                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} 
-                                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none resize-none h-[110px]" 
-                                                placeholder="Nhập thông tin bổ sung nếu có..."
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
 
-                                <div className="flex gap-4 justify-end pt-6 border-t border-slate-100">
-                                    <button 
-                                        onClick={() => setIsAdding(false)} 
-                                        className="px-8 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all"
-                                    >
-                                        Hủy bỏ
-                                    </button>
-                                    <button 
-                                        onClick={handleAddStage} 
-                                        className="px-10 py-3 rounded-xl font-black text-white bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-500/20 transition-all active:scale-95 flex items-center gap-2"
-                                    >
-                                        <span className="material-symbols-outlined notranslate" translate="no">save</span>
-                                        Lưu Thanh toán
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+
+
+
+
 
                     {/* Stage Cards */}
                     {loading ? (

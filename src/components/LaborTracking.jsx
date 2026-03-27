@@ -4,8 +4,10 @@ import ExcelImportModal from './ExcelImportModal';
 
 export default function LaborTracking({ project, onBack, embedded }) {
     const [labors, setLabors] = useState([]);
+    const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showImportModal, setShowImportModal] = useState(false);
+    const [filterProjectId, setFilterProjectId] = useState('all');
 
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState({});
@@ -31,23 +33,37 @@ export default function LaborTracking({ project, onBack, embedded }) {
     ];
 
     const fetchLabors = React.useCallback(async () => {
-        if (!project) return;
-        setLoading(true);
-        const { data, error } = await supabase
+        let query = supabase
             .from('expense_labor')
-            .select('*')
-            .eq('project_id', project.id)
+            .select('*, projects(name, code)')
             .order('created_at', { ascending: false });
 
+        if (project) {
+            query = query.eq('project_id', project.id);
+        } else if (filterProjectId !== 'all') {
+            query = query.eq('project_id', filterProjectId);
+        }
+
+        const { data, error } = await query;
         if (!error && data) {
             setLabors(data);
         }
-        setLoading(false);
+    }, [project, filterProjectId]);
+
+    const fetchProjects = React.useCallback(async () => {
+        if (project) return;
+        const { data } = await supabase.from('projects').select('id, name, code').order('name');
+        if (data) setProjects(data);
     }, [project]);
 
     useEffect(() => {
-        fetchLabors();
-    }, [fetchLabors]);
+        const init = async () => {
+            setLoading(true);
+            await Promise.all([fetchLabors(), fetchProjects()]);
+            setLoading(false);
+        };
+        init();
+    }, [fetchLabors, fetchProjects]);
 
     function handleAddRow() {
         const newRow = {
@@ -65,8 +81,12 @@ export default function LaborTracking({ project, onBack, embedded }) {
             paid_amount: 0,
             priority: 'Bình thường',
             notes: '',
-            project_id: project.id
+            project_id: project ? project.id : (filterProjectId !== 'all' ? filterProjectId : null)
         };
+        if (!newRow.project_id) {
+            alert('Vui lòng chọn một dự án cụ thể để thêm thầu phụ.');
+            return;
+        }
         setLabors([newRow, ...labors]);
         setEditingId(newRow.id);
         setEditForm(newRow);
@@ -138,9 +158,23 @@ export default function LaborTracking({ project, onBack, embedded }) {
 
     if (loading && labors.length === 0) {
         return (
-            <div className="p-12 text-center text-slate-500 flex flex-col items-center justify-center space-y-4">
-                 <div className="w-8 h-8 rounded-full border-4 border-purple-200 border-t-purple-600 animate-spin"></div>
-                 <p className="font-medium text-sm">Đang tải biểu mẫu Thầu phụ & Nhân công...</p>
+            <div className="bg-white border border-slate-200/60 rounded-xl overflow-hidden shadow-sm">
+                <div className="p-4 border-b border-slate-100 flex items-center gap-3">
+                    <div className="h-6 w-32 bg-purple-100 rounded-full animate-pulse" />
+                    <div className="h-6 w-24 bg-slate-100 rounded-full animate-pulse" />
+                </div>
+                <div className="space-y-3 p-4">
+                    {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl animate-pulse">
+                            <div className="w-10 h-10 bg-slate-200 rounded-xl flex-shrink-0" />
+                            <div className="flex-1 space-y-2">
+                                <div className="h-3.5 bg-slate-200 rounded-full w-3/4" />
+                                <div className="h-2.5 bg-slate-100 rounded-full w-1/2" />
+                            </div>
+                            <div className="h-5 w-20 bg-purple-100 rounded-full" />
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     }
@@ -166,7 +200,19 @@ export default function LaborTracking({ project, onBack, embedded }) {
                             Sateco: Kế hoạch Thầu phụ & Tổ đội
                         </h2>
                         <div className="text-[11px] font-bold text-slate-500 tracking-widest uppercase mt-0.5 ml-10">
-                            Chi phí thi công vận hành thuộc {project?.code}
+                            {project ? `Chi phí thi công vận hành thuộc ${project?.code}` : (
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[14px] text-purple-500">handyman</span>
+                                    <select 
+                                        value={filterProjectId} 
+                                        onChange={(e) => setFilterProjectId(e.target.value)}
+                                        className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 px-3 py-1 rounded-full text-[12px] font-black focus:ring-2 focus:ring-purple-500 outline-none transition-all cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/30"
+                                    >
+                                        <option value="all">Tất cả dự án (Toàn cục)</option>
+                                        {projects.map(p => <option key={p.id} value={p.id}>Dự án: {p.code}</option>)}
+                                    </select>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

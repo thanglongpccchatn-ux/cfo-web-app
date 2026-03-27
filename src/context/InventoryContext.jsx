@@ -6,12 +6,13 @@ import { useAuth } from './AuthContext';
 
 const InventoryContext = createContext();
 
-export const useInventory = () => {
+export function useInventory() {
     const context = useContext(InventoryContext);
     if (!context) throw new Error('useInventory must be used within an InventoryProvider');
     return context;
 };
 
+ 
 export const InventoryProvider = ({ children }) => {
     const { user } = useAuth();
     const { sendNotification } = useNotification();
@@ -24,7 +25,7 @@ export const InventoryProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const isFetching = useRef(false);
 
-    const fetchData = async () => {
+    async function fetchData() {
         if (isFetching.current) return;
         isFetching.current = true;
         setLoading(true);

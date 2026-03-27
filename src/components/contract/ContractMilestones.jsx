@@ -2,9 +2,8 @@ import React from 'react';
 import { inputBase, labelBase, formatBillion, formatInputNumber, parseFormattedNumber } from './contractHelpers';
 
 export default function ContractMilestones({
-    paymentSchedule, setPaymentSchedule,
+    paymentSchedule,
     milestoneBase, setMilestoneBase,
-    totalValue, tl_postVat,
     addMilestone, removeMilestone, updateMilestone,
     paymentTerms, setPaymentTerms
 }) {

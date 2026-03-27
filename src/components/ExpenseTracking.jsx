@@ -19,6 +19,7 @@ export default function ExpenseTracking() {
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [filterProject, setFilterProject] = useState('all');
+    const [deleteConfirm, setDeleteConfirm] = useState(null);
     const toast = useToast();
 
     const [form, setForm] = useState({
@@ -83,8 +84,22 @@ export default function ExpenseTracking() {
         } else {
             toast.success('Đã lưu chi phí');
             setShowModal(false);
+            setIsEditing(false);
+            setEditingId(null);
             fetchData();
             setForm({ projectId: '', expenseType: 'BCH công trường', amount: '', paidAmount: '', expenseDate: new Date().toISOString().split('T')[0], paidDate: new Date().toISOString().split('T')[0], description: '' });
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!deleteConfirm) return;
+        const { error } = await supabase.from('expenses').delete().eq('id', deleteConfirm.id);
+        if (error) {
+            toast.error('Lỗi khi xóa: ' + error.message);
+        } else {
+            toast.success('Đã xóa chi phí');
+            setDeleteConfirm(null);
+            fetchData();
         }
     };
 
@@ -110,14 +125,17 @@ export default function ExpenseTracking() {
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                    <select 
-                        value={filterProject} 
-                        onChange={(e) => setFilterProject(e.target.value)}
-                        className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                        <option value="all">Tất cả dự án</option>
-                        {projects.map(p => <option key={p.id} value={p.id}>[{p.code}] {p.name}</option>)}
-                    </select>
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[14px] text-indigo-500">receipt_long</span>
+                        <select 
+                            value={filterProject} 
+                            onChange={(e) => setFilterProject(e.target.value)}
+                            className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 px-3 py-1 rounded-full text-[12px] font-black focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer hover:bg-indigo-100 dark:hover:bg-indigo-900/30"
+                        >
+                            <option value="all">Tất cả dự án (Toàn cục)</option>
+                            {projects.map(p => <option key={p.id} value={p.id}>Dự án: {p.code}</option>)}
+                        </select>
+                    </div>
                 </div>
 
                 {/* Mobile Card View */}
@@ -156,6 +174,12 @@ export default function ExpenseTracking() {
                                         className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shadow-sm active:scale-95 transition-transform"
                                     >
                                         <span className="material-symbols-outlined text-[18px]">edit</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => setDeleteConfirm(item)}
+                                        className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100 shadow-sm active:scale-95 transition-transform"
+                                    >
+                                        <span className="material-symbols-outlined text-[18px]">delete</span>
                                     </button>
                                 </div>
                             </div>
@@ -246,6 +270,12 @@ export default function ExpenseTracking() {
                                         >
                                             Sửa
                                         </button>
+                                        <button 
+                                            onClick={() => setDeleteConfirm(item)}
+                                            className="p-1 px-2 text-rose-600 hover:bg-rose-50 rounded-lg font-bold"
+                                        >
+                                            Xóa
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -255,8 +285,8 @@ export default function ExpenseTracking() {
             </div>
 
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden animate-slide-up">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowModal(false)} onKeyDown={(e) => e.key === 'Escape' && setShowModal(false)}>
+                    <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden animate-slide-up" onClick={(e) => e.stopPropagation()}>
                         <div className="px-8 pt-8 pb-4">
                             <h3 className="text-2xl font-black text-slate-800">{isEditing ? 'Cập nhật chi phí' : 'Ghi nhận chi phí mới'}</h3>
                             <p className="text-slate-500 text-sm">Nhập thông tin chi phí và số tiền thực chi.</p>
@@ -352,6 +382,25 @@ export default function ExpenseTracking() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirm Modal */}
+            {deleteConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={() => setDeleteConfirm(null)}>
+                    <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-slide-up" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-6 text-center">
+                            <div className="w-14 h-14 mx-auto rounded-full bg-rose-100 flex items-center justify-center mb-4">
+                                <span className="material-symbols-outlined text-rose-600 text-3xl">delete_forever</span>
+                            </div>
+                            <h3 className="text-lg font-black text-slate-800 mb-2">Xác nhận xóa?</h3>
+                            <p className="text-sm text-slate-500">Bạn có chắc muốn xóa chi phí cho dự án <strong>{deleteConfirm.projects?.name}</strong>?</p>
+                        </div>
+                        <div className="flex border-t border-slate-100">
+                            <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-3.5 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">Hủy</button>
+                            <button onClick={handleDelete} className="flex-1 py-3.5 text-sm font-black text-rose-600 hover:bg-rose-50 transition-colors border-l border-slate-100">Xóa</button>
+                        </div>
                     </div>
                 </div>
             )}
