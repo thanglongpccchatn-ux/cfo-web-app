@@ -13,6 +13,11 @@ export default function MaterialTracking({ project, onBack, embedded }) {
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState({});
 
+    // --- Danh mục liên kết ---
+    const [suppliersList, setSuppliersList] = useState([]);
+    const [materialsCatalog, setMaterialsCatalog] = useState([]);
+    const [categories, setCategories] = useState([]);
+
     const MATERIAL_COLUMN_MAPPING = {
         expense_date: 'Ngày Nhập',
         item_group: 'Nhóm Vật Tư',
@@ -34,7 +39,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
     const fetchMaterials = React.useCallback(async () => {
         let query = supabase
             .from('expense_materials')
-            .select('*, projects(name, code)')
+            .select('*, projects(name, code, internal_code)')
             .order('expense_date', { ascending: false });
 
         if (project) {
@@ -51,34 +56,47 @@ export default function MaterialTracking({ project, onBack, embedded }) {
 
     const fetchProjects = React.useCallback(async () => {
         if (project) return;
-        const { data } = await supabase.from('projects').select('id, name, code').order('name');
+        const { data } = await supabase.from('projects').select('id, name, code, internal_code').order('name');
         if (data) setProjects(data);
     }, [project]);
+
+    const fetchCatalogs = React.useCallback(async () => {
+        const [supRes, matRes, catRes] = await Promise.all([
+            supabase.from('suppliers').select('id, code, name').order('name'),
+            supabase.from('materials').select('id, code, name, unit, base_price, actual_price, category_code, discount_percentage').order('name'),
+            supabase.from('material_categories').select('id, code, name').order('name'),
+        ]);
+        if (supRes.data) setSuppliersList(supRes.data);
+        if (matRes.data) setMaterialsCatalog(matRes.data);
+        if (catRes.data) setCategories(catRes.data);
+    }, []);
 
     useEffect(() => {
         const init = async () => {
             setLoading(true);
-            await Promise.all([fetchMaterials(), fetchProjects()]);
+            await Promise.all([fetchMaterials(), fetchProjects(), fetchCatalogs()]);
             setLoading(false);
         };
         init();
-    }, [fetchMaterials, fetchProjects]);
+    }, [fetchMaterials, fetchProjects, fetchCatalogs]);
 
     function handleAddRow() {
         const newRow = {
             id: 'temp-' + Date.now(),
             isNew: true,
-            item_group: 'Vật tư phụ',
+            item_group: '',
             expense_date: new Date().toISOString().split('T')[0],
             supplier_name: '',
             product_name: '',
-            unit: 'cái',
+            unit: '',
             quantity: 1,
             unit_price: 0,
-            vat_rate: 0,
+            vat_rate: 8,
             total_amount: 0,
             paid_amount: 0,
             notes: '',
+            material_id: null,
+            supplier_id: null,
             project_id: project ? project.id : (filterProjectId !== 'all' ? filterProjectId : null)
         };
         if (!newRow.project_id) {
@@ -88,6 +106,38 @@ export default function MaterialTracking({ project, onBack, embedded }) {
         setMaterials([newRow, ...materials]);
         setEditingId(newRow.id);
         setEditForm(newRow);
+    };
+
+    // --- Cascade logic khi chọn vật tư từ danh mục ---
+    const handleSelectMaterial = (materialId) => {
+        const mat = materialsCatalog.find(m => m.id === materialId);
+        if (!mat) return;
+        setEditForm(prev => {
+            const price = Number(mat.actual_price || mat.base_price) || 0;
+            const qty = Number(prev.quantity) || 1;
+            const vat = Number(prev.vat_rate) || 8;
+            const beforeVat = qty * price;
+            return {
+                ...prev,
+                material_id: mat.id,
+                product_name: mat.name,
+                unit: mat.unit || prev.unit,
+                unit_price: price,
+                item_group: mat.category_code || prev.item_group,
+                total_amount: beforeVat + (beforeVat * vat / 100),
+            };
+        });
+    };
+
+    // --- Cascade logic khi chọn NCC ---
+    const handleSelectSupplier = (supplierId) => {
+        const sup = suppliersList.find(s => s.id === supplierId);
+        if (!sup) return;
+        setEditForm(prev => ({
+            ...prev,
+            supplier_id: sup.id,
+            supplier_name: sup.name,
+        }));
     };
 
     const handleEditClick = (mat) => {
@@ -145,6 +195,22 @@ export default function MaterialTracking({ project, onBack, embedded }) {
         } else {
             const { error } = await supabase.from('expense_materials').update(payload).eq('id', editingId);
             if (error) console.error(error);
+        }
+
+        // --- Lưu lịch sử giá nếu đơn giá khác giá niêm yết ---
+        if (editForm.material_id && Number(editForm.unit_price) > 0) {
+            const catalogMat = materialsCatalog.find(m => m.id === editForm.material_id);
+            const catalogPrice = Number(catalogMat?.actual_price || catalogMat?.base_price) || 0;
+            if (catalogPrice > 0 && Number(editForm.unit_price) !== catalogPrice) {
+                await supabase.from('material_price_history').insert([{
+                    material_id: editForm.material_id,
+                    supplier_id: editForm.supplier_id || null,
+                    unit_price: Number(editForm.unit_price),
+                    notes: `Giá mua thực tế (giá niêm yết: ${formatCurrency(catalogPrice)})`
+                }]).then(res => {
+                    if (res.error) console.warn('Không thể lưu lịch sử giá:', res.error.message);
+                });
+            }
         }
 
         setEditingId(null);
@@ -216,7 +282,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                              Sateco: Bảng Kê Mua Vật Tư
                         </h2>
                         <div className="text-[11px] font-bold text-slate-500 tracking-widest uppercase mt-0.5 ml-10">
-                            {project ? `Chi phí thi công vận hành thuộc ${project?.code}` : (
+                            {project ? `Dự án: ${project?.internal_code || project?.code}` : (
                                 <div className="flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[14px] text-orange-500">inventory_2</span>
                                     <select 
@@ -225,7 +291,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                         className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300 px-3 py-1 rounded-full text-[12px] font-black focus:ring-2 focus:ring-orange-500 outline-none transition-all cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/30"
                                     >
                                         <option value="all">Tất cả dự án (Toàn cục)</option>
-                                        {projects.map(p => <option key={p.id} value={p.id}>Dự án: {p.code}</option>)}
+                                        {projects.map(p => <option key={p.id} value={p.id}>{p.internal_code || p.code} — {p.name}</option>)}
                                     </select>
                                 </div>
                             )}
@@ -421,16 +487,25 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                                 <tr key={mat.id} className="bg-orange-50/40 relative z-20 shadow-[0_0_10px_rgba(249,115,22,0.1)] outline outline-1 outline-orange-300">
                                                     <td className="px-2 py-1 text-center border-r border-slate-200 font-bold text-orange-500">{mat.isNew ? '*' : index + 1}</td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
-                                                        <input type="text" value={editForm.item_group || ''} onChange={(e) => handleEditChange('item_group', e.target.value)} className="w-full bg-white border border-orange-300 rounded px-2 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all shadow-inner text-xs font-semibold" placeholder="Nhóm..." autoFocus />
+                                                        <select value={editForm.item_group || ''} onChange={(e) => handleEditChange('item_group', e.target.value)} className="w-full bg-white border border-orange-300 rounded px-1 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all text-xs font-semibold" autoFocus>
+                                                            <option value="">-- Nhóm --</option>
+                                                            {categories.map(c => <option key={c.id} value={c.code}>{c.name}</option>)}
+                                                        </select>
                                                     </td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
                                                         <input type="date" value={editForm.expense_date || ''} onChange={(e) => handleEditChange('expense_date', e.target.value)} className="w-full bg-white border border-slate-300 rounded px-1.5 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-xs" />
                                                     </td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
-                                                        <input type="text" value={editForm.supplier_name || ''} onChange={(e) => handleEditChange('supplier_name', e.target.value)} className="w-full bg-white border border-slate-300 rounded px-2 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-xs" placeholder="Tên NCC..." />
+                                                        <select value={editForm.supplier_id || ''} onChange={(e) => handleSelectSupplier(e.target.value)} className="w-full bg-white border border-slate-300 rounded px-1 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-xs">
+                                                            <option value="">-- Chọn NCC --</option>
+                                                            {suppliersList.map(s => <option key={s.id} value={s.id}>[{s.code}] {s.name}</option>)}
+                                                        </select>
                                                     </td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
-                                                        <input type="text" value={editForm.product_name || ''} onChange={(e) => handleEditChange('product_name', e.target.value)} className="w-full bg-white border border-orange-400 rounded px-2 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none font-bold text-orange-700 shadow-inner text-xs" placeholder="Quy cách vật tư..." />
+                                                        <select value={editForm.material_id || ''} onChange={(e) => handleSelectMaterial(e.target.value)} className="w-full bg-white border border-orange-400 rounded px-1 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none font-bold text-orange-700 text-xs">
+                                                            <option value="">-- Chọn Vật tư --</option>
+                                                            {(editForm.item_group ? materialsCatalog.filter(m => m.category_code === editForm.item_group) : materialsCatalog).map(m => <option key={m.id} value={m.id}>[{m.code}] {m.name}</option>)}
+                                                        </select>
                                                     </td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
                                                         <input type="text" value={editForm.unit || ''} onChange={(e) => handleEditChange('unit', e.target.value)} className="w-full bg-white border border-slate-300 rounded px-2 py-1.5 text-center focus:border-orange-500 outline-none text-xs" placeholder="Cái" />
