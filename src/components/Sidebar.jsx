@@ -12,6 +12,8 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
     const canView = (perms) => {
         // If user is Admin, they can see everything
         if (profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN') return true;
+        // '*' means visible to all authenticated users
+        if (perms.includes('*')) return true;
         // Tab without any permission requirement -> hidden for non-admin
         if (!perms || perms.length === 0) return false;
         
@@ -44,6 +46,7 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
         { id: 'settings', icon: 'settings', label: 'Cài đặt', perms: ['manage_users', 'manage_settings'] },
         { id: 'permissions', icon: 'admin_panel_settings', label: 'Quản lý Phân quyền', perms: ['manage_users'] },
         { id: 'users', icon: 'person', label: 'Quản lý Người dùng', perms: ['manage_users'] },
+        { id: 'guide', icon: 'help_center', label: 'Hướng dẫn sử dụng', perms: ['*'] },
     ].filter(tab => canView(tab.perms));
 
     return (

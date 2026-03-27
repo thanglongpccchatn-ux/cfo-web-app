@@ -41,6 +41,7 @@ const VariationsManagement = lazy(() => import('./components/VariationsManagemen
 const BiddingManagement = lazy(() => import('./components/BiddingManagement'));
 const ExpenseTracking = lazy(() => import('./components/ExpenseTracking'));
 const ConstructionModule = lazy(() => import('./components/ConstructionModule'));
+const UserGuide = lazy(() => import('./components/UserGuide'));
 
 const queryClient = new QueryClient();
 
@@ -126,6 +127,7 @@ function MainLayout() {
       case 'labor_tracking': return { title: 'Theo dõi Nhân công', subtitle: 'Chi phí thầu phụ và nhân công' };
       case 'material_tracking': return { title: 'Theo dõi Vật tư', subtitle: 'Chi phí vật tư hiện trường' };
       case 'expense_tracking': return { title: 'Chi phí Chung', subtitle: 'Quản lý chi phí vận hành & văn phòng' };
+      case 'guide': return { title: 'Hướng dẫn sử dụng', subtitle: 'Hướng dẫn chi tiết cho từng vai trò' };
       default: return { title: 'Hệ thống Quản trị', subtitle: `${currentTheme.company_name}` };
     }
   };
@@ -205,6 +207,7 @@ function MainLayout() {
             {/* App Settings */}
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+            <Route path="/guide" element={<ProtectedRoute><UserGuide /></ProtectedRoute>} />
             
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
