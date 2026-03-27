@@ -42,6 +42,7 @@ const BiddingManagement = lazy(() => import('./components/BiddingManagement'));
 const ExpenseTracking = lazy(() => import('./components/ExpenseTracking'));
 const ConstructionModule = lazy(() => import('./components/ConstructionModule'));
 const UserGuide = lazy(() => import('./components/UserGuide'));
+const LoanManagement = lazy(() => import('./components/LoanManagement'));
 
 const queryClient = new QueryClient();
 
@@ -128,6 +129,7 @@ function MainLayout() {
       case 'material_tracking': return { title: 'Theo dõi Vật tư', subtitle: 'Chi phí vật tư hiện trường' };
       case 'expense_tracking': return { title: 'Chi phí Chung', subtitle: 'Quản lý chi phí vận hành & văn phòng' };
       case 'guide': return { title: 'Hướng dẫn sử dụng', subtitle: 'Hướng dẫn chi tiết cho từng vai trò' };
+      case 'loans': return { title: 'Quản lý Vay vốn', subtitle: 'Theo dõi khoản vay, lãi suất và trịch sử trả nợ' };
       default: return { title: 'Hệ thống Quản trị', subtitle: `${currentTheme.company_name}` };
     }
   };
@@ -208,6 +210,7 @@ function MainLayout() {
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
             <Route path="/guide" element={<ProtectedRoute><UserGuide /></ProtectedRoute>} />
+            <Route path="/loans" element={<ProtectedRoute requiredPerms={['view_loans']}><LoanManagement /></ProtectedRoute>} />
             
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

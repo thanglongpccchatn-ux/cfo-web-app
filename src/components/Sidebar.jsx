@@ -32,6 +32,7 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
         { id: 'payment_receipts', icon: 'receipt_long', label: 'Lịch sử thu tiền', perms: ['view_payments'] },
         { id: 'warranty_tracking', icon: 'security', label: 'Theo dõi Bảo hành', perms: ['view_warranty', 'manage_warranty'] },
         { id: 'settlement', icon: 'gavel', label: 'Quyết Toán', perms: ['view_settlement', 'manage_settlement'] },
+        { id: 'loans', icon: 'account_balance_wallet', label: 'Quản lý Vay vốn', perms: ['view_loans', 'manage_loans'] },
         { id: 'suppliers', icon: 'local_shipping', label: 'Nhà cung cấp', perms: ['view_partners', 'manage_partners'] },
         { id: 'subcontractors', icon: 'groups', label: 'Nhà thầu phụ / Tổ đội', perms: ['view_subcontractors', 'manage_subcontractors'] },
         { id: 'planning_hub', icon: 'analytics', label: 'Kế hoạch & Báo cáo', perms: ['view_planning', 'manage_planning'] },
