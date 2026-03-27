@@ -16,13 +16,14 @@ const DashboardOverview = () => {
             const currentYear = new Date().getFullYear();
 
             // All queries run in parallel for maximum speed
-            const [planRes, projRes, pmtRes, , extHistRes, intHistRes] = await Promise.all([
+            const [planRes, projRes, pmtRes, , extHistRes, intHistRes, loansRes] = await Promise.all([
                 supabase.from('revenue_plan').select('*').eq('year', currentYear),
                 supabase.from('projects').select('*, partners!projects_partner_id_fkey(name, code, short_name)'),
                 supabase.from('payments').select('*, projects!inner(code, internal_code, name)'),
                 supabase.from('addendas').select('*').eq('status', 'Đã duyệt'),
                 supabase.from('external_payment_history').select('*'),
-                supabase.from('internal_payment_history').select('*')
+                supabase.from('internal_payment_history').select('*'),
+                supabase.from('loans').select('loan_amount, total_paid, status')
             ]);
 
             const planData = planRes.data?.[0] || { target_revenue: 0, year: currentYear };
@@ -30,6 +31,11 @@ const DashboardOverview = () => {
             const pmts = pmtRes.data;
             const extHist = extHistRes.data;
             const intHist = intHistRes.data;
+            const loansData = loansRes.data || [];
+
+            // Calculate Total Debt from Loans
+            const activeLoans = loansData.filter(l => l.status === 'active' || l.status === 'partially_paid' || l.status === 'overdue');
+            const totalDebtAll = activeLoans.reduce((s, l) => s + (Number(l.loan_amount) - Number(l.total_paid || 0)), 0);
 
             // 1. Basic Counts & Lists (from fetched data to avoid extra requests)
             const projCount = projs?.length || 0;
@@ -97,7 +103,7 @@ const DashboardOverview = () => {
                     .filter(pm => pm.due_date && new Date(pm.due_date).getFullYear() === targetYear)
                     .reduce((sum, pm) => sum + (parseFloat(pm.external_income) || 0), 0);
 
-                financials = { totalValueAll, totalIncomeAll, totalDebtInvoiceAll, totalRequestedAll, totalInvoiceAll, recoveryRate, totalIncomeThisYear };
+                financials = { totalValueAll, totalIncomeAll, totalDebtInvoiceAll, totalRequestedAll, totalInvoiceAll, recoveryRate, totalIncomeThisYear, totalDebtAll };
 
                 // 3. Chart Data Processing
                 // Trend Chart (Last 6 Months Income)
@@ -181,7 +187,7 @@ const DashboardOverview = () => {
     const { planData, stats, financials, chartData, performance, projectDetails, unsignedProjects, unsettledProjects, pendingPaymentsList } = dashboardData || {
         planData: { target_revenue: 0, year: new Date().getFullYear() },
         stats: { totalProjects: 0, pendingPayments: 0, approvedPayments: 0, unsignedContracts: 0, unsettledContracts: 0 },
-        financials: { totalValueAll: 0, totalIncomeAll: 0, totalDebtInvoiceAll: 0, totalRequestedAll: 0, totalInvoiceAll: 0, recoveryRate: 0, totalIncomeThisYear: 0 },
+        financials: { totalValueAll: 0, totalIncomeAll: 0, totalDebtInvoiceAll: 0, totalRequestedAll: 0, totalInvoiceAll: 0, recoveryRate: 0, totalIncomeThisYear: 0, totalDebtAll: 0 },
         performance: { avg_lng_dt: 0, avg_sl_cp: 0, avg_spi: 1, avg_dt_sl: 0, avg_thu_dt: 0, avg_thu_chi: 0 },
         chartData: { trend: { labels: [], values: [] }, portfolio: { labels: [], values: [] }, aging: { labels: [], invoiceValues: [], incomeValues: [] }, topProfit: { labels: [], values: [] } },
         projectDetails: [], unsignedProjects: [], unsettledProjects: [], pendingPaymentsList: []
@@ -389,19 +395,23 @@ const DashboardOverview = () => {
             </div>
 
             {/* Top Row: Financial KPIs (Moved from Contracts) */}
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3 md:gap-4">
                 {[
                     { label: 'TỔNG GIÁ TRỊ HĐ', subLabel: '(SAU VAT, GỒM PHÁT SINH)', value: financials.totalValueAll, icon: 'payments', color: 'blue' },
                     { label: 'THỰC THU (CASH-IN)', value: financials.totalIncomeAll, icon: 'account_balance_wallet', color: 'emerald' },
                     { label: 'CÔNG NỢ HÓA ĐƠN', subLabel: '(ĐÃ XUẤT HĐ - THỰC THU)', value: financials.totalDebtInvoiceAll, icon: 'assignment_turned_in', color: 'rose', type: 'invoice' },
                     { label: 'CÔNG NỢ ĐỀ NGHỊ', subLabel: '(ĐỀ NGHỊ - THỰC THU)', value: financials.totalRequestedAll - financials.totalIncomeAll, icon: 'pending_actions', color: 'amber', type: 'requested' },
+                    { label: 'TỔNG DƯ NỢ VAY', subLabel: '(CẬP NHẬT TỪ HỆ THỐNG)', value: financials.totalDebtAll || 0, icon: 'credit_card', color: 'rose', route: '/loans' },
                     { label: 'TỔNG XUẤT HÓA ĐƠN', value: financials.totalInvoiceAll, icon: 'description', color: 'slate' },
                     { label: 'TỶ LỆ THU HỒI DÒNG TIỀN', value: financials.recoveryRate, icon: 'analytics', color: 'indigo', isPercent: true }
                 ].map((kpi, idx) => (
                     <div 
                         key={idx} 
-                        onClick={() => kpi.type && handleOpenDetail(kpi.type)}
-                        className={`bg-white rounded-2xl md:rounded-[20px] p-3 md:p-4 shadow-sm border border-slate-200/60 relative overflow-hidden group hover:shadow-md transition-all ${kpi.type ? 'cursor-pointer hover:ring-2 hover:border-transparent hover:-translate-y-1 ' + (kpi.color === 'rose' ? 'hover:ring-rose-400' : 'hover:ring-amber-400') : ''}`}
+                        onClick={() => {
+                            if (kpi.route) window.location.href = kpi.route;
+                            else if (kpi.type) handleOpenDetail(kpi.type);
+                        }}
+                        className={`bg-white rounded-2xl md:rounded-[20px] p-3 md:p-4 shadow-sm border border-slate-200/60 relative overflow-hidden group hover:shadow-md transition-all ${(kpi.type || kpi.route) ? 'cursor-pointer hover:ring-2 hover:border-transparent hover:-translate-y-1 ' + (kpi.color === 'rose' ? 'hover:ring-rose-400' : 'hover:ring-amber-400') : ''}`}
                     >
                         {kpi.type && (
                             <div className={`absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ${kpi.color === 'rose' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
