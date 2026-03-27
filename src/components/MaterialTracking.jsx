@@ -258,66 +258,67 @@ export default function MaterialTracking({ project, onBack, embedded }) {
         <>
         <div className={`flex flex-col h-full bg-white border border-slate-200/60 rounded-xl overflow-hidden animate-fade-in shadow-sm ${embedded ? 'min-h-[600px] mb-8' : 'absolute inset-0 z-50'}`}>
             {/* Control Header */}
-            <div className="flex justify-between items-center p-4 border-b border-slate-200/60 bg-white shadow-sm z-10 shrink-0 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-64 h-full bg-gradient-to-r from-orange-50 to-transparent -z-10"></div>
-                
-                <div className="flex items-center gap-4">
-                    {!embedded && (
-                        <button onClick={onBack} className="w-10 h-10 flex items-center justify-center bg-white hover:bg-slate-50 rounded-xl transition-all shadow-sm border border-slate-200 text-slate-500 hover:text-orange-600">
-                             <span className="material-symbols-outlined notranslate text-[22px]" translate="no">arrow_back</span>
-                        </button>
-                    )}
-                    <button
-                        onClick={() => setShowSummary(!showSummary)}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm border ${showSummary ? 'bg-orange-600 text-white border-orange-700 hover:bg-orange-700' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-orange-600'}`}
-                    >
-                        <span className="material-symbols-outlined notranslate text-[18px]" translate="no">{showSummary ? 'grid_on' : 'donut_large'}</span>
-                        {showSummary ? 'Về Bảng kê (Excel)' : 'Xem Phân tích'}
-                    </button>
-                    <div>
-                        <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
-                             <span className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600 shadow-sm border border-orange-200/50">
+            <div className="p-4 border-b border-slate-200/60 bg-white shadow-sm z-10 shrink-0 space-y-3">
+                {/* Row 1: Title + Project Selector */}
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        {!embedded && (
+                            <button onClick={onBack} className="w-9 h-9 flex items-center justify-center bg-white hover:bg-slate-50 rounded-lg transition-all shadow-sm border border-slate-200 text-slate-500 hover:text-orange-600">
+                                 <span className="material-symbols-outlined notranslate text-[20px]" translate="no">arrow_back</span>
+                            </button>
+                        )}
+                        <div className="flex items-center gap-2">
+                            <span className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600 shadow-sm border border-orange-200/50 shrink-0">
                                 <span className="material-symbols-outlined notranslate text-[18px]" translate="no">inventory_2</span>
                             </span>
-                             Sateco: Bảng Kê Mua Vật Tư
-                        </h2>
-                        <div className="text-[11px] font-bold text-slate-500 tracking-widest uppercase mt-0.5 ml-10">
-                            {project ? `Dự án: ${project?.internal_code || project?.code}` : (
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-[14px] text-orange-500">inventory_2</span>
-                                    <select 
-                                        value={filterProjectId} 
-                                        onChange={(e) => setFilterProjectId(e.target.value)}
-                                        className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300 px-3 py-1 rounded-full text-[12px] font-black focus:ring-2 focus:ring-orange-500 outline-none transition-all cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/30"
-                                    >
-                                        <option value="all">Tất cả dự án (Toàn cục)</option>
-                                        {projects.map(p => <option key={p.id} value={p.id}>{p.internal_code || p.code} — {p.name}</option>)}
-                                    </select>
-                                </div>
-                            )}
+                            <h2 className="text-lg font-black text-slate-800">Bảng Kê Mua Vật Tư</h2>
                         </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {project ? (
+                            <span className="text-xs font-bold text-orange-600 bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-lg">
+                                Dự án: {project?.internal_code || project?.code}
+                            </span>
+                        ) : (
+                            <select 
+                                value={filterProjectId} 
+                                onChange={(e) => setFilterProjectId(e.target.value)}
+                                className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-1.5 rounded-lg text-xs font-bold focus:ring-2 focus:ring-orange-500 outline-none cursor-pointer hover:bg-orange-100 transition-all min-w-[200px]"
+                            >
+                                <option value="all">Tất cả dự án</option>
+                                {projects.map(p => <option key={p.id} value={p.id}>{p.internal_code || p.code} — {p.name}</option>)}
+                            </select>
+                        )}
                     </div>
                 </div>
 
-                <div className="flex gap-3 items-center">
-                    {/* Import Button */}
-                    <button
-                        onClick={() => setShowImportModal(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-emerald-300 text-emerald-700 font-bold text-sm hover:bg-emerald-50 transition-all shadow-sm"
-                    >
-                        <span className="material-symbols-outlined notranslate text-[18px]" translate="no">upload_file</span>
-                        Import Excel
-                    </button>
-                    <div className="flex bg-slate-50 rounded-xl border border-slate-200 divide-x divide-slate-200 shadow-sm overflow-hidden">
-                        <div className="px-5 py-2 hover:bg-white transition-colors">
-                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Giá trị Tổng (Gồm VAT)</div>
-                            <div className="font-black text-slate-800 text-lg tabular-nums tracking-tight">{formatCurrency(totalMaterialsValue)}</div>
-                        </div>
+                {/* Row 2: Actions */}
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setShowSummary(!showSummary)}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all border ${showSummary ? 'bg-orange-600 text-white border-orange-700' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-orange-600'}`}
+                        >
+                            <span className="material-symbols-outlined notranslate text-[16px]" translate="no">{showSummary ? 'grid_on' : 'donut_large'}</span>
+                            {showSummary ? 'Bảng kê' : 'Phân tích'}
+                        </button>
+                        <button
+                            onClick={() => setShowImportModal(true)}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-emerald-300 text-emerald-700 font-bold text-xs hover:bg-emerald-50 transition-all"
+                        >
+                            <span className="material-symbols-outlined notranslate text-[16px]" translate="no">upload_file</span>
+                            Import Excel
+                        </button>
                     </div>
-
-                    <button onClick={handleAddRow} className="btn bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-md shadow-orange-500/20 px-5 flex items-center gap-2 h-12">
-                        <span className="material-symbols-outlined notranslate text-[20px]" translate="no">add_box</span> THÊM VẬT TƯ
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <div className="text-right">
+                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tổng (gồm VAT)</div>
+                            <div className="font-black text-slate-800 text-base tabular-nums">{formatCurrency(totalMaterialsValue)}</div>
+                        </div>
+                        <button onClick={handleAddRow} className="btn bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-md shadow-orange-500/20 px-4 flex items-center gap-1.5 h-10 text-sm rounded-lg">
+                            <span className="material-symbols-outlined notranslate text-[18px]" translate="no">add_box</span> Thêm VT
+                        </button>
+                    </div>
                 </div>
             </div>
 
