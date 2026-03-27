@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
 const fmt = (v) => Number(v || 0).toLocaleString('vi-VN');
+const fmtInput = (v) => v ? Number(v).toLocaleString('vi-VN') : '';
 
 const LENDER_TYPES = [
     { value: 'company', label: 'Công ty', icon: 'domain', color: 'bg-blue-100 text-blue-700' },
@@ -60,6 +61,11 @@ export default function LoanManagement() {
     }, []);
 
     useEffect(() => { fetchData(); }, [fetchData]);
+
+    const handleNumberChange = (e, setter, field) => {
+        const val = e.target.value.replace(/[^0-9]/g, '');
+        setter(prev => ({ ...prev, [field]: val }));
+    };
 
     // Auto-detect overdue
     const getStatus = (loan) => {
@@ -487,8 +493,8 @@ export default function LoanManagement() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Số tiền vay (₫) *</label>
-                                    <input required type="number" value={form.loan_amount} onChange={e => setForm({...form, loan_amount: e.target.value})}
-                                        placeholder="500000000" className="w-full px-3 py-2.5 border rounded-xl text-sm" />
+                                    <input required type="text" value={fmtInput(form.loan_amount)} onChange={e => handleNumberChange(e, setForm, 'loan_amount')}
+                                        placeholder="500,000,000" className="w-full px-3 py-2.5 border rounded-xl text-sm" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Lãi suất (%/năm)</label>
@@ -553,7 +559,7 @@ export default function LoanManagement() {
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Trả gốc (₫)</label>
-                                <input type="number" value={payForm.principal_amount} onChange={e => setPayForm({...payForm, principal_amount: e.target.value})}
+                                <input type="text" value={fmtInput(payForm.principal_amount)} onChange={e => handleNumberChange(e, setPayForm, 'principal_amount')}
                                     placeholder="0" className="w-full px-3 py-2.5 border rounded-xl text-sm" />
                             </div>
                             <div>
@@ -566,7 +572,7 @@ export default function LoanManagement() {
                                         </button>
                                     )}
                                 </div>
-                                <input type="number" value={payForm.interest_amount} onChange={e => setPayForm({...payForm, interest_amount: e.target.value})}
+                                <input type="text" value={fmtInput(payForm.interest_amount)} onChange={e => handleNumberChange(e, setPayForm, 'interest_amount')}
                                     placeholder="0" className="w-full px-3 py-2.5 border rounded-xl text-sm" />
                             </div>
                             <div className="bg-slate-50 rounded-xl p-3 text-center">

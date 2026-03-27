@@ -55,6 +55,23 @@ const GUIDE_DATA = [
         ]
     },
     {
+        code: 'NHANSU', name: 'Nhân sự',
+        desc: 'Quản lý, thống kê và theo dõi chấm công nhân sự, tổ đội thi công.',
+        icon: 'badge', color: 'from-fuchsia-500 to-pink-600',
+        sections: [
+            { title: 'Theo dõi Nhân công', steps: [
+                'Vào "Theo dõi Nhân công" → chọn dự án từ danh sách',
+                'Xem và điền bảng chấm công, số ngày công, đơn giá từng nhân sự',
+                'Cập nhật dữ liệu công nhật hàng ngày/tuần',
+                'Chốt bảng công để gửi duyệt thanh toán lương',
+            ]},
+            { title: 'Xem Nhà thầu phụ / Tổ đội', steps: [
+                'Vào "Nhà thầu phụ / Tổ đội" → xem danh sách các tổ đội',
+                'Kiểm tra thông tin liên hệ và năng lực tổ đội cơ bản',
+            ]},
+        ]
+    },
+    {
         code: 'DAUTHAU', name: 'Đấu thầu',
         desc: 'Tạo, quản lý gói thầu và báo giá. Quản lý nhân sự thầu phụ/tổ đội.',
         icon: 'assignment_turned_in', color: 'from-blue-500 to-indigo-600',
