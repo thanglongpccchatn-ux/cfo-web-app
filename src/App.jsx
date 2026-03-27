@@ -113,7 +113,7 @@ function MainLayout() {
       case 'contracts': return { title: 'Quản lý Hợp đồng', subtitle: 'Danh sách và chi tiết dự án' };
       case 'doc_tracking': return { title: 'Hồ sơ & Thanh toán', subtitle: `${currentTheme.company_name}` };
       case 'payment_receipts': return { title: 'Lịch sử thu tiền', subtitle: `${currentTheme.company_name}` };
-      case 'suppliers': return { title: 'Nhà cung cấp', subtitle: 'Bảng theo dõi công nợ nhà cung cấp' };
+      case 'suppliers': return { title: 'Nhà cung cấp & Vật tư', subtitle: 'Theo dõi đối tác và nhật ký nhập vật tư' };
       case 'subcontractors': return { title: 'Nhà thầu phụ / Tổ đội', subtitle: 'Bảng theo dõi công nợ thầu phụ' };
       case 'materials': return { title: 'Danh mục Vật tư', subtitle: 'Quản lý danh pháp vật tư chung' };
       case 'planning_hub': return { title: 'Kế hoạch & Báo cáo', subtitle: 'Kế hoạch dòng tiền tạm tính' };

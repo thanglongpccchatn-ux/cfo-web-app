@@ -126,7 +126,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
         }
 
         const payload = {
-            project_id: project.id,
+            project_id: editForm.project_id,
             item_group: editForm.item_group,
             expense_date: editForm.expense_date,
             supplier_name: editForm.supplier_name,
@@ -543,7 +543,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
             columnMapping={MATERIAL_COLUMN_MAPPING}
             templateFilename="mau_vat_tu_sateco.xlsx"
             templateSampleRows={MATERIAL_SAMPLE_ROWS}
-            fixedData={{ project_id: project.id }}
+            fixedData={{ project_id: project?.id || (filterProjectId !== 'all' ? filterProjectId : null) }}
             onSuccess={(count) => {
                 alert(`Đã import thành công ${count} bản ghi Vật Tư!`);
                 fetchMaterials();

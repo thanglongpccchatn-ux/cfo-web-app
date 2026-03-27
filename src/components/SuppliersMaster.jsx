@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
 import { useToast } from '../context/ToastContext';
+import MaterialTracking from './MaterialTracking';
 
 const EMPTY_LINE = () => ({ _key: Date.now() + Math.random(), materialId: '', productName: '', unit: 'Cái', quantity: '', unitPrice: '', vatRate: '8', notes: '', _showSuggestions: false });
 
 export default function SuppliersMaster() {
+    const [activeSubTab, setActiveSubTab] = useState('suppliers');
     const [suppliersData, setSuppliersData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -304,34 +306,61 @@ export default function SuppliersMaster() {
 
     return (
         <div className="pb-10 animate-fade-in text-slate-900 dark:text-slate-100">
-            <div className="flex justify-between items-center mb-8">
+            <div className="flex justify-between items-center mb-6">
                 <div>
                     <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2 tracking-tight">
                         <span className="material-symbols-outlined notranslate text-orange-500 text-[28px]" translate="no">local_shipping</span>
-                        Danh Mục Nhà Cung Cấp
+                        Nhà Cung Cấp & Vật Tư
                     </h2>
-                    <p className="text-slate-500 text-sm mt-1 uppercase font-semibold tracking-wider">Quản lý đối tác và công nợ dự án</p>
+                    <p className="text-slate-500 text-sm mt-1 uppercase font-semibold tracking-wider">Quản lý đối tác và nhật ký nhập vật tư hiện trường</p>
                 </div>
-                <div className="flex gap-3">
-                    <button 
-                        onClick={() => setShowPurchaseModal(true)}
-                        className="p-2.5 px-4 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-bold flex items-center gap-2 transition-all shadow-md shadow-orange-200"
-                    >
-                        <span className="material-symbols-outlined notranslate" translate="no">add_shopping_cart</span>
-                        Nhập đơn mua hàng
-                    </button>
-                    <button 
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="p-2.5 px-4 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-500/20 font-semibold border border-emerald-200 dark:border-emerald-500/20 flex items-center gap-2 transition-all shadow-sm"
-                    >
-                        <span className="material-symbols-outlined notranslate" translate="no">upload_file</span>
-                        Import Excel
-                    </button>
-                    <button onClick={fetchSuppliersData} className="p-2.5 bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm border border-slate-200 dark:border-slate-700 flex items-center">
-                        <span className="material-symbols-outlined notranslate" translate="no">refresh</span>
-                    </button>
-                </div>
+                {activeSubTab === 'suppliers' && (
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={() => setShowPurchaseModal(true)}
+                            className="p-2.5 px-4 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-bold flex items-center gap-2 transition-all shadow-md shadow-orange-200"
+                        >
+                            <span className="material-symbols-outlined notranslate" translate="no">add_shopping_cart</span>
+                            Nhập đơn mua hàng
+                        </button>
+                        <button 
+                            onClick={() => setIsImportModalOpen(true)}
+                            className="p-2.5 px-4 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-500/20 font-semibold border border-emerald-200 dark:border-emerald-500/20 flex items-center gap-2 transition-all shadow-sm"
+                        >
+                            <span className="material-symbols-outlined notranslate" translate="no">upload_file</span>
+                            Import Excel
+                        </button>
+                        <button onClick={fetchSuppliersData} className="p-2.5 bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm border border-slate-200 dark:border-slate-700 flex items-center">
+                            <span className="material-symbols-outlined notranslate" translate="no">refresh</span>
+                        </button>
+                    </div>
+                )}
             </div>
+
+            {/* Sub-tabs Navigation */}
+            <div className="flex space-x-1 border-b border-slate-200 dark:border-slate-700 mb-6">
+                <button
+                    onClick={() => setActiveSubTab('suppliers')}
+                    className={`px-5 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeSubTab === 'suppliers' ? 'border-orange-500 text-orange-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}
+                >
+                    <span className="material-symbols-outlined notranslate text-[18px]" translate="no">local_shipping</span>
+                    Sổ cái Công nợ NCC
+                </button>
+                <button
+                    onClick={() => setActiveSubTab('materials')}
+                    className={`px-5 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeSubTab === 'materials' ? 'border-orange-500 text-orange-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}
+                >
+                    <span className="material-symbols-outlined notranslate text-[18px]" translate="no">inventory_2</span>
+                    Nhật ký Nhập Vật tư
+                </button>
+            </div>
+
+            {activeSubTab === 'materials' ? (
+                <div className="h-[calc(100vh-220px)] relative">
+                    <MaterialTracking embedded={true} />
+                </div>
+            ) : (
+                <>
 
             {/* Global KPIs */}
             <div className="flex flex-col lg:flex-row gap-6 mb-8">
@@ -540,6 +569,8 @@ export default function SuppliersMaster() {
                     )}
                 </div>
             </div>
+            </>
+            )}
 
             <ExcelImportModal 
                 isOpen={isImportModalOpen}

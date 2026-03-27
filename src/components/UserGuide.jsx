@@ -44,7 +44,7 @@ const GUIDE_DATA = [
                 'Có thể sửa/xóa chi phí đã tạo',
             ]},
             { title: 'Theo dõi Vật tư (chỉ xem)', steps: [
-                'Vào Theo dõi Vật tư → chọn dự án',
+                'Vào Nhà cung cấp & Vật tư → chọn tab Nhật ký Nhập Vật tư',
                 'Xem danh sách vật tư đã nhập, đơn giá, tồn kho',
                 'Kiểm tra đối chiếu với hóa đơn nhà cung cấp',
             ]},
@@ -151,7 +151,7 @@ const GUIDE_DATA = [
                 'Xem khối lượng Kế hoạch vs Thực tế theo hạng mục',
                 'Nhập khối lượng hoàn thành thực tế theo ngày/tuần',
                 'Vào Nhật ký hiện trường → ghi nhận tiến độ, ảnh chụp',
-                'Đối chiếu Theo dõi Vật tư để kiểm tra tiêu hao',
+                'Đối chiếu Nhà cung cấp & Vật tư để kiểm tra tiêu hao',
             ]},
         ]
     },
@@ -221,7 +221,7 @@ const GUIDE_DATA = [
                 'Vào Kho vật tư → tạo Yêu cầu vật tư cho bộ môn',
                 'Chọn dự án, loại vật tư, SL cần → gửi Chỉ huy trưởng duyệt',
                 'Theo dõi tiến độ bộ môn tại Thi công',
-                'Xem lịch sử vật tư đã cấp tại Theo dõi Vật tư',
+                'Xem lịch sử vật tư đã cấp tại Nhà cung cấp & Vật tư',
             ]},
         ]
     },
@@ -234,7 +234,7 @@ const GUIDE_DATA = [
                 'Vào Kho vật tư → xem tồn kho hiện tại dự án',
                 'Tab Nhập kho → ghi nhận vật tư nhận từ kho tổng hoặc NCC',
                 'Tab Xuất kho → xuất vật tư cho hạng mục thi công',
-                'Kiểm tra Theo dõi Vật tư → đối chiếu nhập/xuất',
+                'Kiểm tra Nhà cung cấp & Vật tư → đối chiếu nhập/xuất',
             ]},
         ]
     },
