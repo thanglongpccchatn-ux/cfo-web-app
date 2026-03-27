@@ -25,8 +25,8 @@ export default function PartnerManagement() {
 
     // Mapping cột Excel → cột Supabase (khớp 100% với file Excel mẫu thực tế)
     const partnerMapping = {
-        code: "Mã ĐT",
-        name: "Tên đối tác",
+        code: "Mã NCC",
+        name: "Tên nhà cung cấp",
         short_name: "Tên viết tắt",
         type: "Vai trò",
         tax_code: "Mã số thuế",
@@ -43,14 +43,14 @@ export default function PartnerManagement() {
     };
 
     const handleImportSuccess = (count) => {
-        alert(`Đã import thành công ${count} đối tác (Tab: ${getTabLabel(activeTab)})!`);
+        alert(`Đã import thành công ${count} nhà cung cấp (Tab: ${getTabLabel(activeTab)})!`);
         fetchPartners();
     };
 
     const handleSavePartner = async (e) => {
         e.preventDefault();
         if (!newPartner.name) {
-            alert('Vui lòng nhập Tên đối tác');
+            alert('Vui lòng nhập Tên nhà cung cấp');
             return;
         }
 
@@ -80,7 +80,7 @@ export default function PartnerManagement() {
             fetchPartners();
         } catch (error) {
             console.error('Error saving partner:', error);
-            alert('Đã xảy ra lỗi khi lưu đối tác: ' + error.message);
+            alert('Đã xảy ra lỗi khi lưu: ' + error.message);
         } finally {
             setIsSubmitting(false);
         }
@@ -108,14 +108,14 @@ export default function PartnerManagement() {
     };
 
     const handleDelete = async (id, name) => {
-        if (window.confirm(`Bạn có chắc chắn muốn xóa đối tác "${name}" không?\nLưu ý: Thao tác này có thể bị từ chối nếu đối tác đã được gắn vào hợp đồng.`)) {
+        if (window.confirm(`Bạn có chắc chắn muốn xóa "${name}" không?\nLưu ý: Thao tác này có thể bị từ chối nếu đã được gắn vào hợp đồng.`)) {
             try {
                 const { error } = await supabase.from('partners').delete().eq('id', id);
                 if (error) throw error;
                 fetchPartners();
             } catch (error) {
                 console.error('Lỗi khi xóa đối tác:', error);
-                alert('Có lỗi xảy ra. Khả năng đối tác này đang được sử dụng ở hợp đồng nào đó nên không thể xóa.');
+                alert('Có lỗi xảy ra. Khả năng NCC này đang được sử dụng ở hợp đồng nào đó nên không thể xóa.');
             }
         }
     };
@@ -133,7 +133,7 @@ export default function PartnerManagement() {
             setPartners(data || []);
         } catch (error) {
             console.error('Error fetching partners:', error);
-            alert('Không thể tải danh sách đối tác.');
+            alert('Không thể tải danh sách nhà cung cấp.');
         } finally {
             setIsLoading(false);
         }
@@ -165,9 +165,9 @@ export default function PartnerManagement() {
             {/* Header section */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Danh mục Đối tác</h2>
+                    <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Danh mục Nhà Cung Cấp</h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        Quản lý khách hàng, nhà cung cấp và thầu phụ thi công
+                        Quản lý chủ đầu tư, nhà cung cấp và thầu phụ thi công
                     </p>
                 </div>
                 <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3 w-full md:w-auto">
@@ -175,7 +175,7 @@ export default function PartnerManagement() {
                         <span className="material-symbols-outlined notranslate absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]" translate="no">search</span>
                         <input
                             type="text"
-                            placeholder="Tìm kiếm đối tác..."
+                            placeholder="Tìm kiếm nhà cung cấp..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="h-10 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm w-full md:w-64"
@@ -198,7 +198,7 @@ export default function PartnerManagement() {
                             className="h-10 flex-1 md:flex-none flex items-center justify-center gap-2 px-4 bg-primary text-white text-xs md:text-sm font-semibold rounded-xl hover:bg-primary-hover active:scale-95 transition-all shadow-sm"
                         >
                             <span className="material-symbols-outlined notranslate text-[18px]" translate="no">add</span>
-                            Thêm Đối tác
+                            Thêm NCC
                         </button>
                     </div>
                 </div>
@@ -229,8 +229,8 @@ export default function PartnerManagement() {
                     <table className="w-full text-left border-collapse">
                         <thead className="whitespace-nowrap">
                             <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
-                                <th className="p-4 w-28">Mã ĐT</th>
-                                <th className="p-4">Tên Đối tác / Người đại diện</th>
+                                <th className="p-4 w-28">Mã NCC</th>
+                                <th className="p-4">Tên NCC / Người đại diện</th>
                                 <th className="p-4">Mã số thuế</th>
                                 <th className="p-4">Thông tin Ngân hàng</th>
                                 <th className="p-4">Trạng thái</th>
@@ -341,7 +341,7 @@ export default function PartnerManagement() {
                             {/* --- THÔNG TIN CƠ BẢN --- */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Mã đối tác</label>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Mã NCC</label>
                                     <input type="text" value={newPartner.code}
                                         onChange={e => setNewPartner({ ...newPartner, code: e.target.value })}
                                         className={inp} placeholder="VD: KH001, NCC001" />
@@ -353,10 +353,10 @@ export default function PartnerManagement() {
                                         className={inp} placeholder="VD: HOANG VINH" />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tên khách hàng / Đối tác <span className="text-red-500">*</span></label>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tên nhà cung cấp <span className="text-red-500">*</span></label>
                                     <input type="text" value={newPartner.name}
                                         onChange={e => setNewPartner({ ...newPartner, name: e.target.value })}
-                                        required className={inp} placeholder="Tên đầy đủ của công ty hoặc cá nhân" />
+                                        required className={inp} placeholder="Tên đầy đủ công ty hoặc cá nhân" />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Mã số thuế</label>
@@ -456,7 +456,7 @@ export default function PartnerManagement() {
                                     className="px-6 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary-hover active:scale-95 transition-all shadow-sm disabled:opacity-50 flex items-center gap-2"
                                 >
                                     {isSubmitting && <span className="material-symbols-outlined notranslate animate-spin text-[18px]" translate="no">progress_activity</span>}
-                                    {editingPartnerId ? 'Cập nhật' : 'Lưu Đối tác'}
+                                    {editingPartnerId ? 'Cập nhật' : 'Lưu NCC'}
                                 </button>
                             </div>
                         </form>
@@ -470,7 +470,7 @@ export default function PartnerManagement() {
                 title={`Nhập Danh Sách ${getTabLabel(activeTab)}`}
                 tableName="partners"
                 columnMapping={partnerMapping}
-                templateFilename={`mau_doi_tac_${activeTab.toLowerCase()}.xlsx`}
+                templateFilename={`mau_ncc_${activeTab.toLowerCase()}.xlsx`}
                 templateSampleRows={[
                     ['ZYF', 'CÔNG TY TNHH XÂY DỰNG ZYF VIỆT NAM', 'ZYF', 'Client', '0105720857', '107572897', '', 'Tòa nhà 22, Lô 4D KCN 102 Hà Nội', 'CHEN JING BO', 'Tổng giám đốc', 'INDUSTRIAL AND CO', '1270001000011000', 'CN Hà Nội', 'CHEN JING BO', ''],
                     ['HOANGVINH', 'CÔNG TY CỔ PHẦN HOÀNG VINH', 'HOÀNG VINH', 'Supplier', '0104987600', '0380.937760', '', 'Số 5, Tổ 7, P. Trần Đức Hoàng, Nam Định', 'C HOÀNG VINH', 'Giám đốc', 'Ngân hàng Vietinbank', '114403713959', 'CN Nam Định', 'C HOÀNG VINH', ''],
