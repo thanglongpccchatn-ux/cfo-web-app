@@ -199,7 +199,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
             
             if (error) throw error;
             
-            setProjects(projects.map(p => p.id === projectId ? { ...p, status: newStatus } : p));
+            queryClient.invalidateQueries({ queryKey: ['contractsData'] });
             toast.success(`Đã cập nhật trạng thái sang "${newStatus}"`);
         } catch (error) {
             console.error('Error updating status:', error);
@@ -217,7 +217,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
             
             if (error) throw error;
             
-            setProjects(projects.map(p => p.id === projectId ? { ...p, signature_status: newStatus } : p));
+            queryClient.invalidateQueries({ queryKey: ['contractsData'] });
             toast.success(`Đã cập nhật tình trạng ký sang "${newStatus}"`);
         } catch (error) {
             console.error('Error updating signature status:', error);
@@ -235,7 +235,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
             
             if (error) throw error;
             
-            setProjects(projects.map(p => p.id === projectId ? { ...p, settlement_status: newStatus } : p));
+            queryClient.invalidateQueries({ queryKey: ['contractsData'] });
             toast.success(`Đã cập nhật quyết toán sang "${newStatus}"`);
         } catch (error) {
             console.error('Error updating settlement status:', error);
