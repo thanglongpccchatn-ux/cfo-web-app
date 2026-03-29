@@ -38,15 +38,6 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
     const SATECO_CONTRACT_RATIO = project && project.sateco_contract_ratio ? parseFloat(project.sateco_contract_ratio) / 100 : 0.98;
     const SATECO_ACTUAL_RATIO = project && project.sateco_actual_ratio ? parseFloat(project.sateco_actual_ratio) / 100 : 0.955;
 
-    useEffect(() => {
-        if (project) {
-            fetchDashboardData();
-            if (activeTab === 'doc' && project.google_drive_folder_id) {
-                fetchSubfolders();
-            }
-        }
-    }, [project, activeTab, fetchDashboardData, fetchSubfolders]);
-
     const fetchSubfolders = React.useCallback(async () => {
         try {
             const folders = await drive.getSubfolders(project.google_drive_folder_id);
@@ -75,6 +66,15 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
         if (expLabor) setExpenseLabor(expLabor);
         setLoading(false);
     }, [project.id]);
+
+    useEffect(() => {
+        if (project) {
+            fetchDashboardData();
+            if (activeTab === 'doc' && project.google_drive_folder_id) {
+                fetchSubfolders();
+            }
+        }
+    }, [project, activeTab, fetchDashboardData, fetchSubfolders]);
 
     async function handleAddExpense() {
         if (!newExpenseDate || !newExpenseAmount) return;
@@ -119,6 +119,7 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
     const contractValueSateco = totalContractValueThangLong * SATECO_CONTRACT_RATIO; // Doanh thu nội bộ Sateco xuất HĐ
     const actualValueSateco = totalContractValueThangLong * SATECO_ACTUAL_RATIO; // Chi phí tiền mặt thực tế Sateco được giữ
     const satecoInternalPaid = payments?.reduce((s, p) => s + Number(p.internal_paid || 0), 0) || 0;
+    const satecoPaidPercentage = contractValueSateco > 0 ? (satecoInternalPaid / contractValueSateco) * 100 : 0;
     const raw_cdtTotalInvoiced = payments?.reduce((s, p) => s + Number(p.invoice_amount || 0), 0) || 0;
     const cdtTotalInvoiced = isInternalView ? (payments?.reduce((s, p) => s + Number(p.internal_invoiced_amount || 0), 0) || (raw_cdtTotalInvoiced * SATECO_CONTRACT_RATIO)) : raw_cdtTotalInvoiced;
     const raw_cdtTotalIncome = payments?.reduce((s, p) => s + Number(p.external_income || 0), 0) || 0;
