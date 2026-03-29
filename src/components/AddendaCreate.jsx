@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { smartToast } from '../utils/globalToast';
 
 export default function AddendaCreate({ project, onBack }) {
     const [name, setName] = useState('Phụ lục 01: Bổ sung phần cọc nhồi bổ sung');
@@ -20,7 +21,7 @@ export default function AddendaCreate({ project, onBack }) {
 
     const handleSave = async () => {
         if (!name || addendaValue <= 0) {
-            alert('Vui lòng nhập tên và giá trị hợp lệ!');
+            smartToast('Vui lòng nhập tên và giá trị hợp lệ!');
             return;
         }
 
@@ -36,9 +37,9 @@ export default function AddendaCreate({ project, onBack }) {
 
         if (error) {
             console.error('Save addenda error:', error);
-            alert('Có lỗi khi lưu Phụ lục!');
+            smartToast('Có lỗi khi lưu Phụ lục!');
         } else {
-            alert('Đã tạo và duyệt Phụ lục thành công!');
+            smartToast('Đã tạo và duyệt Phụ lục thành công!');
             onBack();
         }
     };

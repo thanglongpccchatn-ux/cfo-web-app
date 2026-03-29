@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import SkeletonLoader from './common/SkeletonLoader';
 import { useAuth } from '../context/AuthContext';
+import { smartToast } from '../utils/globalToast';
 
 export default function BiddingManagement() {
     const { profile } = useAuth();
@@ -133,7 +134,7 @@ export default function BiddingManagement() {
                 const hasChanged = oldStatus !== formData.status || oldPriceBV !== newPriceBV || oldPriceAV !== newPriceAV;
 
                 if (hasChanged && !formData.change_description?.trim()) {
-                    alert('Vui lòng nhập nội dung thay đổi khi thay đổi giá hoặc trạng thái!');
+                    smartToast('Vui lòng nhập nội dung thay đổi khi thay đổi giá hoặc trạng thái!');
                     return;
                 }
 
@@ -180,7 +181,7 @@ export default function BiddingManagement() {
             fetchData();
         } catch (err) {
             console.error('Lỗi lưu báo giá:', err);
-            alert('Có lỗi xảy ra khi lưu: ' + err.message);
+            smartToast('Có lỗi xảy ra khi lưu: ' + err.message);
         }
     };
 

@@ -244,9 +244,14 @@ export const InventoryProvider = ({ children }) => {
     };
 
     const createRequest = async (request, items) => {
+        const finalRequest = {
+            ...request,
+            status: 'PENDING_L1',
+            created_by: user?.id || null,
+        };
         const { data: requestData, error: rError } = await supabase
             .from('inventory_requests')
-            .insert([request])
+            .insert([finalRequest])
             .select()
             .single();
 
@@ -266,26 +271,49 @@ export const InventoryProvider = ({ children }) => {
             throw iError;
         }
 
-        // Audit log (non-blocking)
-        logAudit({
-            action: 'CREATE',
-            tableName: 'inventory_requests',
-            recordId: requestData.id,
-            recordName: requestData.number,
-            metadata: { items_count: items.length }
-        });
-
-        // Notification: Material request created
-        sendNotification(
-            'view_inventory',
-            'Yêu cầu xuất vật tư mới',
-            `Yêu cầu xuất kho số ${requestData.number || ''} (${items.length} mặt hàng) đang chờ xác nhận.`,
-            'APPROVAL',
-            '#inventory'
-        );
+        logAudit({ action: 'CREATE', tableName: 'inventory_requests', recordId: requestData.id, recordName: requestData.code, metadata: { items_count: items.length } });
+        sendNotification('approve_request_l1', 'Đề nghị vật tư mới', `Đề nghị ${requestData.code} (${items.length} vật tư) đang chờ Chỉ huy trưởng duyệt.`, 'APPROVAL', '#inventory');
 
         await fetchData();
         return requestData;
+    };
+
+    const approveRequestL1 = async (requestId) => {
+        const { error } = await supabase.from('inventory_requests').update({
+            status: 'PENDING_L2',
+            approved_by_l1: user?.id,
+            approved_at_l1: new Date().toISOString()
+        }).eq('id', requestId);
+        if (error) throw error;
+        logAudit({ action: 'UPDATE', tableName: 'inventory_requests', recordId: requestId, changes: { status: { old: 'PENDING_L1', new: 'PENDING_L2' } } });
+        sendNotification('approve_request_l2', 'Đề nghị VT đã duyệt L1', `Đề nghị vật tư đã được CHT duyệt, chờ BP KSKL duyệt lần 2.`, 'INFO', '#inventory');
+        await fetchData();
+    };
+
+    const approveRequestL2 = async (requestId) => {
+        const { error } = await supabase.from('inventory_requests').update({
+            status: 'APPROVED',
+            approved_by_l2: user?.id,
+            approved_at_l2: new Date().toISOString()
+        }).eq('id', requestId);
+        if (error) throw error;
+        logAudit({ action: 'UPDATE', tableName: 'inventory_requests', recordId: requestId, changes: { status: { old: 'PENDING_L2', new: 'APPROVED' } } });
+        sendNotification('create_purchase_order', 'Đề nghị VT đã duyệt hoàn tất', `Đề nghị vật tư đã được duyệt 2 cấp. BP Vật tư có thể tạo PO mua hàng.`, 'SUCCESS', '#inventory');
+        await fetchData();
+    };
+
+    const rejectRequest = async (requestId, reason, currentStatus) => {
+        const newStatus = currentStatus === 'PENDING_L1' ? 'REJECTED_L1' : 'REJECTED_L2';
+        const { error } = await supabase.from('inventory_requests').update({
+            status: newStatus,
+            rejected_by: user?.id,
+            rejected_at: new Date().toISOString(),
+            rejection_reason: reason
+        }).eq('id', requestId);
+        if (error) throw error;
+        logAudit({ action: 'UPDATE', tableName: 'inventory_requests', recordId: requestId, changes: { status: { old: currentStatus, new: newStatus } } });
+        sendNotification('create_material_request', 'Đề nghị VT bị từ chối', `Đề nghị vật tư đã bị từ chối. Lý do: ${reason}`, 'WARNING', '#inventory');
+        await fetchData();
     };
 
     const value = {
@@ -299,7 +327,10 @@ export const InventoryProvider = ({ children }) => {
         refreshData: fetchData,
         createTransaction,
         confirmTransaction,
-        createRequest
+        createRequest,
+        approveRequestL1,
+        approveRequestL2,
+        rejectRequest
     };
 
     return (

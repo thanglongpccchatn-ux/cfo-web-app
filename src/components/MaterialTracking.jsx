@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
+import { smartToast } from '../utils/globalToast';
 
 export default function MaterialTracking({ project, onBack, embedded }) {
     const [materials, setMaterials] = useState([]);
@@ -17,6 +18,30 @@ export default function MaterialTracking({ project, onBack, embedded }) {
     const [suppliersList, setSuppliersList] = useState([]);
     const [materialsCatalog, setMaterialsCatalog] = useState([]);
     const [categories, setCategories] = useState([]);
+    const [supplierSearch, setSupplierSearch] = useState('');
+    const [materialSearch, setMaterialSearch] = useState('');
+    const [categorySearch, setCategorySearch] = useState('');
+    const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+    const [showMaterialDropdown, setShowMaterialDropdown] = useState(false);
+    const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+    const supplierDropdownRef = useRef(null);
+    const materialDropdownRef = useRef(null);
+    const categoryDropdownRef = useRef(null);
+    const projectDropdownRef = useRef(null);
+    const [projectSearch, setProjectSearch] = useState('');
+    const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+
+    // Close dropdowns on outside click
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (supplierDropdownRef.current && !supplierDropdownRef.current.contains(e.target)) setShowSupplierDropdown(false);
+            if (materialDropdownRef.current && !materialDropdownRef.current.contains(e.target)) setShowMaterialDropdown(false);
+            if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target)) setShowCategoryDropdown(false);
+            if (projectDropdownRef.current && !projectDropdownRef.current.contains(e.target)) setShowProjectDropdown(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const MATERIAL_COLUMN_MAPPING = {
         expense_date: 'Ngày Nhập',
@@ -62,7 +87,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
 
     const fetchCatalogs = React.useCallback(async () => {
         const [supRes, matRes, catRes] = await Promise.all([
-            supabase.from('suppliers').select('id, code, name').order('name'),
+            supabase.from('partners').select('id, code, name').eq('type', 'Supplier').order('name'),
             supabase.from('materials').select('id, code, name, unit, base_price, actual_price, category_code, discount_percentage').order('name'),
             supabase.from('material_categories').select('id, code, name').order('name'),
         ]);
@@ -71,14 +96,23 @@ export default function MaterialTracking({ project, onBack, embedded }) {
         if (catRes.data) setCategories(catRes.data);
     }, []);
 
+    // Load projects & catalogs once on mount
     useEffect(() => {
-        const init = async () => {
+        const loadCatalogs = async () => {
+            await Promise.all([fetchProjects(), fetchCatalogs()]);
+        };
+        loadCatalogs();
+    }, [fetchProjects, fetchCatalogs]);
+
+    // Re-fetch materials when project filter changes
+    useEffect(() => {
+        const loadMaterials = async () => {
             setLoading(true);
-            await Promise.all([fetchMaterials(), fetchProjects(), fetchCatalogs()]);
+            await fetchMaterials();
             setLoading(false);
         };
-        init();
-    }, [fetchMaterials, fetchProjects, fetchCatalogs]);
+        loadMaterials();
+    }, [fetchMaterials]);
 
     function handleAddRow() {
         const newRow = {
@@ -100,7 +134,13 @@ export default function MaterialTracking({ project, onBack, embedded }) {
             project_id: project ? project.id : (filterProjectId !== 'all' ? filterProjectId : null)
         };
         if (!newRow.project_id) {
-            alert('Vui lòng chọn một dự án cụ thể để thêm vật tư.');
+            // Flash the project dropdown to draw attention
+            const sel = document.querySelector('[data-project-select]');
+            if (sel) {
+                sel.classList.add('ring-2', 'ring-red-500', 'border-red-500');
+                sel.focus();
+                setTimeout(() => sel.classList.remove('ring-2', 'ring-red-500', 'border-red-500'), 2000);
+            }
             return;
         }
         setMaterials([newRow, ...materials]);
@@ -170,7 +210,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
 
     async function handleSaveEdit() {
         if (!editForm.product_name || !editForm.expense_date) {
-            alert('Vui lòng nhập Tên sản phẩm và Ngày tháng.');
+            smartToast('Vui lòng nhập Tên sản phẩm và Ngày tháng.');
             return;
         }
 
@@ -256,23 +296,20 @@ export default function MaterialTracking({ project, onBack, embedded }) {
 
     return (
         <>
-        <div className={`flex flex-col h-full bg-white border border-slate-200/60 rounded-xl overflow-hidden animate-fade-in shadow-sm ${embedded ? 'min-h-[600px] mb-8' : 'absolute inset-0 z-50'}`}>
+        <div className={`flex flex-col h-full bg-white border border-slate-200/60 rounded-xl animate-fade-in shadow-sm ${embedded ? 'min-h-[600px] mb-8' : 'absolute inset-0 z-50'}`}>
             {/* Control Header */}
-            <div className="p-4 border-b border-slate-200/60 bg-white shadow-sm z-10 shrink-0 space-y-3">
-                {/* Row 1: Title + Project Selector */}
-                <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        {!embedded && (
-                            <button onClick={onBack} className="w-9 h-9 flex items-center justify-center bg-white hover:bg-slate-50 rounded-lg transition-all shadow-sm border border-slate-200 text-slate-500 hover:text-orange-600">
-                                 <span className="material-symbols-outlined notranslate text-[20px]" translate="no">arrow_back</span>
-                            </button>
-                        )}
-                        <div className="flex items-center gap-2">
-                            <span className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600 shadow-sm border border-orange-200/50 shrink-0">
-                                <span className="material-symbols-outlined notranslate text-[18px]" translate="no">inventory_2</span>
-                            </span>
-                            <h2 className="text-lg font-black text-slate-800">Bảng Kê Mua Vật Tư</h2>
-                        </div>
+            <div className="p-4 border-b border-slate-200/60 bg-white shadow-sm z-20 shrink-0 relative overflow-visible">
+                <div className="flex items-center gap-3">
+                    {!embedded && (
+                        <button onClick={onBack} className="w-9 h-9 flex items-center justify-center bg-white hover:bg-slate-50 rounded-lg transition-all shadow-sm border border-slate-200 text-slate-500 hover:text-orange-600">
+                             <span className="material-symbols-outlined notranslate text-[20px]" translate="no">arrow_back</span>
+                        </button>
+                    )}
+                    <div className="flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600 shadow-sm border border-orange-200/50 shrink-0">
+                            <span className="material-symbols-outlined notranslate text-[18px]" translate="no">inventory_2</span>
+                        </span>
+                        <h2 className="text-lg font-black text-slate-800 whitespace-nowrap">Bảng Kê Mua Vật Tư</h2>
                     </div>
                     <div className="flex items-center gap-2">
                         {project ? (
@@ -280,45 +317,54 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                 Dự án: {project?.internal_code || project?.code}
                             </span>
                         ) : (
-                            <select 
-                                value={filterProjectId} 
-                                onChange={(e) => setFilterProjectId(e.target.value)}
-                                className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-1.5 rounded-lg text-xs font-bold focus:ring-2 focus:ring-orange-500 outline-none cursor-pointer hover:bg-orange-100 transition-all min-w-[200px]"
-                            >
-                                <option value="all">Tất cả dự án</option>
-                                {projects.map(p => <option key={p.id} value={p.id}>{p.internal_code || p.code} — {p.name}</option>)}
-                            </select>
+                            <div className="relative" ref={projectDropdownRef}>
+                                <input
+                                    data-project-select
+                                    type="text"
+                                    value={showProjectDropdown ? projectSearch : (filterProjectId === 'all' ? 'Tất cả dự án' : (projects.find(p => p.id === filterProjectId)?.internal_code || projects.find(p => p.id === filterProjectId)?.code || ''))}
+                                    onChange={(e) => { setProjectSearch(e.target.value); setShowProjectDropdown(true); }}
+                                    onFocus={() => { setProjectSearch(''); setShowProjectDropdown(true); }}
+                                    placeholder="Tìm dự án..."
+                                    className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-1.5 rounded-lg text-xs font-bold focus:ring-2 focus:ring-orange-500 outline-none cursor-pointer hover:bg-orange-100 transition-all w-[160px]"
+                                />
+                                {showProjectDropdown && (
+                                    <div className="absolute z-50 left-0 top-full mt-0.5 bg-white border border-orange-200 rounded-lg shadow-lg max-h-60 overflow-y-auto min-w-[160px]">
+                                        <div onClick={() => { setFilterProjectId('all'); setShowProjectDropdown(false); setProjectSearch(''); }} className="px-3 py-2 text-xs cursor-pointer hover:bg-orange-50 transition-colors border-b border-slate-100 font-bold text-slate-600 whitespace-nowrap">
+                                            Tất cả dự án
+                                        </div>
+                                        {projects.filter(p => !projectSearch || (p.internal_code && p.internal_code.toLowerCase().includes(projectSearch.toLowerCase())) || (p.code && p.code.toLowerCase().includes(projectSearch.toLowerCase())) || p.name.toLowerCase().includes(projectSearch.toLowerCase())).map(p => (
+                                            <div key={p.id} onClick={() => { setFilterProjectId(p.id); setShowProjectDropdown(false); setProjectSearch(''); }} className={`px-3 py-2 text-xs cursor-pointer hover:bg-orange-50 transition-colors border-b border-slate-100 last:border-0 whitespace-nowrap ${filterProjectId === p.id ? 'bg-orange-50 font-bold' : ''}`}>
+                                                <span className="font-bold text-orange-600">{p.internal_code || p.code}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         )}
                     </div>
-                </div>
-
-                {/* Row 2: Actions */}
-                <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setShowSummary(!showSummary)}
-                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all border ${showSummary ? 'bg-orange-600 text-white border-orange-700' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-orange-600'}`}
-                        >
-                            <span className="material-symbols-outlined notranslate text-[16px]" translate="no">{showSummary ? 'grid_on' : 'donut_large'}</span>
-                            {showSummary ? 'Bảng kê' : 'Phân tích'}
-                        </button>
-                        <button
-                            onClick={() => setShowImportModal(true)}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-emerald-300 text-emerald-700 font-bold text-xs hover:bg-emerald-50 transition-all"
-                        >
-                            <span className="material-symbols-outlined notranslate text-[16px]" translate="no">upload_file</span>
-                            Import Excel
-                        </button>
+                    <div className="h-5 w-px bg-slate-200 mx-1 shrink-0"></div>
+                    <button
+                        onClick={() => setShowSummary(!showSummary)}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all border ${showSummary ? 'bg-orange-600 text-white border-orange-700' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-orange-600'}`}
+                    >
+                        <span className="material-symbols-outlined notranslate text-[16px]" translate="no">{showSummary ? 'grid_on' : 'donut_large'}</span>
+                        {showSummary ? 'Bảng kê' : 'Phân tích'}
+                    </button>
+                    <button
+                        onClick={() => setShowImportModal(true)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-emerald-300 text-emerald-700 font-bold text-xs hover:bg-emerald-50 transition-all"
+                    >
+                        <span className="material-symbols-outlined notranslate text-[16px]" translate="no">upload_file</span>
+                        Import Excel
+                    </button>
+                    <div className="flex-1"></div>
+                    <div className="text-right">
+                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tổng (gồm VAT)</div>
+                        <div className="font-black text-slate-800 text-base tabular-nums">{formatCurrency(totalMaterialsValue)}</div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <div className="text-right">
-                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tổng (gồm VAT)</div>
-                            <div className="font-black text-slate-800 text-base tabular-nums">{formatCurrency(totalMaterialsValue)}</div>
-                        </div>
-                        <button onClick={handleAddRow} className="btn bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-md shadow-orange-500/20 px-4 flex items-center gap-1.5 h-10 text-sm rounded-lg">
-                            <span className="material-symbols-outlined notranslate text-[18px]" translate="no">add_box</span> Thêm VT
-                        </button>
-                    </div>
+                    <button onClick={handleAddRow} className="btn bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-md shadow-orange-500/20 px-4 flex items-center gap-1.5 h-10 text-sm rounded-lg">
+                        <span className="material-symbols-outlined notranslate text-[18px]" translate="no">add_box</span> Thêm VT
+                    </button>
                 </div>
             </div>
 
@@ -461,7 +507,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                             })}
                         </div>
 
-                        <div className="hidden xl:block overflow-x-auto">
+                        <div className="hidden xl:block overflow-auto max-h-[calc(100vh-230px)]">
                             <table className="w-full text-xs text-left whitespace-nowrap border-collapse">
                                 <thead className="bg-[#f8f9fa] text-slate-600 font-bold sticky top-0 z-10 shadow-sm border-b-2 border-slate-300 uppercase tracking-wider text-[10px]">
                                     <tr>
@@ -488,25 +534,104 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                                 <tr key={mat.id} className="bg-orange-50/40 relative z-20 shadow-[0_0_10px_rgba(249,115,22,0.1)] outline outline-1 outline-orange-300">
                                                     <td className="px-2 py-1 text-center border-r border-slate-200 font-bold text-orange-500">{mat.isNew ? '*' : index + 1}</td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
-                                                        <select value={editForm.item_group || ''} onChange={(e) => handleEditChange('item_group', e.target.value)} className="w-full bg-white border border-orange-300 rounded px-1 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all text-xs font-semibold" autoFocus>
-                                                            <option value="">-- Nhóm --</option>
-                                                            {categories.map(c => <option key={c.id} value={c.code}>{c.name}</option>)}
-                                                        </select>
+                                                        <div className="relative" ref={categoryDropdownRef}>
+                                                            <input
+                                                                type="text"
+                                                                value={showCategoryDropdown ? categorySearch : (categories.find(c => c.code === editForm.item_group)?.name || editForm.item_group || '')}
+                                                                onChange={(e) => { setCategorySearch(e.target.value); setShowCategoryDropdown(true); }}
+                                                                onFocus={() => { setCategorySearch(''); setShowCategoryDropdown(true); }}
+                                                                placeholder="Tìm nhóm..."
+                                                                className="w-full bg-white border border-orange-300 rounded px-2 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all text-xs font-semibold"
+                                                                autoFocus
+                                                            />
+                                                            {showCategoryDropdown && (() => {
+                                                                const filtered = categories.filter(c => !categorySearch || c.name.toLowerCase().includes(categorySearch.toLowerCase()) || c.code.toLowerCase().includes(categorySearch.toLowerCase()));
+                                                                const hasExact = categories.some(c => c.name.toLowerCase() === categorySearch.toLowerCase() || c.code.toLowerCase() === categorySearch.toLowerCase());
+                                                                return (
+                                                                    <div className="absolute z-50 left-0 right-0 top-full mt-0.5 bg-white border border-orange-300 rounded shadow-lg max-h-48 overflow-y-auto min-w-[200px]">
+                                                                        {filtered.map(c => (
+                                                                            <div key={c.id} onClick={() => { handleEditChange('item_group', c.code); setShowCategoryDropdown(false); setCategorySearch(''); }} className="px-2 py-1.5 text-xs cursor-pointer hover:bg-orange-50 transition-colors border-b border-slate-100 last:border-0 font-medium">
+                                                                                {c.name}
+                                                                            </div>
+                                                                        ))}
+                                                                        {categorySearch && !hasExact && (
+                                                                            <div
+                                                                                onClick={async () => {
+                                                                                    const code = categorySearch.toUpperCase().replace(/\s+/g, '_');
+                                                                                    const { data, error } = await supabase.from('material_categories').insert([{ code, name: categorySearch }]).select().single();
+                                                                                    if (!error && data) {
+                                                                                        setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+                                                                                        handleEditChange('item_group', data.code);
+                                                                                    }
+                                                                                    setShowCategoryDropdown(false);
+                                                                                    setCategorySearch('');
+                                                                                }}
+                                                                                className="px-2 py-1.5 text-xs cursor-pointer hover:bg-emerald-50 transition-colors border-t border-emerald-200 text-emerald-700 font-bold flex items-center gap-1"
+                                                                            >
+                                                                                <span className="material-symbols-outlined text-[14px]">add_circle</span>  Thêm "{categorySearch}"
+                                                                            </div>
+                                                                        )}
+                                                                        {filtered.length === 0 && !categorySearch && (
+                                                                            <div className="px-2 py-2 text-xs text-slate-400 text-center">Không có nhóm nào</div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
                                                     </td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
                                                         <input type="date" value={editForm.expense_date || ''} onChange={(e) => handleEditChange('expense_date', e.target.value)} className="w-full bg-white border border-slate-300 rounded px-1.5 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-xs" />
                                                     </td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
-                                                        <select value={editForm.supplier_id || ''} onChange={(e) => handleSelectSupplier(e.target.value)} className="w-full bg-white border border-slate-300 rounded px-1 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-xs">
-                                                            <option value="">-- Chọn NCC --</option>
-                                                            {suppliersList.map(s => <option key={s.id} value={s.id}>[{s.code}] {s.name}</option>)}
-                                                        </select>
+                                                        <div className="relative" ref={supplierDropdownRef}>
+                                                            <input
+                                                                type="text"
+                                                                value={showSupplierDropdown ? supplierSearch : (editForm.supplier_name || '')}
+                                                                onChange={(e) => { setSupplierSearch(e.target.value); setShowSupplierDropdown(true); }}
+                                                                onFocus={() => { setSupplierSearch(''); setShowSupplierDropdown(true); }}
+                                                                placeholder="Tìm NCC..."
+                                                                className="w-full bg-white border border-slate-300 rounded px-2 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-xs"
+                                                            />
+                                                            {showSupplierDropdown && (
+                                                                <div className="absolute z-50 left-0 right-0 top-full mt-0.5 bg-white border border-slate-300 rounded shadow-lg max-h-48 overflow-y-auto">
+                                                                    {suppliersList.filter(s => !supplierSearch || s.name.toLowerCase().includes(supplierSearch.toLowerCase()) || (s.code && s.code.toLowerCase().includes(supplierSearch.toLowerCase()))).map(s => (
+                                                                        <div key={s.id} onClick={() => { handleSelectSupplier(s.id); setShowSupplierDropdown(false); setSupplierSearch(''); }} className="px-2 py-1.5 text-xs cursor-pointer hover:bg-orange-50 transition-colors border-b border-slate-100 last:border-0">
+                                                                            <span className="font-bold text-slate-500">[{s.code}]</span> {s.name}
+                                                                        </div>
+                                                                    ))}
+                                                                    {suppliersList.filter(s => !supplierSearch || s.name.toLowerCase().includes(supplierSearch.toLowerCase()) || (s.code && s.code.toLowerCase().includes(supplierSearch.toLowerCase()))).length === 0 && (
+                                                                        <div className="px-2 py-2 text-xs text-slate-400 text-center">Không tìm thấy NCC</div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
-                                                        <select value={editForm.material_id || ''} onChange={(e) => handleSelectMaterial(e.target.value)} className="w-full bg-white border border-orange-400 rounded px-1 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none font-bold text-orange-700 text-xs">
-                                                            <option value="">-- Chọn Vật tư --</option>
-                                                            {(editForm.item_group ? materialsCatalog.filter(m => m.category_code === editForm.item_group) : materialsCatalog).map(m => <option key={m.id} value={m.id}>[{m.code}] {m.name}</option>)}
-                                                        </select>
+                                                        <div className="relative" ref={materialDropdownRef}>
+                                                            <input
+                                                                type="text"
+                                                                value={showMaterialDropdown ? materialSearch : (editForm.product_name || '')}
+                                                                onChange={(e) => { setMaterialSearch(e.target.value); setShowMaterialDropdown(true); }}
+                                                                onFocus={() => { setMaterialSearch(''); setShowMaterialDropdown(true); }}
+                                                                placeholder="Tìm vật tư..."
+                                                                className="w-full bg-white border border-orange-400 rounded px-2 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none font-bold text-orange-700 text-xs"
+                                                            />
+                                                            {showMaterialDropdown && (() => {
+                                                                const filtered = (editForm.item_group ? materialsCatalog.filter(m => m.category_code === editForm.item_group) : materialsCatalog).filter(m => !materialSearch || m.name.toLowerCase().includes(materialSearch.toLowerCase()) || (m.code && m.code.toLowerCase().includes(materialSearch.toLowerCase())));
+                                                                return (
+                                                                    <div className="absolute z-50 left-0 right-0 top-full mt-0.5 bg-white border border-orange-300 rounded shadow-lg max-h-48 overflow-y-auto">
+                                                                        {filtered.map(m => (
+                                                                            <div key={m.id} onClick={() => { handleSelectMaterial(m.id); setShowMaterialDropdown(false); setMaterialSearch(''); }} className="px-2 py-1.5 text-xs cursor-pointer hover:bg-orange-50 transition-colors border-b border-slate-100 last:border-0">
+                                                                                <span className="font-bold text-orange-500">[{m.code}]</span> {m.name}
+                                                                            </div>
+                                                                        ))}
+                                                                        {filtered.length === 0 && (
+                                                                            <div className="px-2 py-2 text-xs text-slate-400 text-center">Không tìm thấy vật tư</div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
                                                     </td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
                                                         <input type="text" value={editForm.unit || ''} onChange={(e) => handleEditChange('unit', e.target.value)} className="w-full bg-white border border-slate-300 rounded px-2 py-1.5 text-center focus:border-orange-500 outline-none text-xs" placeholder="Cái" />
@@ -582,7 +707,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
             templateSampleRows={MATERIAL_SAMPLE_ROWS}
             fixedData={{ project_id: project?.id || (filterProjectId !== 'all' ? filterProjectId : null) }}
             onSuccess={(count) => {
-                alert(`Đã import thành công ${count} bản ghi Vật Tư!`);
+                smartToast(`Đã import thành công ${count} bản ghi Vật Tư!`);
                 fetchMaterials();
             }}
         />

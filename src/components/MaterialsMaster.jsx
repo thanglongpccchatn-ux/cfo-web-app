@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
+import { smartToast } from '../utils/globalToast';
 
 const EMPTY_MATERIAL = {
     code: '',
@@ -97,14 +98,14 @@ export default function MaterialsMaster() {
     };
 
     const handleImportSuccess = (count) => {
-        alert(`Đã import thành công ${count} vật tư!`);
+        smartToast(`Đã import thành công ${count} vật tư!`);
         fetchData();
     };
 
     const handleSaveManual = async (e) => {
         e.preventDefault();
         if (!newMaterial.name || !newMaterial.code) {
-            alert('Vui lòng nhập Mã và Tên vật tư');
+            smartToast('Vui lòng nhập Mã và Tên vật tư');
             return;
         }
 
@@ -136,7 +137,7 @@ export default function MaterialsMaster() {
             fetchData();
         } catch (err) {
             console.error("Lỗi lưu vật tư:", err);
-            alert("Đã xảy ra lỗi: " + err.message);
+            smartToast("Đã xảy ra lỗi: " + err.message);
         } finally {
             setIsSubmitting(false);
         }
@@ -147,7 +148,7 @@ export default function MaterialsMaster() {
       
       try {
         if (quickAddType === 'CATEGORY') {
-          if (!quickAddValue.code) { alert('Mã danh mục là bắt buộc'); return; }
+          if (!quickAddValue.code) { smartToast('Mã danh mục là bắt buộc'); return; }
           const { error } = await supabase.from('material_categories').insert([{ name: quickAddValue.name, code: quickAddValue.code.toUpperCase() }]);
           if (error) throw error;
           setNewMaterial({ ...newMaterial, category_code: quickAddValue.code.toUpperCase() });
@@ -161,7 +162,7 @@ export default function MaterialsMaster() {
         setIsQuickAddOpen(false);
         setQuickAddValue({ name: '', code: '' });
       } catch (err) {
-        alert("Lỗi khi thêm nhanh: " + err.message);
+        smartToast("Lỗi khi thêm nhanh: " + err.message);
       }
     };
 
@@ -191,7 +192,7 @@ export default function MaterialsMaster() {
         if (!window.confirm(`Bạn có chắc muốn xóa vật tư "${name}"?`)) return;
         const { error } = await supabase.from('materials').delete().eq('id', id);
         if (error) {
-            alert("Không thể xóa. Vật tư này có thể đang được sử dụng.");
+            smartToast("Không thể xóa. Vật tư này có thể đang được sử dụng.");
         } else {
             fetchData();
         }
@@ -221,13 +222,13 @@ export default function MaterialsMaster() {
     const handleBulkUpdate = async () => {
         if (selectedIds.size === 0) return;
         if (!bulkUpdateForm.value) {
-            alert("Vui lòng nhập giá trị!");
+            smartToast("Vui lòng nhập giá trị!");
             return;
         }
 
         const val = Number(bulkUpdateForm.value);
         if (isNaN(val)) {
-            alert("Giá trị không hợp lệ!");
+            smartToast("Giá trị không hợp lệ!");
             return;
         }
 
@@ -250,9 +251,9 @@ export default function MaterialsMaster() {
 
         if (error) {
             console.error("Lỗi cập nhật:", error);
-            alert("Lỗi khi cập nhật giá hàng loạt!");
+            smartToast("Lỗi khi cập nhật giá hàng loạt!");
         } else {
-            alert(`Cập nhật thành công ${updates.length} vật tư!`);
+            smartToast(`Cập nhật thành công ${updates.length} vật tư!`);
             setIsBulkUpdateModalOpen(false);
             setSelectedIds(new Set());
             fetchData();

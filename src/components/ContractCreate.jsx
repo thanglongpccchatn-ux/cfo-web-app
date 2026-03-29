@@ -88,6 +88,35 @@ export default function ContractCreate({ onBack, project }) {
     const [isDriveConnected, setIsDriveConnected] = useState(drive.isConnected());
     const [googleDriveFolderId, setGoogleDriveFolderId] = useState(null);
 
+    // ── Fetch Functions (must be declared before the useEffect below) ──
+    const fetchPartners = React.useCallback(async () => {
+        setIsLoadingPartners(true);
+        const { data } = await supabase.from('partners').select('*').eq('type', 'Client').order('name');
+        setPartners(data || []);
+        setIsLoadingPartners(false);
+    }, []);
+
+    const fetchCompanySettings = React.useCallback(async () => {
+        const { data } = await supabase.from('company_settings').select('*');
+        if (data) {
+            setAllCompanies(data);
+            const tl = data.find(d => d.company_key === 'thanglong');
+            const st = data.find(d => d.company_key === 'sateco');
+            const tp = data.find(d => d.company_key === 'thanhphat');
+            
+            if (!project) {
+                if (tl) setTlBank({ account: tl.bank_account || '', name: tl.bank_name || '', branch: tl.bank_branch || '', holder: tl.account_holder || '' });
+                if (st) setStBank({ account: st.bank_account || '', name: st.bank_name || '', branch: st.bank_branch || '', holder: st.account_holder || '' });
+                if (tp) setTpBank({ account: tp.bank_account || '', name: tp.bank_name || '', branch: tp.bank_branch || '', holder: tp.account_holder || '' });
+            }
+        }
+    }, [project]);
+
+    const fetchBankProfiles = React.useCallback(async () => {
+        const { data } = await supabase.from('company_bank_profiles').select('*').order('label');
+        setBankProfiles(data || []);
+    }, []);
+
     // ── Data Fetching & Initialization ──
     useEffect(() => {
         fetchPartners();
@@ -183,33 +212,7 @@ export default function ContractCreate({ onBack, project }) {
         })));
     }, [totalValue, tl_postVat, milestoneBase]);
 
-    const fetchPartners = React.useCallback(async () => {
-        setIsLoadingPartners(true);
-        const { data } = await supabase.from('partners').select('*').eq('type', 'Client').order('name');
-        setPartners(data || []);
-        setIsLoadingPartners(false);
-    }, []);
-
-    const fetchCompanySettings = React.useCallback(async () => {
-        const { data } = await supabase.from('company_settings').select('*');
-        if (data) {
-            setAllCompanies(data);
-            const tl = data.find(d => d.company_key === 'thanglong');
-            const st = data.find(d => d.company_key === 'sateco');
-            const tp = data.find(d => d.company_key === 'thanhphat');
-            
-            if (!project) {
-                if (tl) setTlBank({ account: tl.bank_account || '', name: tl.bank_name || '', branch: tl.bank_branch || '', holder: tl.account_holder || '' });
-                if (st) setStBank({ account: st.bank_account || '', name: st.bank_name || '', branch: st.bank_branch || '', holder: st.account_holder || '' });
-                if (tp) setTpBank({ account: tp.bank_account || '', name: tp.bank_name || '', branch: tp.bank_branch || '', holder: tp.account_holder || '' });
-            }
-        }
-    }, [project]);
-
-    const fetchBankProfiles = React.useCallback(async () => {
-        const { data } = await supabase.from('company_bank_profiles').select('*').order('label');
-        setBankProfiles(data || []);
-    }, []);
+    // fetchPartners, fetchCompanySettings, fetchBankProfiles are now declared above the useEffect
 
     const handleBankProfileSelect = (profileId) => {
         setSelectedBankProfile(profileId);
@@ -295,8 +298,19 @@ export default function ContractCreate({ onBack, project }) {
     };
 
     async function handleSave() {
-        if (!name || !code || !partnerId) {
-            toast.warning('Vui lòng điền đủ Tên hợp đồng, Mã và chọn Đối tác!');
+        // ── Comprehensive Validation ──
+        const errors = [];
+        if (!name?.trim()) errors.push('Tên hợp đồng không được để trống');
+        if (!code?.trim()) errors.push('Mã hợp đồng không được để trống');
+        if (!partnerId) errors.push('Chưa chọn Chủ đầu tư / Đối tác');
+        if (!totalValue || totalValue <= 0) errors.push('Giá trị hợp đồng phải lớn hơn 0');
+        if (contractRatio < 0 || contractRatio > 100) errors.push('Tỷ lệ Sateco phải từ 0% đến 100%');
+        if (internalDeduction < 0 || internalDeduction > contractRatio) errors.push('Chiết khấu nội bộ không hợp lệ');
+        if (startDate && endDate && new Date(startDate) > new Date(endDate)) errors.push('Ngày bắt đầu không thể sau ngày kết thúc');
+        if (vat < 0 || vat > 30) errors.push('Thuế VAT phải từ 0% đến 30%');
+        
+        if (errors.length > 0) {
+            toast.warning(errors.join('. ') + '!');
             return;
         }
         setIsSaving(true);

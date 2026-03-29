@@ -7,6 +7,8 @@ import InventoryInbound from './InventoryInbound';
 import InventoryOutbound from './InventoryOutbound';
 import InventoryRequestForm from './InventoryRequestForm';
 import InventoryRequestList from './InventoryRequestList';
+import PurchaseOrderList from './PurchaseOrderList';
+import PurchaseOrderCreate from './PurchaseOrderCreate';
 
 class InventoryErrorBoundary extends React.Component {
   constructor(props) {
@@ -42,16 +44,18 @@ class InventoryErrorBoundary extends React.Component {
 }
 
 export default function InventoryManager() {
-    const [subTab, setSubTab] = useState('overview'); // overview, stock, inbound, outbound, requests
+    const [subTab, setSubTab] = useState('overview');
+    const [poRequestId, setPORequestId] = useState(null);
     const { loading } = useInventory();
     const { hasPermission, profile } = useAuth();
 
     const tabs = [
         { id: 'overview', label: 'Tổng quan', icon: 'dashboard', perm: 'view_inventory' },
+        { id: 'requests', label: 'Đề nghị VT', icon: 'assignment', perm: 'view_inventory' },
+        { id: 'po', label: 'Đơn đặt hàng', icon: 'shopping_cart', perm: 'view_inventory' },
         { id: 'stock', label: 'Kho vật tư', icon: 'inventory_2', perm: 'view_inventory' },
         { id: 'inbound', label: 'Nhập kho', icon: 'login', perm: 'import_inventory' },
         { id: 'outbound', label: 'Xuất kho', icon: 'logout', perm: 'export_inventory' },
-        { id: 'requests', label: 'Yêu cầu', icon: 'assignment', perm: 'view_inventory' }
     ].filter(t => !t.perm || hasPermission(t.perm) || profile?.role_code === 'ROLE01');
 
     if (loading) {
@@ -76,6 +80,8 @@ export default function InventoryManager() {
             case 'outbound': return <InventoryOutbound onBack={() => setSubTab('stock')} />;
             case 'requests': return <InventoryRequestList onCreateNew={() => setSubTab('request_form')} />;
             case 'request_form': return <InventoryRequestForm onBack={() => setSubTab('requests')} />;
+            case 'po': return <PurchaseOrderList onCreateNew={(reqId) => { setPORequestId(reqId); setSubTab('po_create'); }} onViewTab={(tab) => setSubTab(tab)} />;
+            case 'po_create': return <PurchaseOrderCreate requestId={poRequestId} onBack={() => { setPORequestId(null); setSubTab('po'); }} />;
             default: return <InventoryDashboard onAction={(tab) => setSubTab(tab)} />;
         }
     };

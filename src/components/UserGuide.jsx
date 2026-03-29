@@ -268,6 +268,9 @@ const GUIDE_DATA = [
 export default function UserGuide() {
     const { profile } = useAuth();
     const userRole = profile?.role_code;
+    const isAdmin = userRole === 'ROLE01';
+    // Admin sees all, others see only their own role
+    const visibleGuides = isAdmin ? GUIDE_DATA : GUIDE_DATA.filter(g => g.code === userRole);
     const [expandedRole, setExpandedRole] = useState(userRole || 'ROLE01');
     const [expandedSection, setExpandedSection] = useState(null);
 
@@ -298,7 +301,9 @@ export default function UserGuide() {
                         </div>
                     </div>
                     <p className="text-blue-200 text-sm mt-4 max-w-2xl leading-relaxed">
-                        Chọn vai trò của bạn bên dưới để xem hướng dẫn chi tiết. Mỗi vai trò có các module và quyền hạn khác nhau.
+                        {isAdmin
+                            ? 'Bạn là Admin — xem hướng dẫn cho tất cả các vai trò trong hệ thống.'
+                            : 'Hướng dẫn chi tiết các chức năng dành cho vai trò của bạn.'}
                     </p>
                     {userRole && (
                         <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-white/15 backdrop-blur-sm rounded-lg border border-white/20">
@@ -313,7 +318,7 @@ export default function UserGuide() {
 
             {/* Role Cards */}
             <div className="space-y-3">
-                {GUIDE_DATA.map((role) => {
+                {visibleGuides.map((role) => {
                     const isExpanded = expandedRole === role.code;
                     const isCurrentRole = userRole === role.code;
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { smartToast } from '../utils/globalToast';
 
 const fmt = (v) => Number(v || 0).toLocaleString('vi-VN');
 const fmtInput = (v) => v ? Number(v).toLocaleString('vi-VN') : '';
@@ -144,7 +145,7 @@ export default function LoanManagement() {
             setIsFormOpen(false);
             fetchData();
         } catch (err) {
-            alert('Lỗi: ' + err.message);
+            smartToast('Lỗi: ' + err.message);
         }
     };
 
@@ -168,7 +169,7 @@ export default function LoanManagement() {
         e.preventDefault();
         const principal = Number(payForm.principal_amount) || 0;
         const interest = Number(payForm.interest_amount) || 0;
-        if (principal + interest <= 0) return alert('Vui lòng nhập số tiền trả');
+        if (principal + interest <= 0) return smartToast('Vui lòng nhập số tiền trả');
 
         try {
             const { error } = await supabase.from('loan_payments').insert([{
@@ -195,7 +196,7 @@ export default function LoanManagement() {
             setIsPaymentOpen(false);
             fetchData();
         } catch (err) {
-            alert('Lỗi trả nợ: ' + err.message);
+            smartToast('Lỗi trả nợ: ' + err.message);
         }
     };
 

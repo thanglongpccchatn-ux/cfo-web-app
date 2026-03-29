@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { smartToast } from '../utils/globalToast';
 
 export default function RoleManagement() {
     const [roles, setRoles] = useState([]);
@@ -47,7 +48,7 @@ export default function RoleManagement() {
             setRoleCounts(counts);
         } catch (error) {
             console.error('Error fetching data:', error);
-            alert('Không thể tải dữ liệu vai trò/quyền hạn.');
+            smartToast('Không thể tải dữ liệu vai trò/quyền hạn.');
         } finally {
             setIsLoading(false);
         }
@@ -87,14 +88,14 @@ export default function RoleManagement() {
             setIsRoleModalOpen(false);
             fetchData();
         } catch (err) {
-            alert('Lỗi lưu vai trò: ' + err.message);
+            smartToast('Lỗi lưu vai trò: ' + err.message);
         }
     };
 
     const handleDeleteRole = async (code) => {
         if(window.confirm(`Bạn có chắc chắn muốn xóa vai trò ${code}?`)) {
             const { error } = await supabase.from('roles').delete().eq('code', code);
-            if(error) alert('Lỗi xóa vai trò: ' + error.message);
+            if(error) smartToast('Lỗi xóa vai trò: ' + error.message);
             else fetchData();
         }
     };
@@ -147,9 +148,9 @@ export default function RoleManagement() {
                 if (error) throw error;
             }
             setIsPermissionModalOpen(false);
-            alert('Đã cập nhật phân quyền thành công.');
+            smartToast('Đã cập nhật phân quyền thành công.');
         } catch (err) {
-            alert('Lỗi cập nhật quyền: ' + err.message);
+            smartToast('Lỗi cập nhật quyền: ' + err.message);
         } finally {
             setIsSavingPerms(false);
         }

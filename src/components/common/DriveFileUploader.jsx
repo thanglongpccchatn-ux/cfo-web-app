@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import * as drive from '../../lib/googleDrive';
+import { smartToast } from '../../utils/globalToast';
 
 export default function DriveFileUploader({ parentId, folderName, onUploadSuccess }) {
     const [isUploading, setIsUploading] = useState(false);
@@ -34,7 +35,7 @@ export default function DriveFileUploader({ parentId, folderName, onUploadSucces
             }, 1000);
         } catch (err) {
             console.error('Upload error:', err);
-            alert('Lỗi khi tải lên: ' + err.message);
+            smartToast('Lỗi khi tải lên: ' + err.message);
             setIsUploading(false);
         }
     };

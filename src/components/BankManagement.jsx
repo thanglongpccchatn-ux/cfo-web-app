@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { smartToast } from '../utils/globalToast';
 
 const EMPTY_PROFILE = {
     label: '',
@@ -63,7 +64,7 @@ export default function BankManagement() {
             fetchProfiles();
         } catch (error) {
             console.error('Error saving bank profile:', error);
-            alert('Lỗi: ' + error.message);
+            smartToast('Lỗi: ' + error.message);
         } finally {
             setIsSubmitting(false);
         }
@@ -86,7 +87,7 @@ export default function BankManagement() {
                 fetchProfiles();
             } catch (error) {
                 console.error('Error deleting profile:', error);
-                alert('Lỗi: ' + error.message);
+                smartToast('Lỗi: ' + error.message);
             }
         }
     };

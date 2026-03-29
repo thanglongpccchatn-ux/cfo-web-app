@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { logAudit } from '../lib/auditLog';
+import { smartToast } from '../utils/globalToast';
 
 function getPaymentStatus(stage, lastExternalPaymentDate) {
     const income = Number(stage.external_income || 0);
@@ -123,7 +124,7 @@ export default function PaymentTracking({ project, onBack, embedded }) {
 
     async function _handleAddStage() {
         if (!form.name || !form.expected) {
-            alert('Vui lòng nhập tên đợt và giá trị dự kiến');
+            smartToast('Vui lòng nhập tên đợt và giá trị dự kiến');
             return;
         }
         
@@ -147,7 +148,7 @@ export default function PaymentTracking({ project, onBack, embedded }) {
 
         if (error) {
             console.error('Error adding stage:', error);
-            alert('Lỗi khi lưu: ' + error.message);
+            smartToast('Lỗi khi lưu: ' + error.message);
             return;
         }
 

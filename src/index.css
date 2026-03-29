@@ -408,4 +408,102 @@ h6 {
   .grid > div > p.text-2xl {
     font-size: 1.25rem !important;
   }
+
+  /* ── MODALS: Fullscreen on Mobile ── */
+  [class*="fixed inset-0"][class*="flex items-center justify-center"] > div[class*="rounded-"] {
+    border-radius: 0 !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    width: 100% !important;
+    height: 100dvh !important;
+    margin: 0 !important;
+  }
+
+  /* ── TABLE WRAPPER: Horizontal Scroll with Hint ── */
+  .overflow-x-auto,
+  .overflow-auto {
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+  }
+
+  /* Scrollable Table Container with fade hint */
+  .table-scroll-container {
+    position: relative;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .table-scroll-container::after {
+    content: '';
+    position: sticky;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 32px;
+    background: linear-gradient(to left, rgba(248,250,252,0.95), transparent);
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  /* ── TOUCH TARGETS: Minimum 44px ── */
+  button,
+  a[role="button"],
+  [role="tab"],
+  nav a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* ── TAB BAR: Scroll with fade hint ── */
+  [class*="flex"][class*="gap-"] > [role="tab"],
+  [class*="flex"][class*="gap-"] > button[class*="rounded-"] {
+    flex-shrink: 0;
+  }
+
+  /* ── SIDEBAR: Ensure full-height on mobile ── */
+  aside {
+    height: 100dvh !important;
+  }
+
+  /* ── BOTTOM SAFE AREA: for iOS notch ── */
+  .fixed.bottom-4,
+  .fixed.bottom-8 {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* ── Tablet Responsive (768px - 1024px) ── */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .grid.grid-cols-2.md\\:grid-cols-3.xl\\:grid-cols-7 {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+  
+  .grid.grid-cols-2.lg\\:grid-cols-3.xl\\:grid-cols-6 {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+/* ── Smooth Animations ── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.35s ease-out;
+}
+
+/* ── Focus Visible (Accessibility) ── */
+*:focus-visible {
+  outline: 2px solid var(--color-primary, #005faf);
+  outline-offset: 2px;
+  border-radius: 4px;
 }

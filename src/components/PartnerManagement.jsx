@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
+import { smartToast } from '../utils/globalToast';
 
 const EMPTY_PARTNER = {
     code: '', name: '', short_name: '', tax_code: '',
@@ -43,14 +44,14 @@ export default function PartnerManagement() {
     };
 
     const handleImportSuccess = (count) => {
-        alert(`Đã import thành công ${count} nhà cung cấp (Tab: ${getTabLabel(activeTab)})!`);
+        smartToast(`Đã import thành công ${count} nhà cung cấp (Tab: ${getTabLabel(activeTab)})!`);
         fetchPartners();
     };
 
     const handleSavePartner = async (e) => {
         e.preventDefault();
         if (!newPartner.name) {
-            alert('Vui lòng nhập Tên nhà cung cấp');
+            smartToast('Vui lòng nhập Tên nhà cung cấp');
             return;
         }
 
@@ -80,7 +81,7 @@ export default function PartnerManagement() {
             fetchPartners();
         } catch (error) {
             console.error('Error saving partner:', error);
-            alert('Đã xảy ra lỗi khi lưu: ' + error.message);
+            smartToast('Đã xảy ra lỗi khi lưu: ' + error.message);
         } finally {
             setIsSubmitting(false);
         }
@@ -115,7 +116,7 @@ export default function PartnerManagement() {
                 fetchPartners();
             } catch (error) {
                 console.error('Lỗi khi xóa đối tác:', error);
-                alert('Có lỗi xảy ra. Khả năng NCC này đang được sử dụng ở hợp đồng nào đó nên không thể xóa.');
+                smartToast('Có lỗi xảy ra. Khả năng NCC này đang được sử dụng ở hợp đồng nào đó nên không thể xóa.');
             }
         }
     };
@@ -133,7 +134,7 @@ export default function PartnerManagement() {
             setPartners(data || []);
         } catch (error) {
             console.error('Error fetching partners:', error);
-            alert('Không thể tải danh sách nhà cung cấp.');
+            smartToast('Không thể tải danh sách nhà cung cấp.');
         } finally {
             setIsLoading(false);
         }

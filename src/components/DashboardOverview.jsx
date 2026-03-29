@@ -5,8 +5,8 @@ import { CashFlowChart, PortfolioChart, ReceivablesAgingChart, TopProfitChart } 
 import AIFinanceInsights from './AIFinanceInsights';
 import LiquidityGauge from './LiquidityGauge';
 import SkeletonLoader from './common/SkeletonLoader';
-
-const formatVND = (v) => v ? Number(Math.round(v)).toLocaleString('vi-VN') : '0';
+import { formatVND, formatBillion, formatBillionParts, parseFormattedNumber, formatInputNumber } from '../utils/formatters';
+import { smartToast } from '../utils/globalToast';
 
 const DashboardOverview = () => {
     const { data: dashboardData, refetch: refetchDashboard, isLoading: loading } = useQuery({
@@ -95,6 +95,7 @@ const DashboardOverview = () => {
                 const totalInvoiceAll = processed.reduce((s, p) => s + (p.totalInvoice || 0), 0);
                 const totalRequestedAll = processed.reduce((s, p) => s + (p.totalRequested || 0), 0);
                 const totalDebtInvoiceAll = totalInvoiceAll - totalIncomeAll;
+                const totalDebtRequestedAll = processed.reduce((s, p) => s + Math.max(0, p.debtRequested || 0), 0);
                 const recoveryRate = totalValueAll > 0 ? (totalIncomeAll / totalValueAll) * 100 : 0;
 
                 // ADD: Calculate income for the current year based on due_date (to match DocumentTrackingModule)
@@ -103,7 +104,7 @@ const DashboardOverview = () => {
                     .filter(pm => pm.due_date && new Date(pm.due_date).getFullYear() === targetYear)
                     .reduce((sum, pm) => sum + (parseFloat(pm.external_income) || 0), 0);
 
-                financials = { totalValueAll, totalIncomeAll, totalDebtInvoiceAll, totalRequestedAll, totalInvoiceAll, recoveryRate, totalIncomeThisYear, totalDebtAll };
+                financials = { totalValueAll, totalIncomeAll, totalDebtInvoiceAll, totalDebtRequestedAll, totalRequestedAll, totalInvoiceAll, recoveryRate, totalIncomeThisYear, totalDebtAll };
 
                 // 3. Chart Data Processing
                 // Trend Chart (Last 6 Months Income)
@@ -138,14 +139,24 @@ const DashboardOverview = () => {
 
                 chartData = {
                     trend: { labels: trendLabels, values: trendValues },
-                    portfolio: { labels: Object.keys(statusGroups), values: Object.values(statusGroups) },
+                    portfolio: { 
+                        labels: Object.keys(statusGroups).map(k => {
+                            const val = statusGroups[k];
+                            const billions = val / 1e9;
+                            return `${k} (${billions >= 1 ? billions.toFixed(1) + ' Tỷ' : (val / 1e6).toFixed(0) + ' Tr'})`;
+                        }), 
+                        values: Object.values(statusGroups) 
+                    },
                     aging: { 
                         labels: agingLabels, 
                         invoiceValues: agingLabels.map(l => monthlyInvoice[l] || 0), 
                         incomeValues: agingLabels.map(l => monthlyRec[l] || 0) 
                     },
                     topProfit: { 
-                        labels: top5Profit.map(p => p.code || p.name || 'N/A').map(s => String(s).length > 15 ? String(s).slice(0,12)+'...' : s), 
+                        labels: top5Profit.map(p => {
+                            const label = p.internal_code || p.code || p.name || 'N/A';
+                            return String(label).length > 18 ? String(label).slice(0, 15) + '...' : label;
+                        }), 
                         values: top5Profit.map(p => p.profit) 
                     }
                 };
@@ -187,7 +198,7 @@ const DashboardOverview = () => {
     const { planData, stats, financials, chartData, performance, projectDetails, unsignedProjects, unsettledProjects, pendingPaymentsList } = dashboardData || {
         planData: { target_revenue: 0, year: new Date().getFullYear() },
         stats: { totalProjects: 0, pendingPayments: 0, approvedPayments: 0, unsignedContracts: 0, unsettledContracts: 0 },
-        financials: { totalValueAll: 0, totalIncomeAll: 0, totalDebtInvoiceAll: 0, totalRequestedAll: 0, totalInvoiceAll: 0, recoveryRate: 0, totalIncomeThisYear: 0, totalDebtAll: 0 },
+        financials: { totalValueAll: 0, totalIncomeAll: 0, totalDebtInvoiceAll: 0, totalDebtRequestedAll: 0, totalRequestedAll: 0, totalInvoiceAll: 0, recoveryRate: 0, totalIncomeThisYear: 0, totalDebtAll: 0 },
         performance: { avg_lng_dt: 0, avg_sl_cp: 0, avg_spi: 1, avg_dt_sl: 0, avg_thu_dt: 0, avg_thu_chi: 0 },
         chartData: { trend: { labels: [], values: [] }, portfolio: { labels: [], values: [] }, aging: { labels: [], invoiceValues: [], incomeValues: [] }, topProfit: { labels: [], values: [] } },
         projectDetails: [], unsignedProjects: [], unsettledProjects: [], pendingPaymentsList: []
@@ -232,16 +243,13 @@ const DashboardOverview = () => {
             refetchDashboard();
         } catch (error) {
             console.error('Error saving target:', error);
-            alert('Lỗi lưu mục tiêu: ' + error.message);
+            smartToast('Lỗi lưu mục tiêu: ' + error.message);
             setTargetModal(prev => ({ ...prev, isSaving: false }));
         }
     };
 
 
-    const formatBillion = (val) => {
-        if (!val) return '0';
-        return (val / 1000000000).toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
-    };
+    // formatBillion imported from utils/formatters.js
 
     const [detailModal, setDetailModal] = useState({ isOpen: false, type: null, data: [] });
     const [expandedProject, setExpandedProject] = useState(null);
@@ -296,16 +304,24 @@ const DashboardOverview = () => {
                         </div>
                         <div className="p-6">
                             <label className="text-sm font-black text-slate-700 block mb-2">Mục tiêu Thực thu (VNĐ)</label>
-                            <input 
-                                type="number" 
-                                value={targetModal.target}
-                                onChange={(e) => setTargetModal(prev => ({ ...prev, target: e.target.value }))}
-                                className="w-full border-slate-200 rounded-xl px-4 py-3 font-bold text-lg focus:ring-blue-500 focus:border-transparent transition-all"
-                                placeholder="Nhập số tiền..."
-                                autoFocus
-                            />
+                            <div className="relative">
+                                <input 
+                                    type="text"
+                                    inputMode="numeric" 
+                                    value={formatInputNumber(targetModal.target)}
+                                    onChange={(e) => {
+                                        const raw = parseFormattedNumber(e.target.value);
+                                        setTargetModal(prev => ({ ...prev, target: raw }));
+                                    }}
+                                    className="w-full border border-slate-200 rounded-xl px-4 py-3.5 pr-10 font-black text-lg text-blue-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                                    placeholder="500.000.000.000"
+                                    autoFocus
+                                />
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm pointer-events-none">₫</span>
+                            </div>
                             {targetModal.target > 0 && (
-                                <p className="text-xs font-black text-blue-600 mt-2 bg-blue-50 p-2 rounded-lg inline-block">
+                                <p className="text-xs font-black text-blue-600 mt-2 bg-blue-50 p-2.5 rounded-lg inline-flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-[14px]">equal</span>
                                     ~ {formatBillion(targetModal.target)} Tỷ VNĐ
                                 </p>
                             )}
@@ -400,7 +416,7 @@ const DashboardOverview = () => {
                     { label: 'TỔNG GIÁ TRỊ HĐ', subLabel: '(SAU VAT, GỒM PHÁT SINH)', value: financials.totalValueAll, icon: 'payments', color: 'blue' },
                     { label: 'THỰC THU (CASH-IN)', value: financials.totalIncomeAll, icon: 'account_balance_wallet', color: 'emerald' },
                     { label: 'CÔNG NỢ HÓA ĐƠN', subLabel: '(ĐÃ XUẤT HĐ - THỰC THU)', value: financials.totalDebtInvoiceAll, icon: 'assignment_turned_in', color: 'rose', type: 'invoice' },
-                    { label: 'CÔNG NỢ ĐỀ NGHỊ', subLabel: '(ĐỀ NGHỊ - THỰC THU)', value: financials.totalRequestedAll - financials.totalIncomeAll, icon: 'pending_actions', color: 'amber', type: 'requested' },
+                    { label: 'CÔNG NỢ ĐỀ NGHỊ', subLabel: '(ĐỀ NGHỊ - THỰC THU)', value: financials.totalDebtRequestedAll || 0, icon: 'pending_actions', color: 'amber', type: 'requested' },
                     { label: 'TỔNG DƯ NỢ VAY', subLabel: '(CẬP NHẬT TỪ HỆ THỐNG)', value: financials.totalDebtAll || 0, icon: 'credit_card', color: 'rose', route: '/loans' },
                     { label: 'TỔNG XUẤT HÓA ĐƠN', value: financials.totalInvoiceAll, icon: 'description', color: 'slate' },
                     { label: 'TỶ LỆ THU HỒI DÒNG TIỀN', value: financials.recoveryRate, icon: 'analytics', color: 'indigo', isPercent: true }
@@ -429,10 +445,10 @@ const DashboardOverview = () => {
                             <div className="flex justify-between items-end">
                                 <div className="flex items-baseline gap-0.5 md:gap-1">
                                     <h3 className={`text-lg md:text-xl font-black text-${kpi.color === 'slate' ? 'slate-700' : (kpi.color === 'rose' ? 'rose-600' : (kpi.color === 'emerald' ? 'emerald-600' : (kpi.color === 'amber' ? 'amber-600' : (kpi.color === 'blue' ? 'blue-600' : 'indigo-600'))))} tracking-tighter`}>
-                                        {kpi.isPercent ? kpi.value.toFixed(1) : formatBillion(kpi.value)}
+                                        {kpi.isPercent ? kpi.value.toFixed(1) : formatBillionParts(kpi.value).number}
                                     </h3>
                                     <span className="text-[9px] md:text-[10px] font-black text-slate-400 capitalize">
-                                        {kpi.isPercent ? '%' : 'Tỷ'}
+                                        {kpi.isPercent ? '%' : formatBillionParts(kpi.value).unit}
                                     </span>
                                 </div>
                                 <div className={`w-7 h-7 md:w-8 md:h-8 rounded-lg bg-${kpi.color === 'slate' ? 'slate' : kpi.color}-50 text-${kpi.color === 'slate' ? 'slate' : kpi.color}-500 flex items-center justify-center shadow-inner shrink-0`}>
@@ -686,16 +702,16 @@ const DashboardOverview = () => {
                 <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_30%_50%,rgba(59,130,246,0.1),transparent)] transition-opacity opacity-50 group-hover:opacity-100"></div>
                 <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-blue-600/10 rounded-full blur-3xl"></div>
                 
-                <h2 className="text-2xl font-black text-white mb-4 relative z-10 tracking-tight">Phân phân tài chính nâng cao</h2>
+                <h2 className="text-2xl font-black text-white mb-4 relative z-10 tracking-tight">Phân tích tài chính nâng cao</h2>
                 <p className="text-slate-400 max-w-lg mx-auto mb-8 text-sm leading-relaxed relative z-10">
                     Sử dụng module <strong className="text-blue-400 italic">Kế hoạch & Báo cáo</strong> để xem phân tích chi tiết dòng tiền, dự báo lợi nhuận và biến động chi phí theo tháng.
                 </p>
                 
                 <div className="flex justify-center gap-4 relative z-10">
-                    <div className="flex items-center gap-3 px-6 py-3 bg-white/5 rounded-2xl border border-white/10 text-white font-bold text-xs hover:bg-white/10 transition-all cursor-default">
+                    <a href="/planning_hub" className="flex items-center gap-3 px-6 py-3 bg-white/10 rounded-2xl border border-white/20 text-white font-bold text-sm hover:bg-white/20 transition-all cursor-pointer shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">
                         <span className="material-symbols-outlined text-[18px]">find_in_page</span>
-                        Kế Hoạch & Báo Cáo &rarr; Báo cáo Tổng hợp
-                    </div>
+                        Mở Kế Hoạch & Báo Cáo &rarr;
+                    </a>
                 </div>
             </div>
 
@@ -735,7 +751,7 @@ const DashboardOverview = () => {
                                     <p className="text-xs font-black text-slate-500 uppercase tracking-widest mt-1">
                                         {detailModal.type === 'unsigned' ? 'DANH SÁCH CÁC HỢP ĐỒNG CHƯA HOÀN TẤT KÝ KẾT' :
                                          detailModal.type === 'unsettled' ? 'DỰ ÁN ĐÃ HOÀN THÀNH NHƯNG CHƯA QUYẾT TOÁN XONG' :
-                                         detailModal.type === 'pending' ? 'DỊNH SÁCH HỒ SƠ THANH TOÁN ĐANG CHỜ XÉT DUYỆT' :
+                                         detailModal.type === 'pending' ? 'DANH SÁCH HỒ SƠ THANH TOÁN ĐANG CHỜ XÉT DUYỆT' :
                                          'CÁC DỰ ÁN ĐANG GHI NHẬN CÔNG NỢ > 0 ₫'}
                                     </p>
                                 </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
 import { useToast } from '../context/ToastContext';
+import { smartToast } from '../utils/globalToast';
 
 export default function SubcontractorsMaster() {
     const [subcontractorsData, setSubcontractorsData] = useState([]);
@@ -102,7 +103,7 @@ export default function SubcontractorsMaster() {
     };
 
     const handleImportSuccess = (count) => {
-        alert(`Đã import thành công ${count} thầu phụ/tổ đội!`);
+        smartToast(`Đã import thành công ${count} thầu phụ/tổ đội!`);
         fetchData();
     };
 

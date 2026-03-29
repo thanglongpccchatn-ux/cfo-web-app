@@ -6,6 +6,7 @@ import MaterialTracking from './MaterialTracking';
 import LaborTracking from './LaborTracking';
 import * as drive from '../lib/googleDrive';
 import DriveFileUploader from './common/DriveFileUploader';
+import { smartToast } from '../utils/globalToast';
 
 const TABS = [
     { id: 'overview', label: 'Tổng quan Dự án', icon: 'dashboard', color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -84,7 +85,7 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
             amount: Number(newExpenseAmount),
             description: newExpenseNotes
         }]);
-        if (error) { alert('Lỗi khi thêm chi phí'); return; }
+        if (error) { smartToast('Lỗi khi thêm chi phí'); return; }
         setNewExpenseDate(''); setNewExpenseAmount(''); setNewExpenseNotes('');
         fetchDashboardData();
     };

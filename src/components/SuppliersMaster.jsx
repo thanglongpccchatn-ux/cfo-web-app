@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
 import { useToast } from '../context/ToastContext';
 import MaterialTracking from './MaterialTracking';
+import { smartToast } from '../utils/globalToast';
 
 const EMPTY_LINE = () => ({ _key: Date.now() + Math.random(), materialId: '', productName: '', unit: 'Cái', quantity: '', unitPrice: '', vatRate: '8', notes: '', _showSuggestions: false });
 
@@ -131,7 +132,7 @@ export default function SuppliersMaster() {
     };
 
     const handleImportSuccess = (count) => {
-        alert(`Đã import thành công ${count} nhà cung cấp!`);
+        smartToast(`Đã import thành công ${count} nhà cung cấp!`);
         fetchSuppliersData();
     };
 

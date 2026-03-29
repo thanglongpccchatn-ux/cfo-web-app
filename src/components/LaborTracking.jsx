@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
+import { smartToast } from '../utils/globalToast';
 
 export default function LaborTracking({ project, onBack, embedded }) {
     const [labors, setLabors] = useState([]);
@@ -84,7 +85,7 @@ export default function LaborTracking({ project, onBack, embedded }) {
             project_id: project ? project.id : (filterProjectId !== 'all' ? filterProjectId : null)
         };
         if (!newRow.project_id) {
-            alert('Vui lòng chọn một dự án cụ thể để thêm thầu phụ.');
+            smartToast('Vui lòng chọn một dự án cụ thể để thêm thầu phụ.');
             return;
         }
         setLabors([newRow, ...labors]);
@@ -110,7 +111,7 @@ export default function LaborTracking({ project, onBack, embedded }) {
 
     async function handleSaveEdit() {
         if (!editForm.team_name || !editForm.payment_stage) {
-            alert('Vui lòng nhập Tên Thầu phụ/Tổ đội và Đợt thanh toán.');
+            smartToast('Vui lòng nhập Tên Thầu phụ/Tổ đội và Đợt thanh toán.');
             return;
         }
 
@@ -459,7 +460,7 @@ export default function LaborTracking({ project, onBack, embedded }) {
             templateSampleRows={LABOR_SAMPLE_ROWS}
             fixedData={{ project_id: project.id }}
             onSuccess={(count) => {
-                alert(`Đã import thành công ${count} bản ghi Thầu phụ / Nhân công!`);
+                smartToast(`Đã import thành công ${count} bản ghi Thầu phụ / Nhân công!`);
                 fetchLabors();
             }}
         />

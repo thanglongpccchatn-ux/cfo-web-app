@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { smartToast } from '../utils/globalToast';
 
 export default function VariationsManagement() {
     const { profile, hasPermission: _hasPermission } = useAuth();
@@ -141,7 +142,7 @@ export default function VariationsManagement() {
 
                 const hasChanged = oldStatus !== newStatus || oldValue !== newValue;
                 if (hasChanged && !formData.reason?.trim() && editingVar) {
-                    alert('Vui lòng nhập lý do thay đổi trạng thái hoặc giá trị!');
+                    smartToast('Vui lòng nhập lý do thay đổi trạng thái hoặc giá trị!');
                     return;
                 }
 
@@ -181,7 +182,7 @@ export default function VariationsManagement() {
             fetchData();
         } catch (error) {
             console.error('Lỗi lưu phát sinh:', error);
-            alert('Có lỗi xảy ra khi lưu phát sinh');
+            smartToast('Có lỗi xảy ra khi lưu phát sinh');
         }
     };
 
