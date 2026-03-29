@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import ContractDetailedDashboard from './ContractDetailedDashboard';
 import ExcelImportModal from './ExcelImportModal';
@@ -9,21 +10,19 @@ import { useAuth } from '../context/AuthContext';
 
 export default function ContractMasterDetail({ onOpenFullscreen }) {
     const { hasPermission } = useAuth();
+    const queryClient = useQueryClient();
 
     const [view, setView] = useState('list');
     const [selectedProject, setSelectedProject] = useState(null);
-    const [projects, setProjects] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
     const [filterMonth, setFilterMonth] = useState('all');
-    const [activeEntity, setActiveEntity] = useState('all'); // all, thanglong, sateco, thanhphat
-    // const [isAdmin, setIsAdmin] = useState(true); // Replaced by RBAC hasPermission
+    const [activeEntity, setActiveEntity] = useState('all');
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-    const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name }
+    const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-    const [partnerModal, setPartnerModal] = useState(null); // { code, name, projects }
+    const [partnerModal, setPartnerModal] = useState(null);
     const toast = useToast();
 
     const projectMapping = {
@@ -45,17 +44,15 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
             return;
         }
         
-        setDeleteConfirm(null); // Close modal
+        setDeleteConfirm(null);
         
         try {
             toast.info('Đang thực hiện xóa...');
             
-            // Manual cleanup for tables missing ON DELETE CASCADE
             const { data: receipts } = await supabase.from('inventory_receipts').select('id').eq('project_id', projId);
             const receiptIds = receipts?.map(r => r.id) || [];
             
             if (receiptIds.length > 0) {
-                
                 await supabase.from('inventory_receipt_items').delete().in('receipt_id', receiptIds);
                 await supabase.from('inventory_receipts').delete().in('id', receiptIds);
             }
@@ -64,13 +61,10 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
             const requestIds = requests?.map(r => r.id) || [];
             
             if (requestIds.length > 0) {
-                
                 await supabase.from('inventory_request_items').delete().in('request_id', requestIds);
                 await supabase.from('inventory_requests').delete().in('id', requestIds);
             }
 
-            
-            // Finally delete the project (other tables like addendas, payments, expenses have CASCADE)
             const { error } = await supabase
                 .from('projects')
                 .delete()
@@ -79,9 +73,9 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
             if (error) throw error;
 
             
-            setProjects(projects.filter(p => p.id !== projId));
+            // Invalidate cache → auto-refetch
+            queryClient.invalidateQueries({ queryKey: ['contractsData'] });
             toast.success('Đã xóa hợp đồng thành công.');
-            // Audit log (non-blocking)
             logAudit({ action: 'DELETE', tableName: 'projects', recordId: projId, recordName: projName });
         } catch (error) {
             console.error('Error in handleDeleteProject:', error);
@@ -89,76 +83,73 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
         }
     };
 
-    useEffect(() => { fetchProjects(); }, []);
+    // ── React Query: Single query for all contract data ──
+    const { data: rawData, isLoading: loading, refetch: fetchProjects } = useQuery({
+        queryKey: ['contractsData'],
+        queryFn: async () => {
+            const [projRes, addRes, pmtRes] = await Promise.all([
+                supabase.from('projects')
+                    .select('*, partners!projects_partner_id_fkey(name, code, short_name)')
+                    .order('created_at', { ascending: false }),
+                supabase.from('addendas')
+                    .select('project_id, requested_value').eq('status', 'Đã duyệt'),
+                supabase.from('payments')
+                    .select('project_id, expected_amount, external_income, invoice_amount, payment_request_amount')
+            ]);
+            return { projs: projRes.data || [], adds: addRes.data || [], pmts: pmtRes.data || [] };
+        },
+        staleTime: 5 * 60 * 1000,
+    });
 
-    const fetchProjects = async () => {
-        setLoading(true);
-        // All queries run in parallel for maximum speed
-        const [projRes, addRes, pmtRes] = await Promise.all([
-            supabase.from('projects')
-                .select('*, partners!projects_partner_id_fkey(name, code, short_name)')
-                .order('created_at', { ascending: false }),
-            supabase.from('addendas')
-                .select('project_id, requested_value').eq('status', 'Đã duyệt'),
-            supabase.from('payments')
-                .select('project_id, expected_amount, external_income, invoice_amount, payment_request_amount')
-        ]);
-        
-        const projs = projRes.data;
-        const adds = addRes.data;
-        const pmts = pmtRes.data;
+    // ── Computed: Enhance projects with financial data ──
+    const projects = useMemo(() => {
+        if (!rawData?.projs) return [];
+        const { projs, adds, pmts } = rawData;
 
-        if (projs) {
-            const enhanced = projs.map(p => {
-                const projAdds = (adds || []).filter(a => a.project_id === p.id);
-                const addendaValue = projAdds.reduce((s, a) => s + Number(a.requested_value), 0);
-                const projPmts = (pmts || []).filter(pm => pm.project_id === p.id);
-                
-                // Calculations for Financial Columns (including variations)
-                const baseTotalValuePreVat = Number(p.original_value) || 0;
-                const baseVatAmount = p.vat_amount || (baseTotalValuePreVat * (p.vat_percentage ?? 8) / 100);
-                const baseTotalValuePostVat = p.total_value_post_vat || (baseTotalValuePreVat + baseVatAmount);
-                
-                const approvedVariationsPreVat = Number(p.total_approved_variations) || 0;
-                const totalValuePreVat = baseTotalValuePreVat + approvedVariationsPreVat;
-                const totalValuePostVat = baseTotalValuePostVat + approvedVariationsPreVat * (1 + (p.vat_percentage ?? 8) / 100);
-                const vatAmount = totalValuePostVat - totalValuePreVat;
-                
-                const totalInvoice = projPmts.reduce((s, pm) => s + Number(pm.invoice_amount || 0), 0);
-                const totalRequested = projPmts.reduce((s, pm) => s + Number(pm.payment_request_amount || 0), 0);
-                const totalIncome = projPmts.reduce((s, pm) => s + Number(pm.external_income || 0), 0);
-                
-                const debtInvoice = totalInvoice - totalIncome;
-                const debtPayment = totalValuePostVat - totalIncome;
-                
-                const incomeProgress = totalValuePostVat > 0 ? Math.min(100, (totalIncome / totalValuePostVat) * 100) : 0;
+        return projs.map(p => {
+            const projAdds = (adds || []).filter(a => a.project_id === p.id);
+            const addendaValue = projAdds.reduce((s, a) => s + Number(a.requested_value), 0);
+            const projPmts = (pmts || []).filter(pm => pm.project_id === p.id);
+            
+            const baseTotalValuePreVat = Number(p.original_value) || 0;
+            const baseVatAmount = p.vat_amount || (baseTotalValuePreVat * (p.vat_percentage ?? 8) / 100);
+            const baseTotalValuePostVat = p.total_value_post_vat || (baseTotalValuePreVat + baseVatAmount);
+            
+            const approvedVariationsPreVat = Number(p.total_approved_variations) || 0;
+            const totalValuePreVat = baseTotalValuePreVat + approvedVariationsPreVat;
+            const totalValuePostVat = baseTotalValuePostVat + approvedVariationsPreVat * (1 + (p.vat_percentage ?? 8) / 100);
+            const vatAmount = totalValuePostVat - totalValuePreVat;
+            
+            const totalInvoice = projPmts.reduce((s, pm) => s + Number(pm.invoice_amount || 0), 0);
+            const totalRequested = projPmts.reduce((s, pm) => s + Number(pm.payment_request_amount || 0), 0);
+            const totalIncome = projPmts.reduce((s, pm) => s + Number(pm.external_income || 0), 0);
+            
+            const debtInvoice = totalInvoice - totalIncome;
+            const debtPayment = totalValuePostVat - totalIncome;
+            
+            const incomeProgress = totalValuePostVat > 0 ? Math.min(100, (totalIncome / totalValuePostVat) * 100) : 0;
 
-                return { 
-                    ...p, 
-                    addendaValue, 
-                    totalIncome, 
-                    totalInvoice, 
-                    totalRequested,
-                    totalValuePreVat,
-                    vatAmount,
-                    totalValuePostVat,
-                    debtInvoice,
-                    debtPayment,
-                    incomeProgress,
-                    totalThangLong: totalValuePreVat + addendaValue,
-                    satecoContractRatio: p.sateco_contract_ratio || 98,
-                    satecoActualRatio: p.sateco_actual_ratio || 95.5,
-                    acting_entity_key: p.acting_entity_key || 'thanglong', // Default to TL for old data
-                    satecoInternalRevenue: (totalValuePostVat * (p.sateco_contract_ratio || 98) / 100),
-                    satecoDueFromGroup: (totalIncome * (p.sateco_contract_ratio || 98) / 100)
-                };
-            });
-            setProjects(enhanced);
-        } else {
-            setProjects([]);
-        }
-        setLoading(false);
-    };
+            return { 
+                ...p, 
+                addendaValue, 
+                totalIncome, 
+                totalInvoice, 
+                totalRequested,
+                totalValuePreVat,
+                vatAmount,
+                totalValuePostVat,
+                debtInvoice,
+                debtPayment,
+                incomeProgress,
+                totalThangLong: totalValuePreVat + addendaValue,
+                satecoContractRatio: p.sateco_contract_ratio || 98,
+                satecoActualRatio: p.sateco_actual_ratio || 95.5,
+                acting_entity_key: p.acting_entity_key || 'thanglong',
+                satecoInternalRevenue: (totalValuePostVat * (p.sateco_contract_ratio || 98) / 100),
+                satecoDueFromGroup: (totalIncome * (p.sateco_contract_ratio || 98) / 100)
+            };
+        });
+    }, [rawData]);
 
     const handleViewDetail = (proj) => {
         setSelectedProject(proj);
