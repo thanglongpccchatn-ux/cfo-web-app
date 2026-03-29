@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 
 // Helper formatting
@@ -11,17 +12,12 @@ const formatBillion = (val) => {
 };
 
 export default function MonthlyReport() {
-    const [loading, setLoading] = useState(true);
-    const [rawData, setRawData] = useState({
-        projects: [], payments: [], materials: [], labors: [], expenses: []
-    });
     const [targetDate, setTargetDate] = useState(new Date());
 
-    useEffect(() => { fetchAllData(); }, []);
-
-    const fetchAllData = async () => {
-        setLoading(true);
-        try {
+    // ── React Query: All report data (parallel) ──
+    const { data: rawData = { projects: [], payments: [], materials: [], labors: [], expenses: [] }, isLoading: loading } = useQuery({
+        queryKey: ['monthlyReportData'],
+        queryFn: async () => {
             const [ { data: projs }, { data: pmt }, { data: mats }, { data: labs }, { data: exps } ] = await Promise.all([
                 supabase.from('projects').select('*'),
                 supabase.from('payments').select('*, projects(code, name)'),
@@ -29,15 +25,12 @@ export default function MonthlyReport() {
                 supabase.from('expense_labor').select('*'),
                 supabase.from('expenses').select('*')
             ]);
-            setRawData({
+            return {
                 projects: projs || [], payments: pmt || [], materials: mats || [], labors: labs || [], expenses: exps || []
-            });
-        } catch (error) { 
-            console.error(error); 
-        } finally { 
-            setLoading(false); 
-        }
-    };
+            };
+        },
+        staleTime: 5 * 60 * 1000,
+    });
 
     const stats = useMemo(() => {
         const month = targetDate.getMonth() + 1;

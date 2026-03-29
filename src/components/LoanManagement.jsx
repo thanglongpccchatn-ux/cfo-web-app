@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { smartToast } from '../utils/globalToast';
@@ -23,9 +24,6 @@ export default function LoanManagement() {
     const { hasPermission, profile } = useAuth();
     const canManage = hasPermission('manage_loans') || profile?.role_code === 'ROLE01';
 
-    const [loans, setLoans] = useState([]);
-    const [projects, setProjects] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingLoan, setEditingLoan] = useState(null);
     const [isPaymentOpen, setIsPaymentOpen] = useState(false);
@@ -45,23 +43,21 @@ export default function LoanManagement() {
         principal_amount: '', interest_amount: '', notes: ''
     });
 
-    const fetchData = useCallback(async () => {
-        setIsLoading(true);
-        try {
+    // ── React Query: Loans + Projects (parallel) ──
+    const { data: loanData, isLoading, refetch: fetchData } = useQuery({
+        queryKey: ['loanManagementData'],
+        queryFn: async () => {
             const [loansRes, projRes] = await Promise.all([
                 supabase.from('loans').select('*, projects(name, code)').order('created_at', { ascending: false }),
                 supabase.from('projects').select('id, name, code').order('name'),
             ]);
-            setLoans(loansRes.data || []);
-            setProjects(projRes.data || []);
-        } catch (err) {
-            console.error('Fetch error:', err);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
+            return { loans: loansRes.data || [], projects: projRes.data || [] };
+        },
+        staleTime: 5 * 60 * 1000,
+    });
 
-    useEffect(() => { fetchData(); }, [fetchData]);
+    const loans = loanData?.loans || [];
+    const projects = loanData?.projects || [];
 
     const handleNumberChange = (e, setter, field) => {
         const val = e.target.value.replace(/[^0-9]/g, '');
