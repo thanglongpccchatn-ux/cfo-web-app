@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 
 // Helper functions (reused from PaymentTracking)
@@ -27,51 +28,50 @@ function daysDiff(dateStr) {
 }
 
 export default function PaymentsMaster() {
-    const [stages, setStages] = useState([]);
-    const [projectsMap, setProjectsMap] = useState({});
-    const [loading, setLoading] = useState(true);
-    const [lastPayDates, setLastPayDates] = useState({});
     const [expandedCard, setExpandedCard] = useState(null);
 
     const fmt = (v) => v ? Number(v).toLocaleString('vi-VN') : '—';
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '—';
     const formatBillion = (val) => (val / 1000000000).toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Tỷ';
 
-    useEffect(() => {
-        fetchAll();
-    }, []);
+    // ── React Query: All payment data ──
+    const { data: rawData, isLoading: loading, refetch: fetchAll } = useQuery({
+        queryKey: ['paymentsMasterData'],
+        queryFn: async () => {
+            const [projRes, pmtRes] = await Promise.all([
+                supabase.from('projects').select('id, code, name'),
+                supabase.from('payments').select('*').order('created_at', { ascending: false }),
+            ]);
+            const projs = projRes.data || [];
+            const stages = pmtRes.data || [];
 
-    async function fetchAll() {
-        setLoading(true);
-        // Fetch all projects to map IDs to project codes/names
-        const { data: projs } = await supabase.from('projects').select('id, code, name');
-        const pMap = {};
-        if (projs) {
-            projs.forEach(p => { pMap[p.id] = p; });
-            setProjectsMap(pMap);
-        }
+            // Build projects map
+            const projectsMap = {};
+            projs.forEach(p => { projectsMap[p.id] = p; });
 
-        // Fetch all payment stages
-        const { data } = await supabase.from('payments').select('*').order('created_at', { ascending: false });
-        setStages(data || []);
-
-        if (data && data.length > 0) {
-            const ids = data.map(s => s.id);
-            const { data: extHist } = await supabase.from('external_payment_history')
-                .select('payment_stage_id, payment_date')
-                .in('payment_stage_id', ids)
-                .order('payment_date', { ascending: false });
-
-            const map = {};
-            if (extHist) {
-                extHist.forEach(h => {
-                    if (!map[h.payment_stage_id]) map[h.payment_stage_id] = h.payment_date;
-                });
+            // Fetch last payment dates
+            let lastPayDates = {};
+            if (stages.length > 0) {
+                const ids = stages.map(s => s.id);
+                const { data: extHist } = await supabase.from('external_payment_history')
+                    .select('payment_stage_id, payment_date')
+                    .in('payment_stage_id', ids)
+                    .order('payment_date', { ascending: false });
+                if (extHist) {
+                    extHist.forEach(h => {
+                        if (!lastPayDates[h.payment_stage_id]) lastPayDates[h.payment_stage_id] = h.payment_date;
+                    });
+                }
             }
-            setLastPayDates(map);
-        }
-        setLoading(false);
-    };
+
+            return { stages, projectsMap, lastPayDates };
+        },
+        staleTime: 5 * 60 * 1000,
+    });
+
+    const stages = rawData?.stages || [];
+    const projectsMap = rawData?.projectsMap || {};
+    const lastPayDates = rawData?.lastPayDates || {};
 
     // Calculate aggregated stats
     const totalExpected = stages.reduce((s, p) => s + Number(p.expected_amount || 0), 0);

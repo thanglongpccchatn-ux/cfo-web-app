@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { logAudit } from '../lib/auditLog';
@@ -16,10 +17,8 @@ import { useNotification } from '../context/NotificationContext';
 export default function DocumentTrackingModule() {
     const { hasPermission } = useAuth();
     const { sendNotification } = useNotification();
+    const queryClient = useQueryClient();
 
-    const [data, setData] = useState([]);
-    const [projects, setProjects] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -30,21 +29,18 @@ export default function DocumentTrackingModule() {
     const [duplicateWarning, setDuplicateWarning] = useState('');
     const [filterYear, setFilterYear] = useState('all');
     const [filterMonth, setFilterMonth] = useState('all');
-    const [activeTab, setActiveTab] = useState('cdt'); // 'cdt' or 'internal'
-    const [activeEntity, setActiveEntity] = useState('all'); // 'all', 'thanglong', 'thanhphat', 'sateco'
+    const [activeTab, setActiveTab] = useState('cdt');
+    const [activeEntity, setActiveEntity] = useState('all');
     
-    // Entity dynamic labels
     const entityShort = activeEntity === 'thanhphat' ? 'TP' : activeEntity === 'sateco' ? 'ST' : 'TL';
     const entityLabel = activeEntity === 'thanhphat' ? 'Thành Phát' : activeEntity === 'sateco' ? 'Sateco' : 'Thăng Long';
 
-    // Row Expansion State (History)
     const [expandedId, setExpandedId] = useState(null);
     const [paymentHistory, setPaymentHistory] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
     
     const toast = useToast();
 
-    // Form State
     const [form, setForm] = useState({
         projectId: '',
         paymentCode: '',
@@ -59,43 +55,45 @@ export default function DocumentTrackingModule() {
         internalVat: '8'
     });
 
-    useEffect(() => {
-        fetchData();
-        fetchProjects();
-    }, []);
+    // ── React Query: Payments data ──
+    const { data: data = [], isLoading: loading, refetch: fetchData } = useQuery({
+        queryKey: ['docTrackingPayments'],
+        queryFn: async () => {
+            const { data: payments, error } = await supabase
+                .from('payments')
+                .select(`
+                    *,
+                    projects (
+                        id, 
+                        code, 
+                        internal_code,
+                        name,
+                        acting_entity_key,
+                        partners!projects_partner_id_fkey (id, name, code, short_name)
+                    )
+                `)
+                .order('due_date', { ascending: true });
+            if (error) {
+                console.error('Error fetching document tracking data:', error);
+                return [];
+            }
+            return payments || [];
+        },
+        staleTime: 5 * 60 * 1000,
+    });
 
-    const fetchData = async () => {
-        setLoading(true);
-        const { data: payments, error } = await supabase
-            .from('payments')
-            .select(`
-                *,
-                projects (
-                    id, 
-                    code, 
-                    internal_code,
-                    name,
-                    acting_entity_key,
-                    partners!projects_partner_id_fkey (id, name, code, short_name)
-                )
-            `)
-            .order('due_date', { ascending: true });
-
-        if (error) {
-            console.error('Error fetching document tracking data:', error);
-        } else {
-            setData(payments || []);
-        }
-        setLoading(false);
-    };
-
-    const fetchProjects = async () => {
-        const { data: projs } = await supabase
-            .from('projects')
-            .select('id, code, internal_code, name, sateco_contract_ratio, sateco_actual_ratio, acting_entity_key, partners!projects_partner_id_fkey(name, code, short_name)')
-            .order('code', { ascending: true });
-        setProjects(projs || []);
-    };
+    // ── React Query: Projects list ──
+    const { data: projects = [] } = useQuery({
+        queryKey: ['docTrackingProjects'],
+        queryFn: async () => {
+            const { data: projs } = await supabase
+                .from('projects')
+                .select('id, code, internal_code, name, sateco_contract_ratio, sateco_actual_ratio, acting_entity_key, partners!projects_partner_id_fkey(name, code, short_name)')
+                .order('code', { ascending: true });
+            return projs || [];
+        },
+        staleTime: 10 * 60 * 1000,
+    });
 
     const handleProjectChange = async (projId) => {
         const selectedProj = projects.find(p => p.id === projId);
