@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { logAudit } from '../lib/auditLog';
@@ -6,10 +7,6 @@ import SearchableSelect from './common/SearchableSelect';
 import { smartToast } from '../utils/globalToast';
 
 export default function UserManagement() {
-    const [users, setUsers] = useState([]);
-    const [roles, setRoles] = useState([]);
-    const [projects, setProjects] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
     const { hasPermission, profile: currentProfile } = useAuth();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,17 +25,15 @@ export default function UserManagement() {
 
     const canTransfer = hasPermission('manage_staff_assignment') || currentProfile?.role_code === 'ROLE01';
 
-    const fetchData = async () => {
-        setIsLoading(true);
-        try {
+    // ── React Query: Users, Roles, Projects ──
+    const { data: queryData, isLoading, refetch: fetchData } = useQuery({
+        queryKey: ['userManagementData'],
+        queryFn: async () => {
             const [rolesRes, projRes] = await Promise.all([
                 supabase.from('roles').select('*').order('name'),
                 supabase.from('projects').select('id, name, code, internal_code').order('name')
             ]);
-            setRoles(rolesRes.data || []);
-            setProjects(projRes.data || []);
 
-            // Fetch users with fallback
             let usersData;
             const { data: d1, error: e1 } = await supabase.from('profiles')
                 .select('*, roles:role_code (name), current_project:current_project_id (id, name, code, internal_code)')
@@ -52,7 +47,6 @@ export default function UserManagement() {
                 usersData = d1 || [];
             }
 
-            // Fetch active assignments for ALL users to show multi-project badges
             const { data: assignData } = await supabase.from('staff_assignments')
                 .select('user_id, project_id, project:project_id (id, name, code, internal_code)')
                 .is('end_date', null);
@@ -64,15 +58,19 @@ export default function UserManagement() {
             });
             
             usersData.forEach(u => { u.active_projects = assignMap[u.id] || []; });
-            setUsers(usersData);
-        } catch (error) {
-            console.error('Error fetching data:', error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
-    useEffect(() => { fetchData(); }, []);
+            return {
+                users: usersData,
+                roles: rolesRes.data || [],
+                projects: projRes.data || []
+            };
+        },
+        staleTime: 5 * 60 * 1000,
+    });
+
+    const users = queryData?.users || [];
+    const roles = queryData?.roles || [];
+    const projects = queryData?.projects || [];
 
     const handleOpenModal = (user = null) => {
         if (user) {
