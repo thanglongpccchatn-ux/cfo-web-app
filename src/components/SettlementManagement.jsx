@@ -226,6 +226,31 @@ export default function SettlementManagement() {
                             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none transition-all text-sm font-medium bg-slate-50/50"
                         />
                     </div>
+                    <button 
+                        onClick={async () => {
+                            const { exportToExcel } = await import('../utils/exportExcel');
+                            const today = new Date().toLocaleDateString('vi-VN').replaceAll('/', '-');
+                            const cols = [
+                                { key: 'internal_code', label: 'Mã DA' },
+                                { key: 'code', label: 'Mã HĐ' },
+                                { key: 'name', label: 'Tên dự án' },
+                                { key: item => item.partners?.short_name || '', label: 'CĐT' },
+                                { key: 'tvh', label: 'Giá trị HĐ', format: 'currency' },
+                                { key: 'proposedValue', label: 'Đề nghị QT', format: 'currency' },
+                                { key: 'approvedValue', label: 'CĐT duyệt', format: 'currency' },
+                                { key: 'totalInvoiced', label: 'Đã xuất HĐ', format: 'currency' },
+                                { key: 'totalIncome', label: 'Đã thu', format: 'currency' },
+                                { key: 'debtRemaining', label: 'Còn nợ', format: 'currency' },
+                                { key: 'settlement_status', label: 'Trạng thái' },
+                                { key: 'daysWaiting', label: 'Ngày chờ', format: 'number' },
+                            ];
+                            exportToExcel(filtered, cols, `QuyetToan_${today}`, 'Quyết toán');
+                        }}
+                        className="p-2.5 rounded-xl border border-violet-200 bg-violet-50 text-violet-600 hover:bg-violet-100 transition-colors shadow-sm shrink-0"
+                        title="Xuất Excel"
+                    >
+                        <span className="material-symbols-outlined block text-[20px]">download</span>
+                    </button>
                     <button onClick={() => refetch()} className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors text-slate-600 bg-white shadow-sm shrink-0">
                         <span className="material-symbols-outlined block">refresh</span>
                     </button>
