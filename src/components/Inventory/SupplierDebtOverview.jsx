@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
-
-const fmt = (v) => v ? Number(v).toLocaleString('vi-VN') : '0';
+import { fmt } from '../../utils/formatters';
 
 export default function SupplierDebtOverview() {
     const [expandedId, setExpandedId] = useState(null);

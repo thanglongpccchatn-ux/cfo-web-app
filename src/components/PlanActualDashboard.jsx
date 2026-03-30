@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { fmt, fmtB, fmtDate } from '../utils/formatters';
 
-const fmt = (v) => new Intl.NumberFormat('vi-VN').format(Math.round(v || 0));
-const fmtB = (v) => {
-    const n = v || 0;
-    if (Math.abs(n) >= 1e9) return `${(n / 1e9).toFixed(2)} Tỷ`;
-    if (Math.abs(n) >= 1e6) return `${(n / 1e6).toFixed(0)} Tr`;
-    return fmt(n);
-};
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '—';
 
 // ─────────────────────────────────────────────
 // LEVEL 1: Bảng tổng hợp tất cả dự án

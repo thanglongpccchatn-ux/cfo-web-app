@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
 import { smartToast } from '../utils/globalToast';
+import { fmt } from '../utils/formatters';
 
 const EMPTY_MATERIAL = {
     code: '',
@@ -46,7 +47,7 @@ export default function MaterialsMaster() {
         value: ''
     });
 
-    const fmt = (v) => v ? Number(v).toLocaleString('vi-VN') : '0';
+
 
     const materialMapping = {
         code: "Mã VT",

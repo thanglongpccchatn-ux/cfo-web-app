@@ -1,15 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-
-// Helper formatting
-const formatVND = (v) => v ? Number(Math.round(v)).toLocaleString('vi-VN') : '0';
-const formatBillion = (val) => {
-    if (!val) return '0';
-    if (val >= 1e9) return (val / 1e9).toFixed(1) + ' Tỷ';
-    if (val >= 1e6) return (val / 1e6).toFixed(0) + ' Tr';
-    return formatVND(val);
-};
+import { formatVND, formatBillion } from '../utils/formatters';
 
 export default function MonthlyReport() {
     const [targetDate, setTargetDate] = useState(new Date());

@@ -32,5 +32,5 @@ export const formatInput = (val) => {
     return num.toLocaleString('vi-VN');
 };
 
-export const fmt = (v) => v ? Number(v).toLocaleString('vi-VN') : '0';
-export const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '—';
+// Re-export from central formatters for backward compatibility
+export { fmt, fmtDate } from '../../utils/formatters';

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
+import { fmt } from '../utils/formatters';
 
 const EXPENSE_TYPES = [
     { value: 'BCH công trường', label: 'BCH Công trường (Kế toán nội bộ)', color: 'amber' },
@@ -105,7 +106,7 @@ export default function ExpenseTracking() {
 
     const filtered = expenses.filter(x => filterProject === 'all' || x.project_id === filterProject);
 
-    const fmt = (v) => new Intl.NumberFormat('vi-VN').format(v || 0);
+
 
     return (
         <div className="p-6 space-y-6 animate-fade-in">

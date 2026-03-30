@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatBillion } from '../utils/formatters';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -27,11 +28,7 @@ ChartJS.register(
   Filler
 );
 
-// Formatters
-const formatBillion = (val) => {
-    if (!val) return '0';
-    return (val / 1000000000).toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-};
+
 
 export function CashFlowChart({ data }) {
     const options = {

@@ -7,6 +7,7 @@ import LaborTracking from './LaborTracking';
 import * as drive from '../lib/googleDrive';
 import DriveFileUploader from './common/DriveFileUploader';
 import { smartToast } from '../utils/globalToast';
+import { fmt, fmtB, fmtDate } from '../utils/formatters';
 
 const TABS = [
     { id: 'overview', label: 'Tổng quan Dự án', icon: 'dashboard', color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -96,14 +97,7 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
         fetchDashboardData();
     };
 
-    const fmt = (val) => new Intl.NumberFormat('vi-VN').format(Math.round(val || 0));
-    const fmtB = (val) => {
-        if (!val) return '0 ₫';
-        if (Math.abs(val) >= 1000000000) return (val / 1000000000).toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + ' Tỷ';
-        if (Math.abs(val) >= 1000000) return (val / 1000000).toLocaleString('vi-VN', { minimumFractionDigits: 1 }) + ' Tr';
-        return val.toLocaleString('vi-VN') + ' ₫';
-    };
-    const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '-';
+
 
 
 

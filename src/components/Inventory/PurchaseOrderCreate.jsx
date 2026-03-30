@@ -5,8 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { logAudit } from '../../lib/auditLog';
 import { useNotification } from '../../context/NotificationContext';
-
-const fmt = (v) => v ? Number(v).toLocaleString('vi-VN') : '0';
+import { fmt } from '../../utils/formatters';
 
 export default function PurchaseOrderCreate({ requestId, onBack }) {
     const { partners, materials, refreshData } = useInventory();

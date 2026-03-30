@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import SkeletonLoader from './common/SkeletonLoader';
 import { useAuth } from '../context/AuthContext';
 import { smartToast } from '../utils/globalToast';
+import { fmt, fmtDatePadded as fmtDate } from '../utils/formatters';
 
 export default function BiddingManagement() {
     const { profile } = useAuth();
@@ -203,8 +204,6 @@ export default function BiddingManagement() {
     };
 
     // Helpers
-    const fmt = (v) => v ? new Intl.NumberFormat('vi-VN').format(Math.round(v)) : '-';
-    const fmtDate = (d) => { if (!d) return '-'; const dt = new Date(d); return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${dt.getFullYear()}`; };
     const fmtDateTime = (d) => { if (!d) return '-'; const dt = new Date(d); return `${fmtDate(d)} ${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`; };
 
     const getStatusColor = (s) => {

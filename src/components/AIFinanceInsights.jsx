@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { fmt, fmtB } from '../utils/formatters';
 
 /**
  * AIFinanceInsights - Automated financial analysis engine.
@@ -6,13 +7,7 @@ import React, { useMemo } from 'react';
  */
 export default function AIFinanceInsights({ financials, performance, planData, dashboardData }) {
     
-    const fmt = (v) => v ? Number(Math.round(v)).toLocaleString('vi-VN') : '0';
-    const fmtB = (v) => {
-        const n = Math.abs(v || 0);
-        if (n >= 1e9) return `${(v / 1e9).toFixed(1)} Tỷ`;
-        if (n >= 1e6) return `${(v / 1e6).toFixed(0)} Tr`;
-        return fmt(v);
-    };
+
 
     const insights = useMemo(() => {
         const list = [];

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { smartToast } from '../utils/globalToast';
+import { fmt, fmtDatePadded as formatDate, formatVND as formatCurrency } from '../utils/formatters';
 
 export default function VariationsManagement() {
     const { profile, hasPermission: _hasPermission } = useAuth();
@@ -203,12 +204,6 @@ export default function VariationsManagement() {
         }
     };
 
-    const formatDate = (dateStr) => {
-        if (!dateStr) return '-';
-        const d = new Date(dateStr);
-        return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-    };
-
     const formatDateTime = (dateStr) => {
         if (!dateStr) return '-';
         const d = new Date(dateStr);
@@ -217,12 +212,7 @@ export default function VariationsManagement() {
 
     const formatBillion = (val) => {
         if (!val || isNaN(val)) return '-';
-        return new Intl.NumberFormat('vi-VN').format(Math.round(val));
-    };
-
-    const formatCurrency = (val) => {
-        if (!val || isNaN(val)) return '0 ₫';
-        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
+        return fmt(val);
     };
 
     const getStatusColor = (status) => {

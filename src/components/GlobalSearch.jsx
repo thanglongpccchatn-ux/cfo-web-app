@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { fmt } from '../utils/formatters';
 
 /**
  * GlobalSearch — Command palette-style search (Ctrl+K / Cmd+K)
@@ -95,7 +96,7 @@ export default function GlobalSearch() {
 
                 // Format projects
                 (projects || []).forEach(p => {
-                    const fmt = (v) => v ? Number(Math.round(v)).toLocaleString('vi-VN') : '0';
+                
                     formatted.push({
                         type: 'project',
                         icon: 'folder_open',

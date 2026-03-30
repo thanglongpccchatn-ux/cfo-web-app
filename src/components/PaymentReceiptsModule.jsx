@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
+import { fmt } from '../utils/formatters';
 
 export default function PaymentReceiptsModule() {
     const [activeTab, setActiveTab] = useState('external'); // 'external' (CĐT -> TL) or 'internal' (TL -> Sateco)
@@ -398,7 +399,7 @@ export default function PaymentReceiptsModule() {
         setShowModal(true);
     };
 
-    const fmt = (v) => v ? Number(v).toLocaleString('vi-VN') : '0';
+
 
     const currentList = filteredReceipts;
 

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { fmtDash as fmt, fmtDate, formatBillion } from '../utils/formatters';
 
 // Helper functions (reused from PaymentTracking)
 function getPaymentStatus(stage, lastExternalPaymentDate) {
@@ -30,9 +31,7 @@ function daysDiff(dateStr) {
 export default function PaymentsMaster() {
     const [expandedCard, setExpandedCard] = useState(null);
 
-    const fmt = (v) => v ? Number(v).toLocaleString('vi-VN') : '—';
-    const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '—';
-    const formatBillion = (val) => (val / 1000000000).toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Tỷ';
+
 
     // ── React Query: All payment data ──
     const { data: rawData, isLoading: loading, refetch: fetchAll } = useQuery({

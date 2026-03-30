@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
+import { fmt } from '../utils/formatters';
 
 export default function InflowPlanning() {
     const [projects, setProjects] = useState([]);
@@ -110,10 +111,7 @@ export default function InflowPlanning() {
         if (!isNaN(num)) setForm({ ...form, amount: num });
     };
 
-    const fmt = (val) => {
-        if (!val) return '0';
-        return Number(val).toLocaleString('vi-VN');
-    };
+
 
     const handleSubmit = async (e) => {
         e.preventDefault();

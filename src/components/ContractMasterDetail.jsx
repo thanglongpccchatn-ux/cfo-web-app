@@ -5,7 +5,7 @@ import ContractDetailedDashboard from './ContractDetailedDashboard';
 import ExcelImportModal from './ExcelImportModal';
 import { useToast } from '../context/ToastContext';
 import { logAudit } from '../lib/auditLog';
-
+import { fmt, formatBillion } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
 
 export default function ContractMasterDetail({ onOpenFullscreen }) {
@@ -341,11 +341,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
         );
     }
 
-    // Helper functions
-    const formatBillion = (val) => {
-        if (!val) return '0';
-        return Math.round(Number(val)).toLocaleString('vi-VN');
-    };
+
 
     const Th = ({ label, sortKey, align = 'left', extraClass = '' }) => (
         <th 

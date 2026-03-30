@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { fmt } from '../../utils/formatters';
 
 const STATUS_MAP = {
     'ORDERED':   { label: 'Đã đặt', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: 'local_shipping' },
@@ -17,7 +18,7 @@ const PAY_STATUS = {
     'PAID':    { label: 'Đã TT', color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
 };
 
-const fmt = (v) => v ? Number(v).toLocaleString('vi-VN') : '0';
+
 
 export default function PurchaseOrderList({ onCreateNew, onViewTab }) {
     const { profile } = useAuth();

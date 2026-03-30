@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { logAudit } from '../lib/auditLog';
 import { smartToast } from '../utils/globalToast';
+import { fmt, fmtDate } from '../utils/formatters';
 
 function getPaymentStatus(stage, lastExternalPaymentDate) {
     const income = Number(stage.external_income || 0);
@@ -64,8 +65,7 @@ export default function PaymentTracking({ project, onBack, embedded }) {
     const actualRatio = project ? parseFloat(project.sateco_actual_ratio || 95.5) / 100 : 0.955;
     const refundRatio = Math.max(0, contractRatio - actualRatio);
 
-    const fmt = (v) => v ? Number(Math.round(v)).toLocaleString('vi-VN') : '0';
-    const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '—';
+
 
     const suggestNextStage = React.useCallback(() => {
         if (!project) return;
