@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import SkeletonLoader from './common/SkeletonLoader';
 import { useAuth } from '../context/AuthContext';
@@ -7,11 +8,7 @@ import { fmt, fmtDatePadded as fmtDate } from '../utils/formatters';
 
 export default function BiddingManagement() {
     const { profile } = useAuth();
-    const [bids, setBids] = useState([]);
-    const [partners, setPartners] = useState([]);
-    const [directors, setDirectors] = useState([]);       // Giám đốc → Người yêu cầu
-    const [biddingStaff, setBiddingStaff] = useState([]); // Đấu thầu → Người phụ trách
-    const [loading, setLoading] = useState(true);
+
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
@@ -34,36 +31,42 @@ export default function BiddingManagement() {
     const [historyLogs, setHistoryLogs] = useState([]);
     const [selectedBidName, setSelectedBidName] = useState('');
 
+    const queryClient = useQueryClient();
+    const invalidateBids = () => queryClient.invalidateQueries({ queryKey: ['biddingData'] });
+
+    // Realtime subscription
     useEffect(() => {
-        fetchData();
         const subscription = supabase
             .channel('public:bids')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'bids' }, () => fetchData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'bids' }, () => invalidateBids())
             .subscribe();
         return () => supabase.removeChannel(subscription);
     }, []);
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
+    // ── React Query: Bids + Partners + Profiles ──
+    const { data: queryData, isLoading: loading } = useQuery({
+        queryKey: ['biddingData'],
+        queryFn: async () => {
             const [bidRes, partnerRes, profilesRes] = await Promise.all([
                 supabase.from('bids').select('*, partners(name, code, short_name)').order('created_at', { ascending: false }),
                 supabase.from('partners').select('id, name, code, short_name, type').or('type.eq.Client,type.eq.Subcontractor').order('name'),
                 supabase.from('profiles').select('id, full_name, role_code, roles:role_code(name)').eq('status', 'Hoạt động').order('full_name')
             ]);
-            setBids(bidRes.data || []);
-            setPartners(partnerRes.data || []);
-
-            // Lọc nhân viên theo role name
             const allProfiles = profilesRes.data || [];
-            setDirectors(allProfiles.filter(p => p.roles?.name?.toLowerCase().includes('giám đốc')));
-            setBiddingStaff(allProfiles.filter(p => p.roles?.name?.toLowerCase().includes('đấu thầu')));
-        } catch (err) {
-            console.error('Error fetching bids:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
+            return {
+                bids: bidRes.data || [],
+                partners: partnerRes.data || [],
+                directors: allProfiles.filter(p => p.roles?.name?.toLowerCase().includes('giám đốc')),
+                biddingStaff: allProfiles.filter(p => p.roles?.name?.toLowerCase().includes('đấu thầu')),
+            };
+        },
+        staleTime: 2 * 60 * 1000,
+    });
+
+    const bids = queryData?.bids || [];
+    const partners = queryData?.partners || [];
+    const directors = queryData?.directors || [];
+    const biddingStaff = queryData?.biddingStaff || [];
 
     const handleOpenForm = (bid = null) => {
         if (bid) {
@@ -179,7 +182,7 @@ export default function BiddingManagement() {
             }
 
             setIsFormOpen(false);
-            fetchData();
+            invalidateBids();
         } catch (err) {
             console.error('Lỗi lưu báo giá:', err);
             smartToast('Có lỗi xảy ra khi lưu: ' + err.message);
@@ -300,7 +303,7 @@ export default function BiddingManagement() {
                             <option value="All">Trạng thái (Tất cả)</option>
                             {statusOptions.map(o => <option key={o} value={o}>{o}</option>)}
                         </select>
-                        <button onClick={fetchData} className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 transition-all">
+                        <button onClick={invalidateBids} className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 transition-all">
                             <span className="material-symbols-outlined block text-[18px]">refresh</span>
                         </button>
                     </div>

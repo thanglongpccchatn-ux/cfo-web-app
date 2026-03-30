@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { logAudit } from '../lib/auditLog';
 import { smartToast } from '../utils/globalToast';
@@ -33,7 +34,7 @@ const STAGE_TYPES = ['Tạm ứng', 'Nghiệm thu', 'Quyết toán', 'Bảo hàn
 
 export default function PaymentTracking({ project, onBack, embedded }) {
     const [stages, setStages] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [_isAdding, setIsAdding] = useState(false);
     const [expandedCard, setExpandedCard] = useState(null);
     const [editingStage, setEditingStage] = useState(null);
@@ -100,27 +101,27 @@ export default function PaymentTracking({ project, onBack, embedded }) {
         setForm(f => ({ ...f, invoiceDate: date, dueDate: due }));
     };
 
-    const fetchAll = React.useCallback(async () => {
-        if (!project) return;
-        setLoading(true);
-        const { data } = await supabase.from('payments').select('*').eq('project_id', project.id).order('created_at', { ascending: true });
-        setStages(data || []);
-        if (data && data.length > 0) {
-            const ids = data.map(s => s.id);
-            const { data: extHist } = await supabase.from('external_payment_history').select('payment_stage_id, payment_date').in('payment_stage_id', ids).order('payment_date', { ascending: false });
-            const map = {};
-            if (extHist) extHist.forEach(h => { if (!map[h.payment_stage_id]) map[h.payment_stage_id] = h.payment_date; });
-            setLastPayDates(map);
-        }
-        setLoading(false);
-    }, [project]);
-
-    useEffect(() => { 
-        if (project) {
-            fetchAll(); 
+    // ── React Query: Payment stages ──
+    const { isLoading: loading } = useQuery({
+        queryKey: ['paymentStages', project?.id],
+        queryFn: async () => {
+            const { data } = await supabase.from('payments').select('*').eq('project_id', project.id).order('created_at', { ascending: true });
+            setStages(data || []);
+            if (data && data.length > 0) {
+                const ids = data.map(s => s.id);
+                const { data: extHist } = await supabase.from('external_payment_history').select('payment_stage_id, payment_date').in('payment_stage_id', ids).order('payment_date', { ascending: false });
+                const map = {};
+                if (extHist) extHist.forEach(h => { if (!map[h.payment_stage_id]) map[h.payment_stage_id] = h.payment_date; });
+                setLastPayDates(map);
+            }
             suggestNextStage();
-        }
-    }, [project, fetchAll, suggestNextStage]);
+            return data || [];
+        },
+        enabled: !!project,
+        staleTime: 2 * 60 * 1000,
+    });
+
+    const invalidateStages = () => queryClient.invalidateQueries({ queryKey: ['paymentStages'] });
 
     async function _handleAddStage() {
         if (!form.name || !form.expected) {
@@ -153,7 +154,7 @@ export default function PaymentTracking({ project, onBack, embedded }) {
         }
 
         setIsAdding(false);
-        fetchAll();
+        invalidateStages();
         // Reset form for next entry
         setForm({ name: '', type: 'Nghiệm thu', expected: '', dueDate: '', invoiceAmount: '', invoiceStatus: 'Chưa xuất', paymentCode: '', notes: '' });
     };
@@ -161,7 +162,7 @@ export default function PaymentTracking({ project, onBack, embedded }) {
     const handleDeleteStage = async (id) => {
         if (!window.confirm('Xóa đợt thanh toán này?')) return;
         await supabase.from('payments').delete().eq('id', id);
-        fetchAll();
+        invalidateStages();
     };
 
     const handleSaveEdit = async (stage) => {
@@ -176,7 +177,7 @@ export default function PaymentTracking({ project, onBack, embedded }) {
         }).eq('id', stage.id);
         
         setEditingStage(null);
-        fetchAll();
+        invalidateStages();
     };
 
     // --- CĐT -> Thăng Long (Thu tiền Khách hàng) ---
@@ -206,7 +207,7 @@ export default function PaymentTracking({ project, onBack, embedded }) {
         });
 
         setCdtForm({ date: '', amount: '', notes: '' });
-        fetchAll();
+        invalidateStages();
         const { data: updated } = await supabase.from('payments').select('*').eq('id', cdtModal.id).single();
         if (updated) setCdtModal(updated);
         openCdtModal(updated || cdtModal);
@@ -229,7 +230,7 @@ export default function PaymentTracking({ project, onBack, embedded }) {
         const { data: remaining } = await supabase.from('external_payment_history').select('amount').eq('payment_stage_id', cdtModal.id);
         const newIncome = (remaining || []).reduce((sum, r) => sum + Number(r.amount || 0), 0);
         await supabase.from('payments').update({ external_income: newIncome, status: newIncome > 0 ? 'CĐT Đã thanh toán' : 'Chưa thanh toán' }).eq('id', cdtModal.id);
-        fetchAll();
+        invalidateStages();
         const { data: updated } = await supabase.from('payments').select('*').eq('id', cdtModal.id).single();
         if (updated) setCdtModal(updated);
         openCdtModal(updated || cdtModal);
@@ -262,7 +263,7 @@ export default function PaymentTracking({ project, onBack, embedded }) {
         });
 
         setTlSatecoForm({ date: '', amount: '', notes: '' });
-        fetchAll();
+        invalidateStages();
         const { data: updated } = await supabase.from('payments').select('*').eq('id', tlSatecoModal.id).single();
         if (updated) setTlSatecoModal(updated);
         openTlSatecoModal(updated || tlSatecoModal);
@@ -285,7 +286,7 @@ export default function PaymentTracking({ project, onBack, embedded }) {
         const { data: remaining } = await supabase.from('internal_payment_history').select('amount').eq('payment_stage_id', tlSatecoModal.id);
         const newPaid = (remaining || []).reduce((sum, r) => sum + Number(r.amount || 0), 0);
         await supabase.from('payments').update({ internal_paid: newPaid }).eq('id', tlSatecoModal.id);
-        fetchAll();
+        invalidateStages();
         const { data: updated } = await supabase.from('payments').select('*').eq('id', tlSatecoModal.id).single();
         if (updated) setTlSatecoModal(updated);
         openTlSatecoModal(updated || tlSatecoModal);
@@ -340,7 +341,7 @@ export default function PaymentTracking({ project, onBack, embedded }) {
                         <span className="material-symbols-outlined notranslate text-[14px]" translate="no">info</span>
                         NHẬP LIỆU TẠI TAB "HỒ SƠ & THANH TOÁN"
                     </div>
-                    <button onClick={fetchAll} className="w-10 h-10 flex items-center justify-center bg-white hover:bg-slate-50 rounded-xl transition-all shadow-sm border border-slate-200 text-slate-500 hover:text-emerald-600">
+                    <button onClick={invalidateStages} className="w-10 h-10 flex items-center justify-center bg-white hover:bg-slate-50 rounded-xl transition-all shadow-sm border border-slate-200 text-slate-500 hover:text-emerald-600">
                         <span className="material-symbols-outlined notranslate block" translate="no">refresh</span>
                     </button>
                 </div>

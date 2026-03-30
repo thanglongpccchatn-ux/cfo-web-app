@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { smartToast } from '../utils/globalToast';
@@ -41,8 +41,11 @@ export default function LoanManagement() {
         principal_amount: '', interest_amount: '', notes: ''
     });
 
+    const queryClient = useQueryClient();
+    const invalidateLoans = () => queryClient.invalidateQueries({ queryKey: ['loanManagementData'] });
+
     // ── React Query: Loans + Projects (parallel) ──
-    const { data: loanData, isLoading, refetch: fetchData } = useQuery({
+    const { data: loanData, isLoading } = useQuery({
         queryKey: ['loanManagementData'],
         queryFn: async () => {
             const [loansRes, projRes] = await Promise.all([
@@ -137,7 +140,7 @@ export default function LoanManagement() {
                 if (error) throw error;
             }
             setIsFormOpen(false);
-            fetchData();
+            invalidateLoans();
         } catch (err) {
             smartToast('Lỗi: ' + err.message);
         }
@@ -146,7 +149,7 @@ export default function LoanManagement() {
     const handleDelete = async (id) => {
         if (!window.confirm('Xác nhận xóa khoản vay này?')) return;
         await supabase.from('loans').delete().eq('id', id);
-        fetchData();
+        invalidateLoans();
     };
 
     // Payment
@@ -188,7 +191,7 @@ export default function LoanManagement() {
             await supabase.from('loans').update({ total_paid: newTotalPaid, status: newStatus }).eq('id', selectedLoan.id);
             
             setIsPaymentOpen(false);
-            fetchData();
+            invalidateLoans();
         } catch (err) {
             smartToast('Lỗi trả nợ: ' + err.message);
         }
@@ -220,7 +223,7 @@ export default function LoanManagement() {
         else if (totalPrincipal >= Number(loan?.loan_amount)) status = 'fully_paid';
         await supabase.from('loans').update({ total_paid: newTotal, status }).eq('id', loanId);
         setPaymentHistory(prev => prev.filter(p => p.id !== paymentId));
-        fetchData();
+        invalidateLoans();
     };
 
     // Interest suggestion
