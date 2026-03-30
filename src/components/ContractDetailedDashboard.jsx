@@ -843,7 +843,7 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
                                         folderName={selectedSubfolder.name}
                                         onUploadSuccess={() => {
                                             // Optional: Show a success toast or message
-                                            console.log('Upload success!');
+                                            // Upload success
                                         }}
                                     />
                                     

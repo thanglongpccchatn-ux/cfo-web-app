@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
 import { useToast } from '../context/ToastContext';
 import { smartToast } from '../utils/globalToast';
+import { fmt, formatBillion } from '../utils/formatters';
 
 export default function SubcontractorsMaster() {
     const [subcontractorsData, setSubcontractorsData] = useState([]);
@@ -18,8 +19,7 @@ export default function SubcontractorsMaster() {
         requestedAmount: '', approvedAmount: '', paymentDate: '', paidAmount: '', priority: 'Bình thường', notes: ''
     });
 
-    const fmt = (v) => v ? Number(v).toLocaleString('vi-VN') : '0';
-    const formatBillion = (val) => (val / 1000000000).toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Tỷ';
+
 
     // Định nghĩa cấu hình Import cho Thầu Phụ
     const subMapping = {
@@ -314,8 +314,8 @@ export default function SubcontractorsMaster() {
                             </div>
                             <h3 className="text-2xl font-extrabold text-slate-800 tracking-tight">Ghi nhận thanh toán nhân công</h3>
                         </div>
-                        <form onSubmit={handlePaymentSubmit} className="px-8 py-6 space-y-5">
-                            <div className="grid grid-cols-2 gap-5">
+                        <form onSubmit={handlePaymentSubmit} className="px-4 md:px-8 py-6 space-y-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
                                 <div className="space-y-2">
                                     <label className="block text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Thầu phụ / Tổ đội</label>
                                     <select required value={paymentForm.subcontractorId} onChange={(e) => setPaymentForm({...paymentForm, subcontractorId: e.target.value})} className="w-full bg-slate-50 border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-purple-500">
@@ -331,7 +331,7 @@ export default function SubcontractorsMaster() {
                                     </select>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-3 gap-5">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
                                 <div className="space-y-2">
                                     <label className="block text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Giai đoạn TT</label>
                                     <select value={paymentForm.paymentStage} onChange={(e) => setPaymentForm({...paymentForm, paymentStage: e.target.value})} className="w-full bg-slate-50 border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-purple-500">
@@ -350,7 +350,7 @@ export default function SubcontractorsMaster() {
                                     <input type="date" value={paymentForm.requestDate} onChange={(e) => setPaymentForm({...paymentForm, requestDate: e.target.value})} className="w-full bg-slate-50 border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-purple-500" />
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
                                 <div className="space-y-2">
                                     <label className="block text-[11px] font-extrabold text-indigo-600 uppercase tracking-wider">Số tiền đề nghị</label>
                                     <input placeholder="0" value={fmt(paymentForm.requestedAmount)} onChange={(e) => handleNumChange('requestedAmount', e.target.value)} className="w-full bg-indigo-50/50 border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 text-right font-bold text-indigo-700" />
@@ -360,7 +360,7 @@ export default function SubcontractorsMaster() {
                                     <input placeholder="0" value={fmt(paymentForm.approvedAmount)} onChange={(e) => handleNumChange('approvedAmount', e.target.value)} className="w-full bg-blue-50 border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 text-right font-black text-blue-700" />
                                 </div>
                             </div>
-                            <div className="grid grid-cols-3 gap-5">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
                                 <div className="space-y-2">
                                     <label className="block text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Ngày thanh toán</label>
                                     <input type="date" value={paymentForm.paymentDate} onChange={(e) => setPaymentForm({...paymentForm, paymentDate: e.target.value})} className="w-full bg-slate-50 border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-green-500" />

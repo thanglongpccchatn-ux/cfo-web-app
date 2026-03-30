@@ -30,7 +30,7 @@ export const initGoogleAuth = () => {
                     reject(response);
                 }
                 accessToken = response.access_token;
-                console.log('Google Auth success:', response);
+                // Google Auth success
                 resolve(response);
             },
         });

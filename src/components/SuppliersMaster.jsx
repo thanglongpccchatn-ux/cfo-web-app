@@ -5,6 +5,7 @@ import ExcelImportModal from './ExcelImportModal';
 import { useToast } from '../context/ToastContext';
 import MaterialTracking from './MaterialTracking';
 import { smartToast } from '../utils/globalToast';
+import { fmt, formatBillion } from '../utils/formatters';
 
 const EMPTY_LINE = () => ({ _key: Date.now() + Math.random(), materialId: '', productName: '', unit: 'Cái', quantity: '', unitPrice: '', vatRate: '8', notes: '', _showSuggestions: false });
 
@@ -33,8 +34,7 @@ export default function SuppliersMaster() {
     });
     const [purchaseLines, setPurchaseLines] = useState([EMPTY_LINE()]);
 
-    const fmt = (v) => v ? Number(v).toLocaleString('vi-VN') : '0';
-    const formatBillion = (val) => (val / 1000000000).toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Tỷ';
+
 
     // Định nghĩa cấu hình Import cho Nhà cung cấp
     const supplierMapping = {

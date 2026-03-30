@@ -3,9 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { smartToast } from '../utils/globalToast';
-
-const fmt = (v) => Number(v || 0).toLocaleString('vi-VN');
-const fmtInput = (v) => v ? Number(v).toLocaleString('vi-VN') : '';
+import { fmt, formatInputNumber as fmtInput } from '../utils/formatters';
 
 const LENDER_TYPES = [
     { value: 'company', label: 'Công ty', icon: 'domain', color: 'bg-blue-100 text-blue-700' },

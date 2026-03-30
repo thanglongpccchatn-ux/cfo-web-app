@@ -1,9 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-
-const fmt = (v) => v ? Number(Math.round(v)).toLocaleString('vi-VN') : '0';
-const fmtB = (v) => v ? (v / 1e9).toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0';
+import { fmt, fmtB } from '../utils/formatters';
 
 const DEFAULT_DOCS = [
     { doc_type: 'bien_ban_nghiem_thu', doc_name: 'Biên bản nghiệm thu hoàn thành' },
