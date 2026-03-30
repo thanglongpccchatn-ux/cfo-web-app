@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { fmtDash as fmt, fmtDate, formatBillion } from '../utils/formatters';
 import SkeletonTable from './ui/SkeletonTable';
+import { exportToExcel } from '../utils/exportExcel';
 
 // Helper functions (reused from PaymentTracking)
 function getPaymentStatus(stage, lastExternalPaymentDate) {
@@ -96,9 +97,32 @@ export default function PaymentsMaster() {
                     </h2>
                     <p className="text-slate-500 text-sm mt-1 uppercase font-semibold tracking-wider">Tất cả dự án · Quản lý Dòng tiền Thăng Long & Sateco</p>
                 </div>
-                <button onClick={fetchAll} className="p-2.5 bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm border border-slate-200 dark:border-slate-700 flex items-center hover:rotate-180 duration-500">
-                    <span className="material-symbols-outlined notranslate" translate="no">refresh</span>
-                </button>
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={() => {
+                            const today = new Date().toLocaleDateString('vi-VN').replaceAll('/', '-');
+                            const cols = [
+                                { key: item => item.project?.internal_code || item.project?.code || '', label: 'Mã DA' },
+                                { key: item => item.project?.name || '', label: 'Tên dự án' },
+                                { key: 'stage_name', label: 'Giai đoạn' },
+                                { key: 'invoice_amount', label: 'Xuất HĐ', format: 'currency' },
+                                { key: 'payment_request_amount', label: 'Đề nghị TT', format: 'currency' },
+                                { key: 'external_income', label: 'Đã thu', format: 'currency' },
+                                { key: item => (item.payment_request_amount || 0) - (item.external_income || 0), label: 'Còn nợ', format: 'currency' },
+                                { key: 'internal_debt_actual', label: 'Nợ Sateco', format: 'currency' },
+                                { key: 'internal_paid', label: 'Sateco đã trả', format: 'currency' },
+                            ];
+                            exportToExcel(stages, cols, `ThanhToan_${today}`, 'Thanh toán');
+                        }}
+                        className="p-2.5 bg-violet-50 text-violet-600 rounded-full hover:bg-violet-100 transition-all shadow-sm border border-violet-200 flex items-center"
+                        title="Xuất Excel"
+                    >
+                        <span className="material-symbols-outlined notranslate text-[20px]" translate="no">download</span>
+                    </button>
+                    <button onClick={fetchAll} className="p-2.5 bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm border border-slate-200 dark:border-slate-700 flex items-center hover:rotate-180 duration-500">
+                        <span className="material-symbols-outlined notranslate" translate="no">refresh</span>
+                    </button>
+                </div>
             </div>
 
             {/* Global KPIs */}

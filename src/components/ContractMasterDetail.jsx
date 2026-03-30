@@ -8,6 +8,7 @@ import { logAudit } from '../lib/auditLog';
 import { fmt, formatBillion } from '../utils/formatters';
 import { useAuth } from '../context/AuthContext';
 import PartnerDetailModal from './contract/PartnerDetailModal';
+import { exportToExcel, EXPORT_CONFIGS } from '../utils/exportExcel';
 
 export default function ContractMasterDetail({ onOpenFullscreen }) {
     const { hasPermission } = useAuth();
@@ -389,6 +390,15 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                             <span className="material-symbols-outlined notranslate text-[18px] md:text-[20px] group-hover:rotate-90 transition-transform" translate="no">add</span> <span className="hidden sm:inline">Tạo Hợp đồng mới</span><span className="sm:hidden">Tạo HĐ</span>
                         </button>
                     )}
+                    <button 
+                        onClick={() => {
+                            const today = new Date().toLocaleDateString('vi-VN').replaceAll('/', '-');
+                            exportToExcel(filteredProjects, EXPORT_CONFIGS.contracts, `HopDong_${activeEntity}_${today}`, 'Hợp đồng');
+                        }}
+                        className="btn btn-glass bg-violet-50 text-violet-700 font-bold border-violet-200 hover:bg-violet-100 flex items-center gap-2 transition-all shadow-sm text-xs md:text-sm"
+                    >
+                        <span className="material-symbols-outlined notranslate text-[18px] md:text-[20px]" translate="no">download</span> <span className="hidden sm:inline">Xuất Excel</span><span className="sm:hidden">Excel</span>
+                    </button>
                 </div>
             </div>
 
