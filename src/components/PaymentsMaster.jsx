@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { fmtDash as fmt, fmtDate, formatBillion } from '../utils/formatters';
 import SkeletonTable from './ui/SkeletonTable';
@@ -36,7 +36,10 @@ export default function PaymentsMaster() {
 
 
     // ── React Query: All payment data ──
-    const { data: rawData, isLoading: loading, refetch: fetchAll } = useQuery({
+    const queryClient = useQueryClient();
+    const invalidatePayments = () => queryClient.invalidateQueries({ queryKey: ['paymentsMasterData'] });
+
+    const { data: rawData, isLoading: loading } = useQuery({
         queryKey: ['paymentsMasterData'],
         queryFn: async () => {
             const [projRes, pmtRes] = await Promise.all([
@@ -119,7 +122,7 @@ export default function PaymentsMaster() {
                     >
                         <span className="material-symbols-outlined notranslate text-[20px]" translate="no">download</span>
                     </button>
-                    <button onClick={fetchAll} className="p-2.5 bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm border border-slate-200 dark:border-slate-700 flex items-center hover:rotate-180 duration-500">
+                    <button onClick={invalidatePayments} className="p-2.5 bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm border border-slate-200 dark:border-slate-700 flex items-center hover:rotate-180 duration-500">
                         <span className="material-symbols-outlined notranslate" translate="no">refresh</span>
                     </button>
                 </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useInventory } from '../../context/InventoryContext';
 import { useAuth } from '../../context/AuthContext';
@@ -53,8 +53,11 @@ export default function InventoryRequestList({ onCreateNew }) {
 
     const roleCode = profile?.role_code;
 
+    const queryClient = useQueryClient();
+    const invalidateRequests = () => queryClient.invalidateQueries({ queryKey: ['inventoryRequestList'] });
+
     // ── React Query: Inventory Requests ──
-    const { data: requests = [], isLoading: loading, refetch: fetchRequests } = useQuery({
+    const { data: requests = [], isLoading: loading } = useQuery({
         queryKey: ['inventoryRequestList'],
         queryFn: async () => {
             const { data, error: err } = await supabase
@@ -80,7 +83,7 @@ export default function InventoryRequestList({ onCreateNew }) {
         try {
             await approveRequestL1(id);
             success('Đã duyệt đề nghị VT (Cấp 1)');
-            fetchRequests();
+            invalidateRequests();
         } catch (e) { toastError('Lỗi duyệt: ' + e.message); }
         finally { setProcessing(false); }
     };
@@ -90,7 +93,7 @@ export default function InventoryRequestList({ onCreateNew }) {
         try {
             await approveRequestL2(id);
             success('Đã duyệt đề nghị VT (Cấp 2) — Sẵn sàng tạo PO');
-            fetchRequests();
+            invalidateRequests();
         } catch (e) { toastError('Lỗi duyệt: ' + e.message); }
         finally { setProcessing(false); }
     };
@@ -104,7 +107,7 @@ export default function InventoryRequestList({ onCreateNew }) {
             success('Đã từ chối đề nghị VT');
             setRejectModalId(null);
             setRejectReason('');
-            fetchRequests();
+            invalidateRequests();
         } catch (e) { toastError('Lỗi: ' + e.message); }
         finally { setProcessing(false); }
     };

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -29,8 +29,11 @@ export default function PurchaseOrderList({ onCreateNew, onViewTab }) {
 
     const canCreatePO = profile?.role_code === 'ROLE03' || profile?.role_code === 'ROLE01';
 
+    const queryClient = useQueryClient();
+    const invalidatePOs = () => queryClient.invalidateQueries({ queryKey: ['purchaseOrderList'] });
+
     // ── React Query: POs + Approved Requests ──
-    const { data: queryData, isLoading: loading, refetch: fetchData } = useQuery({
+    const { data: queryData, isLoading: loading } = useQuery({
         queryKey: ['purchaseOrderList'],
         queryFn: async () => {
             const [poRes, reqRes] = await Promise.all([

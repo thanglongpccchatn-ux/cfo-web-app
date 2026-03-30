@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
 import { useToast } from '../context/ToastContext';
@@ -53,8 +53,11 @@ export default function SuppliersMaster() {
         account_holder: "Chủ tài khoản"
     };
 
+    const queryClient = useQueryClient();
+    const invalidateSuppliers = () => queryClient.invalidateQueries({ queryKey: ['suppliersMaster'] });
+
     // ── React Query: Suppliers + POs + Materials aggregation ──
-    const { data: suppliersData = [], isLoading: loading, refetch: fetchSuppliersData } = useQuery({
+    const { data: suppliersData = [], isLoading: loading } = useQuery({
         queryKey: ['suppliersMaster'],
         queryFn: async () => {
             const [supRes, poRes, matRes] = await Promise.all([
@@ -107,7 +110,7 @@ export default function SuppliersMaster() {
 
     const handleImportSuccess = (count) => {
         smartToast(`Đã import thành công ${count} nhà cung cấp!`);
-        fetchSuppliersData();
+        invalidateSuppliers();
     };
 
     // --- Line item helpers ---
@@ -142,7 +145,7 @@ export default function SuppliersMaster() {
         toast.success('Đã thêm NCC: ' + data.name);
         setShowAddSupplierInline(false);
         setNewSupplier({ code: '', name: '', phone: '' });
-        await fetchSuppliersData();
+        await invalidateSuppliers();
         setPurchaseHeader(prev => ({ ...prev, supplierId: data.id }));
     };
 
@@ -184,7 +187,7 @@ export default function SuppliersMaster() {
             setShowPurchaseModal(false);
             setPurchaseHeader({ supplierId: '', projectId: '', expenseDate: new Date().toISOString().split('T')[0] });
             setPurchaseLines([EMPTY_LINE()]);
-            fetchSuppliersData();
+            invalidateSuppliers();
         } catch (err) {
             toast.error('Lỗi: ' + err.message);
         } finally {
@@ -254,7 +257,7 @@ export default function SuppliersMaster() {
             toast.success(`Đã nhận hàng ${toReceive.length} dòng — PO ${allDone ? 'hoàn tất ✅' : 'giao một phần'}`);
             setShowReceiveModal(false);
             toggleSupplierPOs(receivePO.supplier_id);
-            fetchSuppliersData();
+            invalidateSuppliers();
         } catch (err) {
             toast.error('Lỗi nhận hàng: ' + err.message);
         } finally {
@@ -305,7 +308,7 @@ export default function SuppliersMaster() {
                             <span className="material-symbols-outlined notranslate" translate="no">upload_file</span>
                             Import Excel
                         </button>
-                        <button onClick={fetchSuppliersData} className="p-2.5 bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm border border-slate-200 dark:border-slate-700 flex items-center">
+                        <button onClick={invalidateSuppliers} className="p-2.5 bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm border border-slate-200 dark:border-slate-700 flex items-center">
                             <span className="material-symbols-outlined notranslate" translate="no">refresh</span>
                         </button>
                     </div>

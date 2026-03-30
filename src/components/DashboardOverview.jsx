@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { CashFlowChart, PortfolioChart, ReceivablesAgingChart, TopProfitChart } from './DashboardCharts';
 import AIFinanceInsights from './AIFinanceInsights';
@@ -10,7 +10,10 @@ import { formatVND, formatBillion, formatBillionParts, parseFormattedNumber, for
 import { smartToast } from '../utils/globalToast';
 
 const DashboardOverview = () => {
-    const { data: dashboardData, refetch: refetchDashboard, isLoading: loading } = useQuery({
+    const queryClient = useQueryClient();
+    const invalidateDashboard = () => queryClient.invalidateQueries({ queryKey: ['dashboard-overview-data'] });
+
+    const { data: dashboardData, isLoading: loading } = useQuery({
         queryKey: ['dashboard-overview-data'],
         staleTime: 1000 * 60 * 5, // 5 minutes cache
         queryFn: async () => {
@@ -241,7 +244,7 @@ const DashboardOverview = () => {
             );
             if (error) throw error;
             setTargetModal({ isOpen: false, target: 0, isSaving: false });
-            refetchDashboard();
+            invalidateDashboard();
         } catch (error) {
             console.error('Error saving target:', error);
             smartToast('Lỗi lưu mục tiêu: ' + error.message);
