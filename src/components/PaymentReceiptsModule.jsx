@@ -1,108 +1,98 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { fmt } from '../utils/formatters';
 import ReceiptFormModal from './payments/ReceiptFormModal';
 
 export default function PaymentReceiptsModule() {
-    const [activeTab, setActiveTab] = useState('external'); // 'external' (CĐT -> TL) or 'internal' (TL -> Sateco)
-    const [receipts, setReceipts] = useState([]);
-    const [internalReceipts, setInternalReceipts] = useState([]);
-    const [projects, setProjects] = useState([]);
+    const [activeTab, setActiveTab] = useState('external');
     const [availablePayments, setAvailablePayments] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
-    const [activeEntity, setActiveEntity] = useState('all'); // 'all', 'thanglong', 'thanhphat'
+    const [activeEntity, setActiveEntity] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [filterPartnerId, setFilterPartnerId] = useState('');
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
-    const [quickFilter, setQuickFilter] = useState('all'); // 'all', 'thisWeek', 'lastWeek', 'thisMonth', 'lastMonth'
+    const [quickFilter, setQuickFilter] = useState('all');
     const toast = useToast();
+    const queryClient = useQueryClient();
 
     // Form State
     const [form, setForm] = useState({
         projectId: '',
-        paymentId: '', // payment_stage_id
+        paymentId: '',
         amount: '',
         date: new Date().toISOString().split('T')[0],
         description: ''
     });
 
-    useEffect(() => {
-        fetchReceipts();
-        fetchInternalReceipts();
-        fetchProjects();
-    }, []);
-
-    const fetchReceipts = async () => {
-        setLoading(true);
-        const { data, error } = await supabase
-            .from('external_payment_history')
-            .select(`
-                *,
-                payments!external_payment_history_payment_stage_id_fkey (
-                    id,
-                    stage_name,
-                    payment_code,
-                    projects (
-                        id,
-                        code,
-                        internal_code,
-                        name,
-                        acting_entity_key,
-                        partners!projects_partner_id_fkey (id, name, code, short_name)
+    // ── React Query: External Receipts ──
+    const { data: receipts = [], isLoading: loadingExt } = useQuery({
+        queryKey: ['externalReceipts'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('external_payment_history')
+                .select(`
+                    *,
+                    payments!external_payment_history_payment_stage_id_fkey (
+                        id, stage_name, payment_code,
+                        projects (
+                            id, code, internal_code, name, acting_entity_key,
+                            partners!projects_partner_id_fkey (id, name, code, short_name)
+                        )
                     )
-                )
-            `)
-            .order('payment_date', { ascending: false });
+                `)
+                .order('payment_date', { ascending: false });
+            if (error) throw error;
+            return data || [];
+        },
+        staleTime: 2 * 60 * 1000,
+    });
 
-        if (error) {
-            console.error('Error fetching receipts:', error);
-            toast.error('Lỗi khi tải lịch sử thu tiền CĐT');
-        } else {
-            setReceipts(data || []);
-        }
-        setLoading(false);
-    };
-
-    const fetchInternalReceipts = async () => {
-        const { data, error } = await supabase
-            .from('internal_payment_history')
-            .select(`
-                *,
-                payments!internal_payment_history_payment_stage_id_fkey (
-                    id,
-                    stage_name,
-                    payment_code,
-                    projects (
-                        id,
-                        code,
-                        internal_code,
-                        name,
-                        acting_entity_key,
-                        sateco_contract_ratio,
-                        partners!projects_partner_id_fkey (id, name, code, short_name)
+    // ── React Query: Internal Receipts ──
+    const { data: internalReceipts = [], isLoading: loadingInt } = useQuery({
+        queryKey: ['internalReceipts'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('internal_payment_history')
+                .select(`
+                    *,
+                    payments!internal_payment_history_payment_stage_id_fkey (
+                        id, stage_name, payment_code,
+                        projects (
+                            id, code, internal_code, name, acting_entity_key,
+                            sateco_contract_ratio,
+                            partners!projects_partner_id_fkey (id, name, code, short_name)
+                        )
                     )
-                )
-            `)
-            .order('payment_date', { ascending: false });
+                `)
+                .order('payment_date', { ascending: false });
+            if (error) throw error;
+            return data || [];
+        },
+        staleTime: 2 * 60 * 1000,
+    });
 
-        if (error) {
-            console.error('Error fetching internal receipts:', error);
-            toast.error('Lỗi khi tải lịch sử chuyển tiền nội bộ');
-        } else {
-            setInternalReceipts(data || []);
-        }
-    };
+    // ── React Query: Projects list ──
+    const { data: projects = [] } = useQuery({
+        queryKey: ['receiptProjects'],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('projects')
+                .select('id, code, internal_code, name, sateco_contract_ratio, acting_entity_key, partners!projects_partner_id_fkey(id, name, code, short_name)')
+                .order('internal_code', { ascending: true });
+            return data || [];
+        },
+        staleTime: 5 * 60 * 1000,
+    });
 
-    const fetchProjects = async () => {
-        const { data } = await supabase
-            .from('projects')
-            .select('id, code, internal_code, name, sateco_contract_ratio, acting_entity_key, partners!projects_partner_id_fkey(id, name, code, short_name)')
-            .order('internal_code', { ascending: true });
-        setProjects(data || []);
+    const loading = loadingExt || loadingInt;
+
+    const invalidateAll = () => {
+        queryClient.invalidateQueries({ queryKey: ['externalReceipts'] });
+        queryClient.invalidateQueries({ queryKey: ['internalReceipts'] });
     };
 
     const getDates = (type) => {
@@ -316,11 +306,10 @@ export default function PaymentReceiptsModule() {
             // Trigger Sync
             if (activeTab === 'external') {
                 await syncExternalIncome(payload.payment_stage_id);
-                fetchReceipts();
             } else {
                 await syncInternalPaid(payload.payment_stage_id);
-                fetchInternalReceipts();
             }
+            invalidateAll();
             
             toast.success(isEditing ? 'Đã cập nhật giao dịch' : 'Đã ghi nhận thành công');
             setShowModal(false);
@@ -358,7 +347,6 @@ export default function PaymentReceiptsModule() {
     const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
     const handleDelete = async (id) => {
-        setLoading(true);
         try {
             const table = activeTab === 'external' ? 'external_payment_history' : 'internal_payment_history';
             const list = activeTab === 'external' ? receipts : internalReceipts;
@@ -375,12 +363,10 @@ export default function PaymentReceiptsModule() {
             }
             
             toast.success('Đã xóa giao dịch');
-            if (activeTab === 'external') fetchReceipts();
-            else fetchInternalReceipts();
+            invalidateAll();
         } catch (error) {
             toast.error('Lỗi khi xóa: ' + error.message);
         } finally {
-            setLoading(false);
             setConfirmDeleteId(null);
         }
     };

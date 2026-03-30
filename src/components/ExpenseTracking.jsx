@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { fmt } from '../utils/formatters';
@@ -13,15 +14,13 @@ const EXPENSE_TYPES = [
 ];
 
 export default function ExpenseTracking() {
-    const [expenses, setExpenses] = useState([]);
-    const [projects, setProjects] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [filterProject, setFilterProject] = useState('all');
     const [deleteConfirm, setDeleteConfirm] = useState(null);
     const toast = useToast();
+    const queryClient = useQueryClient();
 
     const [form, setForm] = useState({
         projectId: '',
@@ -33,26 +32,29 @@ export default function ExpenseTracking() {
         description: ''
     });
 
-    const fetchData = React.useCallback(async () => {
-        setLoading(true);
-        const { data, error } = await supabase
-            .from('expenses')
-            .select('*, projects(name, code)')
-            .order('expense_date', { ascending: false });
-        if (error) toast.error('Lỗi tải dữ liệu');
-        else setExpenses(data || []);
-        setLoading(false);
-    }, [toast]);
+    // ── React Query: Expenses ──
+    const { data: expenses = [], isLoading: loading } = useQuery({
+        queryKey: ['expenses'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('expenses')
+                .select('*, projects(name, code)')
+                .order('expense_date', { ascending: false });
+            if (error) throw error;
+            return data || [];
+        },
+        staleTime: 2 * 60 * 1000,
+    });
 
-    const fetchProjects = React.useCallback(async () => {
-        const { data } = await supabase.from('projects').select('id, name, code');
-        setProjects(data || []);
-    }, []);
-
-    useEffect(() => {
-        fetchData();
-        fetchProjects();
-    }, [fetchData, fetchProjects]);
+    // ── React Query: Projects ──
+    const { data: projects = [] } = useQuery({
+        queryKey: ['expenseProjects'],
+        queryFn: async () => {
+            const { data } = await supabase.from('projects').select('id, name, code');
+            return data || [];
+        },
+        staleTime: 5 * 60 * 1000,
+    });
 
     const handleNumChange = (field, value) => {
         const clean = value.replace(/[^0-9]/g, '');
@@ -87,7 +89,7 @@ export default function ExpenseTracking() {
             setShowModal(false);
             setIsEditing(false);
             setEditingId(null);
-            fetchData();
+            queryClient.invalidateQueries({ queryKey: ['expenses'] });
             setForm({ projectId: '', expenseType: 'BCH công trường', amount: '', paidAmount: '', expenseDate: new Date().toISOString().split('T')[0], paidDate: new Date().toISOString().split('T')[0], description: '' });
         }
     };
@@ -100,7 +102,7 @@ export default function ExpenseTracking() {
         } else {
             toast.success('Đã xóa chi phí');
             setDeleteConfirm(null);
-            fetchData();
+            queryClient.invalidateQueries({ queryKey: ['expenses'] });
         }
     };
 

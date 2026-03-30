@@ -1,17 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
 import { smartToast } from '../utils/globalToast';
 
 export default function LaborTracking({ project, onBack, embedded }) {
     const [labors, setLabors] = useState([]);
-    const [projects, setProjects] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [showImportModal, setShowImportModal] = useState(false);
     const [filterProjectId, setFilterProjectId] = useState('all');
-
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState({});
+    const queryClient = useQueryClient();
 
     const LABOR_COLUMN_MAPPING = {
         team_name: 'Tên đội/Thầu phụ',
@@ -33,38 +32,39 @@ export default function LaborTracking({ project, onBack, embedded }) {
         ['Đội Cơ Điện Minh Khoa', 'Nghiệm thu', 200000000, '2025-02-05', 50, 80, 60000000, 58000000, '', 0, 'Cao', 'Đang chờ nghiệm thu']
     ];
 
-    const fetchLabors = React.useCallback(async () => {
-        let query = supabase
-            .from('expense_labor')
-            .select('*, projects(name, code)')
-            .order('created_at', { ascending: false });
+    // ── React Query: Labors ──
+    const { isLoading: loading } = useQuery({
+        queryKey: ['labors', project?.id, filterProjectId],
+        queryFn: async () => {
+            let query = supabase
+                .from('expense_labor')
+                .select('*, projects(name, code)')
+                .order('created_at', { ascending: false });
 
-        if (project) {
-            query = query.eq('project_id', project.id);
-        } else if (filterProjectId !== 'all') {
-            query = query.eq('project_id', filterProjectId);
-        }
+            if (project) {
+                query = query.eq('project_id', project.id);
+            } else if (filterProjectId !== 'all') {
+                query = query.eq('project_id', filterProjectId);
+            }
 
-        const { data, error } = await query;
-        if (!error && data) {
-            setLabors(data);
-        }
-    }, [project, filterProjectId]);
+            const { data, error } = await query;
+            if (error) throw error;
+            setLabors(data || []);
+            return data || [];
+        },
+        staleTime: 2 * 60 * 1000,
+    });
 
-    const fetchProjects = React.useCallback(async () => {
-        if (project) return;
-        const { data } = await supabase.from('projects').select('id, name, code').order('name');
-        if (data) setProjects(data);
-    }, [project]);
-
-    useEffect(() => {
-        const init = async () => {
-            setLoading(true);
-            await Promise.all([fetchLabors(), fetchProjects()]);
-            setLoading(false);
-        };
-        init();
-    }, [fetchLabors, fetchProjects]);
+    // ── React Query: Projects (for filter dropdown) ──
+    const { data: projects = [] } = useQuery({
+        queryKey: ['laborProjects'],
+        queryFn: async () => {
+            const { data } = await supabase.from('projects').select('id, name, code').order('name');
+            return data || [];
+        },
+        staleTime: 5 * 60 * 1000,
+        enabled: !project,
+    });
 
     function handleAddRow() {
         const newRow = {
@@ -140,13 +140,13 @@ export default function LaborTracking({ project, onBack, embedded }) {
         }
 
         setEditingId(null);
-        fetchLabors();
+        queryClient.invalidateQueries({ queryKey: ['labors'] });
     };
 
     const handleDelete = async (id) => {
         if (!window.confirm('Xóa bản ghi thanh toán thầu phụ này?')) return;
         const { error } = await supabase.from('expense_labor').delete().eq('id', id);
-        if (!error) fetchLabors();
+        if (!error) queryClient.invalidateQueries({ queryKey: ['labors'] });
     };
 
     const formatCurrency = (val) => new Intl.NumberFormat('vi-VN').format(Math.round(val || 0));
@@ -461,7 +461,7 @@ export default function LaborTracking({ project, onBack, embedded }) {
             fixedData={{ project_id: project.id }}
             onSuccess={(count) => {
                 smartToast(`Đã import thành công ${count} bản ghi Thầu phụ / Nhân công!`);
-                fetchLabors();
+                queryClient.invalidateQueries({ queryKey: ['labors'] });
             }}
         />
         </>

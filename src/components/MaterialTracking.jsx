@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
 import { smartToast } from '../utils/globalToast';
 
 export default function MaterialTracking({ project, onBack, embedded }) {
     const [materials, setMaterials] = useState([]);
-    const [projects, setProjects] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [showSummary, setShowSummary] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
     const [filterProjectId, setFilterProjectId] = useState('all');
+    const queryClient = useQueryClient();
 
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState({});
@@ -61,58 +61,57 @@ export default function MaterialTracking({ project, onBack, embedded }) {
         ['2025-01-20', 'Vật tư phụ', 'Cửa hàng Sắt Thép Minh Hùng', 'Thép phi 12 CB240T', 'Kg', 2000, 18000, 8, 38880000, 0, '']
     ];
 
-    const fetchMaterials = React.useCallback(async () => {
-        let query = supabase
-            .from('expense_materials')
-            .select('*, projects(name, code, internal_code)')
-            .order('expense_date', { ascending: false });
+    // ── React Query: Materials ──
+    const { isLoading: loading } = useQuery({
+        queryKey: ['materials', project?.id, filterProjectId],
+        queryFn: async () => {
+            let query = supabase
+                .from('expense_materials')
+                .select('*, projects(name, code, internal_code)')
+                .order('expense_date', { ascending: false });
+            if (project) query = query.eq('project_id', project.id);
+            else if (filterProjectId !== 'all') query = query.eq('project_id', filterProjectId);
+            const { data, error } = await query;
+            if (error) throw error;
+            setMaterials(data || []);
+            return data || [];
+        },
+        staleTime: 2 * 60 * 1000,
+    });
 
-        if (project) {
-            query = query.eq('project_id', project.id);
-        } else if (filterProjectId !== 'all') {
-            query = query.eq('project_id', filterProjectId);
-        }
+    // ── React Query: Projects ──
+    const { data: projects = [] } = useQuery({
+        queryKey: ['materialProjects'],
+        queryFn: async () => {
+            const { data } = await supabase.from('projects').select('id, name, code, internal_code').order('name');
+            return data || [];
+        },
+        staleTime: 5 * 60 * 1000,
+        enabled: !project,
+    });
 
-        const { data, error } = await query;
-        if (!error && data) {
-            setMaterials(data);
-        }
-    }, [project, filterProjectId]);
+    // ── React Query: Catalogs (suppliers, materials catalog, categories) ──
+    const { data: catalogData } = useQuery({
+        queryKey: ['materialCatalogs'],
+        queryFn: async () => {
+            const [supRes, matRes, catRes] = await Promise.all([
+                supabase.from('partners').select('id, code, name').eq('type', 'Supplier').order('name'),
+                supabase.from('materials').select('id, code, name, unit, base_price, actual_price, category_code, discount_percentage').order('name'),
+                supabase.from('material_categories').select('id, code, name').order('name'),
+            ]);
+            return { suppliers: supRes.data || [], materials: matRes.data || [], categories: catRes.data || [] };
+        },
+        staleTime: 10 * 60 * 1000,
+    });
 
-    const fetchProjects = React.useCallback(async () => {
-        if (project) return;
-        const { data } = await supabase.from('projects').select('id, name, code, internal_code').order('name');
-        if (data) setProjects(data);
-    }, [project]);
-
-    const fetchCatalogs = React.useCallback(async () => {
-        const [supRes, matRes, catRes] = await Promise.all([
-            supabase.from('partners').select('id, code, name').eq('type', 'Supplier').order('name'),
-            supabase.from('materials').select('id, code, name, unit, base_price, actual_price, category_code, discount_percentage').order('name'),
-            supabase.from('material_categories').select('id, code, name').order('name'),
-        ]);
-        if (supRes.data) setSuppliersList(supRes.data);
-        if (matRes.data) setMaterialsCatalog(matRes.data);
-        if (catRes.data) setCategories(catRes.data);
-    }, []);
-
-    // Load projects & catalogs once on mount
+    // Sync catalog data into local state (downstream code mutates these)
     useEffect(() => {
-        const loadCatalogs = async () => {
-            await Promise.all([fetchProjects(), fetchCatalogs()]);
-        };
-        loadCatalogs();
-    }, [fetchProjects, fetchCatalogs]);
-
-    // Re-fetch materials when project filter changes
-    useEffect(() => {
-        const loadMaterials = async () => {
-            setLoading(true);
-            await fetchMaterials();
-            setLoading(false);
-        };
-        loadMaterials();
-    }, [fetchMaterials]);
+        if (catalogData) {
+            setSuppliersList(catalogData.suppliers);
+            setMaterialsCatalog(catalogData.materials);
+            setCategories(catalogData.categories);
+        }
+    }, [catalogData]);
 
     function handleAddRow() {
         const newRow = {
@@ -254,13 +253,13 @@ export default function MaterialTracking({ project, onBack, embedded }) {
         }
 
         setEditingId(null);
-        fetchMaterials();
+        queryClient.invalidateQueries({ queryKey: ['materials'] });
     };
 
     const handleDelete = async (id) => {
         if (!window.confirm('Xóa bản ghi vật tư này?')) return;
         const { error } = await supabase.from('expense_materials').delete().eq('id', id);
-        if (!error) fetchMaterials();
+        if (!error) queryClient.invalidateQueries({ queryKey: ['materials'] });
     };
 
     const formatCurrency = (val) => new Intl.NumberFormat('vi-VN').format(Math.round(val || 0));
@@ -708,7 +707,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
             fixedData={{ project_id: project?.id || (filterProjectId !== 'all' ? filterProjectId : null) }}
             onSuccess={(count) => {
                 smartToast(`Đã import thành công ${count} bản ghi Vật Tư!`);
-                fetchMaterials();
+                queryClient.invalidateQueries({ queryKey: ['materials'] });
             }}
         />
         </>
