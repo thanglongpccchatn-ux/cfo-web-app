@@ -459,6 +459,21 @@ h6 {
     flex-shrink: 0;
   }
 
+  /* Tab scroll container fade hint */
+  .overflow-x-auto {
+    position: relative;
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to right, black calc(100% - 32px), transparent);
+  }
+  .overflow-x-auto:not(:hover) {
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 32px), transparent);
+  }
+  .overflow-x-auto:hover,
+  .overflow-x-auto:focus-within {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
   /* ── SIDEBAR: Ensure full-height on mobile ── */
   aside {
     height: 100dvh !important;
