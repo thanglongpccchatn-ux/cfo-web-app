@@ -87,6 +87,7 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
         { id: 'settings', icon: 'settings', label: 'Cài đặt', perms: ['manage_users', 'manage_settings'] },
         { id: 'permissions', icon: 'admin_panel_settings', label: 'Phân quyền', perms: ['manage_users'] },
         { id: 'users', icon: 'person', label: 'Người dùng', perms: ['manage_users'] },
+        { id: 'audit_trail', icon: 'history', label: 'Nhật ký', perms: ['manage_users'] },
         { id: 'guide', icon: 'help_center', label: 'Hướng dẫn', perms: ['*'] },
     ].filter(tab => canView(tab.perms));
 
