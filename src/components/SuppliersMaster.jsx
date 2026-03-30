@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
 import { useToast } from '../context/ToastContext';
@@ -9,15 +10,13 @@ const EMPTY_LINE = () => ({ _key: Date.now() + Math.random(), materialId: '', pr
 
 export default function SuppliersMaster() {
     const [activeSubTab, setActiveSubTab] = useState('suppliers');
-    const [suppliersData, setSuppliersData] = useState([]);
-    const [loading, setLoading] = useState(true);
+    // loading and suppliersData managed by React Query below
     const [searchQuery, setSearchQuery] = useState('');
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
     const [showAddSupplierInline, setShowAddSupplierInline] = useState(false);
     const [newSupplier, setNewSupplier] = useState({ code: '', name: '', phone: '' });
-    const [projects, setProjects] = useState([]);
-    const [materialsCatalog, setMaterialsCatalog] = useState([]);
+    // projects + materialsCatalog managed by React Query below
     const toast = useToast();
 
     // --- Open PO states ---
@@ -52,84 +51,57 @@ export default function SuppliersMaster() {
         account_holder: "Chủ tài khoản"
     };
 
-    useEffect(() => {
-        fetchSuppliersData();
-        fetchProjects();
-        fetchMaterialsCatalog();
-    }, []);
+    // ── React Query: Suppliers + POs + Materials aggregation ──
+    const { data: suppliersData = [], isLoading: loading, refetch: fetchSuppliersData } = useQuery({
+        queryKey: ['suppliersMaster'],
+        queryFn: async () => {
+            const [supRes, poRes, matRes] = await Promise.all([
+                supabase.from('suppliers').select('*').order('name', { ascending: true }),
+                supabase.from('purchase_orders').select('supplier_id, total_amount, project_id'),
+                supabase.from('expense_materials').select('supplier_id, total_amount, paid_amount, project_id'),
+            ]);
+            if (supRes.error) { console.error('Lỗi tải NCC:', supRes.error); return []; }
+            const supplierAgg = {};
+            (supRes.data || []).forEach(s => {
+                supplierAgg[s.id] = { ...s, totalOrdered: 0, totalValue: 0, totalPaid: 0, projectIds: new Set() };
+            });
+            (poRes.data || []).forEach(po => {
+                if (po.supplier_id && supplierAgg[po.supplier_id]) {
+                    supplierAgg[po.supplier_id].totalOrdered += Number(po.total_amount || 0);
+                    if (po.project_id) supplierAgg[po.supplier_id].projectIds.add(po.project_id);
+                }
+            });
+            (matRes.data || []).forEach(mat => {
+                if (mat.supplier_id && supplierAgg[mat.supplier_id]) {
+                    supplierAgg[mat.supplier_id].totalValue += Number(mat.total_amount || 0);
+                    supplierAgg[mat.supplier_id].totalPaid += Number(mat.paid_amount || 0);
+                    if (mat.project_id) supplierAgg[mat.supplier_id].projectIds.add(mat.project_id);
+                }
+            });
+            return Object.values(supplierAgg).map(s => ({ ...s, totalDebt: s.totalValue - s.totalPaid, projectCount: s.projectIds ? s.projectIds.size : 0 }));
+        },
+        staleTime: 5 * 60 * 1000,
+    });
 
-    async function fetchProjects() {
-        const { data } = await supabase.from('projects').select('id, name, code, internal_code').order('created_at', { ascending: false });
-        setProjects(data || []);
-    };
+    // ── React Query: Projects ──
+    const { data: projects = [] } = useQuery({
+        queryKey: ['supplierProjects'],
+        queryFn: async () => {
+            const { data } = await supabase.from('projects').select('id, name, code, internal_code').order('created_at', { ascending: false });
+            return data || [];
+        },
+        staleTime: 5 * 60 * 1000,
+    });
 
-    async function fetchMaterialsCatalog() {
-        const { data } = await supabase.from('materials').select('id, code, name, unit, base_price, category_code, brand').order('name');
-        setMaterialsCatalog(data || []);
-    };
-
-    async function fetchSuppliersData() {
-        setLoading(true);
-        // 1. Tải danh mục NCC
-        const { data: suppliers, error: supError } = await supabase
-            .from('suppliers')
-            .select('*')
-            .order('name', { ascending: true });
-
-        if (supError) {
-            console.error("Lỗi tải NCC:", supError);
-            setLoading(false);
-            return;
-        }
-
-        // 2. Tải tất cả PO để tính "Tổng Mua (Kế hoạch/Đặt hàng)"
-        const { data: pos, error: _poError } = await supabase
-            .from('purchase_orders')
-            .select('supplier_id, total_amount, project_id');
-        
-        // 3. Tải tất cả Thực nhận & Thanh toán (expense_materials)
-        const { data: materials, error: _matError } = await supabase
-            .from('expense_materials')
-            .select('supplier_id, total_amount, paid_amount, project_id');
-
-        // Aggregate
-        const supplierAgg = {};
-        (suppliers || []).forEach(s => {
-            supplierAgg[s.id] = { 
-                ...s, 
-                totalOrdered: 0,   // Tổng tiền đã đặt (PO)
-                totalValue: 0,     // Tổng tiền thực nhận (Bản chất là Received)
-                totalPaid: 0,      // Tổng tiền đã trả
-                projectIds: new Set() 
-            };
-        });
-
-        // Tính tổng Đặt hàng
-        (pos || []).forEach(po => {
-            if (po.supplier_id && supplierAgg[po.supplier_id]) {
-                supplierAgg[po.supplier_id].totalOrdered += Number(po.total_amount || 0);
-                if (po.project_id) supplierAgg[po.supplier_id].projectIds.add(po.project_id);
-            }
-        });
-
-        // Tính tổng Thực nhận & Thanh toán
-        (materials || []).forEach(mat => {
-            if (mat.supplier_id && supplierAgg[mat.supplier_id]) {
-                supplierAgg[mat.supplier_id].totalValue += Number(mat.total_amount || 0);
-                supplierAgg[mat.supplier_id].totalPaid += Number(mat.paid_amount || 0);
-                if (mat.project_id) supplierAgg[mat.supplier_id].projectIds.add(mat.project_id);
-            }
-        });
-
-        const sArray = Object.values(supplierAgg).map(s => ({
-            ...s,
-            totalDebt: s.totalValue - s.totalPaid,
-            projectCount: s.projectIds ? s.projectIds.size : 0
-        }));
-
-        setSuppliersData(sArray);
-        setLoading(false);
-    };
+    // ── React Query: Materials Catalog ──
+    const { data: materialsCatalog = [] } = useQuery({
+        queryKey: ['supplierMaterialsCatalog'],
+        queryFn: async () => {
+            const { data } = await supabase.from('materials').select('id, code, name, unit, base_price, category_code, brand').order('name');
+            return data || [];
+        },
+        staleTime: 5 * 60 * 1000,
+    });
 
     const handleImportSuccess = (count) => {
         smartToast(`Đã import thành công ${count} nhà cung cấp!`);
@@ -603,7 +575,7 @@ export default function SuppliersMaster() {
 
                         <form onSubmit={handlePurchaseSubmit} className="flex flex-col flex-1 overflow-hidden">
                             {/* Top: NCC + Dự án + Ngày */}
-                            <div className="px-8 py-5 grid grid-cols-3 gap-5 shrink-0 border-b border-slate-100 bg-white">
+                            <div className="px-4 md:px-8 py-5 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 shrink-0 border-b border-slate-100 bg-white">
                                 <div className="space-y-2">
                                     <div className="flex justify-between items-center">
                                         <label className="block text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Nhà cung cấp</label>

@@ -550,4 +550,20 @@ h6 {
   .text-\[7px\], .text-\[8px\] {
     font-size: 10px !important;
   }
+
+  /* Modal fullscreen on mobile */
+  .fixed.inset-0 > .max-w-2xl,
+  .fixed.inset-0 > .max-w-3xl,
+  .fixed.inset-0 > .max-w-4xl,
+  .fixed.inset-0 > .max-w-5xl,
+  .fixed.inset-0 > .max-w-6xl,
+  .fixed.inset-0 > .max-w-lg,
+  .fixed.inset-0 > div[class*="max-w-"] {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
 }
