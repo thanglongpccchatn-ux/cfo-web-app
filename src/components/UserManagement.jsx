@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { logAudit } from '../lib/auditLog';
@@ -27,8 +27,11 @@ export default function UserManagement() {
 
     const canTransfer = hasPermission('manage_staff_assignment') || currentProfile?.role_code === 'ROLE01';
 
+    const queryClient = useQueryClient();
+    const invalidateUsers = () => queryClient.invalidateQueries({ queryKey: ['userManagementData'] });
+
     // ── React Query: Users, Roles, Projects ──
-    const { data: queryData, isLoading, refetch: fetchData } = useQuery({
+    const { data: queryData, isLoading } = useQuery({
         queryKey: ['userManagementData'],
         queryFn: async () => {
             const [rolesRes, projRes] = await Promise.all([
@@ -103,7 +106,7 @@ export default function UserManagement() {
                 smartToast('Thêm tài khoản mới thành công!');
             }
             setIsModalOpen(false);
-            fetchData();
+            invalidateUsers();
         } catch (err) { smartToast('Lỗi: ' + err.message); } finally { setIsSaving(false); }
     };
 
@@ -112,7 +115,7 @@ export default function UserManagement() {
         if (window.confirm(`Đổi trạng thái ${user.email} thành ${newStatus}?`)) {
             const { error } = await supabase.from('profiles').update({ status: newStatus }).eq('id', user.id);
             if (error) smartToast('Lỗi: ' + error.message);
-            else fetchData();
+            else invalidateUsers();
         }
     };
 
@@ -172,7 +175,7 @@ export default function UserManagement() {
                 .eq('user_id', transferUser.id)
                 .order('assigned_date', { ascending: false });
             setAllAssignments(freshAssign || []);
-            fetchData();
+            invalidateUsers();
         } catch (err) { smartToast('Lỗi thêm dự án: ' + err.message); }
         finally { setIsTransferring(false); }
     };
@@ -192,7 +195,7 @@ export default function UserManagement() {
                 .eq('user_id', transferUser.id)
                 .order('assigned_date', { ascending: false });
             setAllAssignments(freshAssign || []);
-            fetchData();
+            invalidateUsers();
         } catch (err) { smartToast('Lỗi rút dự án: ' + err.message); }
         finally { setIsTransferring(false); }
     };

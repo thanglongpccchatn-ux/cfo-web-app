@@ -1,62 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { smartToast } from '../utils/globalToast';
 
 export default function RoleManagement() {
-    const [roles, setRoles] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-
-    const [allPermissions, setAllPermissions] = useState([]);
     const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
     const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false);
-    
-    // For Role creation/editing
     const [editingRole, setEditingRole] = useState(null);
     const [roleForm, setRoleForm] = useState({ code: '', name: '', description: '' });
-    
-    // For Permissions Matrix
     const [selectedRoleForPerm, setSelectedRoleForPerm] = useState(null);
-    const [rolePermissions, setRolePermissions] = useState([]); // array of permission_code
+    const [rolePermissions, setRolePermissions] = useState([]);
     const [isSavingPerms, setIsSavingPerms] = useState(false);
 
-    // Dynamic counts fetched from profiles
-    const [roleCounts, setRoleCounts] = useState({});
+    const queryClient = useQueryClient();
+    const invalidateRoles = () => queryClient.invalidateQueries({ queryKey: ['rolesManagement'] });
 
-    const fetchData = async () => {
-        setIsLoading(true);
-        try {
+    // ── React Query: Roles + Permissions + Counts ──
+    const { data: queryData, isLoading } = useQuery({
+        queryKey: ['rolesManagement'],
+        queryFn: async () => {
             const [rolesRes, permsRes, profilesRes] = await Promise.all([
                 supabase.from('roles').select('*').order('code', { ascending: true }),
                 supabase.from('permissions').select('*').order('module', { ascending: true }),
                 supabase.from('profiles').select('role_code')
             ]);
-
             if (rolesRes.error) throw rolesRes.error;
-            setRoles(rolesRes.data || []);
-            
-            if (permsRes.error) {
-                console.warn("Permissions table might not exist yet:", permsRes.error);
-            } else {
-                setAllPermissions(permsRes.data || []);
-            }
-
-            // Đếm số user theo role_code
             const counts = {};
             (profilesRes.data || []).forEach(p => {
                 if (p.role_code) counts[p.role_code] = (counts[p.role_code] || 0) + 1;
             });
-            setRoleCounts(counts);
-        } catch (error) {
-            console.error('Error fetching data:', error);
-            smartToast('Không thể tải dữ liệu vai trò/quyền hạn.');
-        } finally {
-            setIsLoading(false);
-        }
-    };
+            return {
+                roles: rolesRes.data || [],
+                allPermissions: permsRes.data || [],
+                roleCounts: counts
+            };
+        },
+        staleTime: 2 * 60 * 1000,
+    });
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    const roles = queryData?.roles || [];
+    const allPermissions = queryData?.allPermissions || [];
+    const roleCounts = queryData?.roleCounts || {};
 
     // --- Role CRUD ---
     const handleOpenRoleModal = (role = null) => {
@@ -86,7 +70,7 @@ export default function RoleManagement() {
                 if (error) throw error;
             }
             setIsRoleModalOpen(false);
-            fetchData();
+            invalidateRoles();
         } catch (err) {
             smartToast('Lỗi lưu vai trò: ' + err.message);
         }

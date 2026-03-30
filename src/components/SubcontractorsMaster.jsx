@@ -162,7 +162,7 @@ export default function SubcontractorsMaster() {
                         <span className="material-symbols-outlined notranslate" translate="no">upload_file</span>
                         Import Excel
                     </button>
-                    <button onClick={fetchData} className="p-2.5 bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm border border-slate-200 dark:border-slate-700 flex items-center">
+                    <button onClick={refetchAll} className="p-2.5 bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm border border-slate-200 dark:border-slate-700 flex items-center">
                         <span className="material-symbols-outlined notranslate" translate="no">refresh</span>
                     </button>
                 </div>

@@ -1,14 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { fmt } from '../utils/formatters';
 
+
 export default function InflowPlanning() {
-    const [projects, setProjects] = useState([]);
-    const [payments, setPayments] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
-    const [lastPayDates, setLastPayDates] = useState({});
     const [filterMonth, setFilterMonth] = useState('All');
     const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
     const { success, error: showError } = useToast();
@@ -23,42 +21,38 @@ export default function InflowPlanning() {
         status: 'Chờ thanh toán'
     });
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
+    const queryClient = useQueryClient();
+    const invalidateInflow = () => queryClient.invalidateQueries({ queryKey: ['inflowPlanningData'] });
+
+    // ── React Query: Projects + Payments + Last Pay Dates ──
+    const { data: queryData, isLoading: loading } = useQuery({
+        queryKey: ['inflowPlanningData'],
+        queryFn: async () => {
             const { data: projData } = await supabase.from('projects').select('*, partners!projects_partner_id_fkey(name, code)').order('created_at', { ascending: false });
             const { data: payData } = await supabase.from('payments').select(`
                 *,
                 projects ( name, code, internal_code, partners ( code ) )
             `).order('due_date', { ascending: true });
-            
-            setProjects(projData || []);
-            setPayments(payData || []);
 
+            let lastPayMap = {};
             if (payData && payData.length > 0) {
                 const ids = payData.map(s => s.id);
                 const { data: extHist } = await supabase.from('external_payment_history')
                     .select('payment_stage_id, payment_date')
                     .in('payment_stage_id', ids)
                     .order('payment_date', { ascending: false });
-                
-                const map = {};
                 if (extHist) extHist.forEach(h => { 
-                    if (!map[h.payment_stage_id]) map[h.payment_stage_id] = h.payment_date; 
+                    if (!lastPayMap[h.payment_stage_id]) lastPayMap[h.payment_stage_id] = h.payment_date; 
                 });
-                setLastPayDates(map);
             }
-        } catch (err) {
-            console.error('Error fetching data:', err);
-            showError('Lỗi tải dữ liệu');
-        } finally {
-            setLoading(false);
-        }
-    };
+            return { projects: projData || [], payments: payData || [], lastPayDates: lastPayMap };
+        },
+        staleTime: 2 * 60 * 1000,
+    });
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    const projects = queryData?.projects || [];
+    const payments = queryData?.payments || [];
+    const lastPayDates = queryData?.lastPayDates || {};
 
     const selectedProject = projects.find(p => p.id === form.projectId);
     const rawMilestones = selectedProject?.payment_schedule || [];
@@ -137,7 +131,7 @@ export default function InflowPlanning() {
 
             setShowModal(false);
             setForm({ id: null, projectId: '', stageName: '', stageType: 'Nghiệm thu', dueDate: new Date().toISOString().split('T')[0], amount: '', status: 'Chờ thanh toán' });
-            fetchData();
+            invalidateInflow();
         } catch (err) {
             showError('Lỗi: ' + err.message);
         }
@@ -149,7 +143,7 @@ export default function InflowPlanning() {
         if (delErr) showError('Lỗi xóa');
         else {
             success('Đã xóa');
-            fetchData();
+            invalidateInflow();
         }
     };
 

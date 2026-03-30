@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
 import { smartToast } from '../utils/globalToast';
@@ -23,8 +24,6 @@ const EMPTY_MATERIAL = {
 };
 
 export default function MaterialsMaster() {
-    const [materials, setMaterials] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
@@ -33,74 +32,52 @@ export default function MaterialsMaster() {
     const [editingId, setEditingId] = useState(null);
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [newMaterial, setNewMaterial] = useState(EMPTY_MATERIAL);
-
-    // Categories & Brands options
-    const [categories, setCategories] = useState([]);
-    const [brands, setBrands] = useState([]);
     const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-    const [quickAddType, setQuickAddType] = useState('BRAND'); // 'BRAND' or 'CATEGORY'
+    const [quickAddType, setQuickAddType] = useState('BRAND');
     const [quickAddValue, setQuickAddValue] = useState({ name: '', code: '' });
-    
-    // Bulk Update Form State
-    const [bulkUpdateForm, setBulkUpdateForm] = useState({
-        type: 'PERCENT_DISCOUNT', // PERCENT_DISCOUNT, PERCENT_PRICE, FIXED_PRICE_PER_KG
-        value: ''
-    });
-
-
+    const [bulkUpdateForm, setBulkUpdateForm] = useState({ type: 'PERCENT_DISCOUNT', value: '' });
 
     const materialMapping = {
-        code: "Mã VT",
-        name: "Tên vật tư",
-        category_code: "Danh mục",
-        brand: "Hãng",
-        model: "Model",
-        unit: "ĐVT",
-        base_price: "Đơn giá niêm yết",
-        discount_percentage: "Chiết khấu (%)",
-        weight_per_unit: "Trọng lượng (kg/ĐVT)",
-        min_inventory: "Tồn tối thiểu",
-        import_unit: "ĐVT Nhập",
-        import_conversion_rate: "Hệ số quy đổi nhập",
-        export_unit: "ĐVT Xuất",
-        export_conversion_rate: "Hệ số quy đổi xuất",
-        notes: "Mô tả"
+        code: "Mã VT", name: "Tên vật tư", category_code: "Danh mục", brand: "Hãng", model: "Model",
+        unit: "ĐVT", base_price: "Đơn giá niêm yết", discount_percentage: "Chiết khấu (%)",
+        weight_per_unit: "Trọng lượng (kg/ĐVT)", min_inventory: "Tồn tối thiểu",
+        import_unit: "ĐVT Nhập", import_conversion_rate: "Hệ số quy đổi nhập",
+        export_unit: "ĐVT Xuất", export_conversion_rate: "Hệ số quy đổi xuất", notes: "Mô tả"
     };
 
-    useEffect(() => {
-        fetchData();
-        fetchOptions();
-    }, []);
+    const queryClient = useQueryClient();
+    const invalidateMaterials = () => queryClient.invalidateQueries({ queryKey: ['materialsMasterData'] });
+    const invalidateOptions = () => queryClient.invalidateQueries({ queryKey: ['materialsMasterOptions'] });
 
-    const fetchData = async () => {
-        setLoading(true);
-        const { data, error } = await supabase
-            .from('materials')
-            .select('*')
-            .order('name', { ascending: true });
+    // ── React Query: Materials ──
+    const { data: materials = [], isLoading: loading } = useQuery({
+        queryKey: ['materialsMasterData'],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('materials').select('*').order('name', { ascending: true });
+            if (error) { console.error('Lỗi tải vật tư:', error); return []; }
+            return data || [];
+        },
+        staleTime: 2 * 60 * 1000,
+    });
 
-        if (error) {
-            console.error("Lỗi tải vật tư:", error);
-        } else {
-            setMaterials(data || []);
-        }
-        setLoading(false);
-    };
-
-    const fetchOptions = async () => {
-        // Fetch Categories
-        const { data: catData } = await supabase.from('material_categories').select('*').order('name');
-        setCategories(catData || []);
-
-        // Fetch Brands
-        // We use material_brands table (to be created)
-        const { data: brandData } = await supabase.from('material_brands').select('*').order('name');
-        setBrands(brandData || []);
-    };
+    // ── React Query: Categories & Brands ──
+    const { data: optionsData } = useQuery({
+        queryKey: ['materialsMasterOptions'],
+        queryFn: async () => {
+            const [catRes, brandRes] = await Promise.all([
+                supabase.from('material_categories').select('*').order('name'),
+                supabase.from('material_brands').select('*').order('name'),
+            ]);
+            return { categories: catRes.data || [], brands: brandRes.data || [] };
+        },
+        staleTime: 5 * 60 * 1000,
+    });
+    const categories = optionsData?.categories || [];
+    const brands = optionsData?.brands || [];
 
     const handleImportSuccess = (count) => {
         smartToast(`Đã import thành công ${count} vật tư!`);
-        fetchData();
+        invalidateMaterials();
     };
 
     const handleSaveManual = async (e) => {
@@ -135,7 +112,7 @@ export default function MaterialsMaster() {
             setIsManualModalOpen(false);
             setEditingId(null);
             setNewMaterial(EMPTY_MATERIAL);
-            fetchData();
+            invalidateMaterials();
         } catch (err) {
             console.error("Lỗi lưu vật tư:", err);
             smartToast("Đã xảy ra lỗi: " + err.message);
@@ -159,7 +136,7 @@ export default function MaterialsMaster() {
           setNewMaterial({ ...newMaterial, brand: quickAddValue.name });
         }
         
-        await fetchOptions();
+        await invalidateOptions();
         setIsQuickAddOpen(false);
         setQuickAddValue({ name: '', code: '' });
       } catch (err) {
@@ -195,7 +172,7 @@ export default function MaterialsMaster() {
         if (error) {
             smartToast("Không thể xóa. Vật tư này có thể đang được sử dụng.");
         } else {
-            fetchData();
+            invalidateMaterials();
         }
     };
 
@@ -257,7 +234,7 @@ export default function MaterialsMaster() {
             smartToast(`Cập nhật thành công ${updates.length} vật tư!`);
             setIsBulkUpdateModalOpen(false);
             setSelectedIds(new Set());
-            fetchData();
+            invalidateMaterials();
         }
     };
 
@@ -306,7 +283,7 @@ export default function MaterialsMaster() {
                         <span className="material-symbols-outlined notranslate text-[18px]" translate="no">upload_file</span>
                         Import Excel
                     </button>
-                    <button onClick={fetchData} className="h-10 w-10 flex items-center justify-center bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-50 border border-slate-200 dark:border-slate-700 transition-all shadow-sm">
+                    <button onClick={invalidateMaterials} className="h-10 w-10 flex items-center justify-center bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-50 border border-slate-200 dark:border-slate-700 transition-all shadow-sm">
                         <span className="material-symbols-outlined notranslate" translate="no">refresh</span>
                     </button>
                 </div>

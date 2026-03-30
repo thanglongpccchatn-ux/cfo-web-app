@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { smartToast } from '../utils/globalToast';
@@ -6,62 +7,47 @@ import { fmt, fmtDatePadded as formatDate, formatVND as formatCurrency } from '.
 
 export default function VariationsManagement() {
     const { profile, hasPermission: _hasPermission } = useAuth();
-    const [projects, setProjects] = useState([]);
-    const [variations, setVariations] = useState([]);
-    const [loading, setLoading] = useState(true);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const statusOptions = ['Chờ duyệt', 'Đang xử lý', 'Đã duyệt', 'Hủy'];
-
-    // Modal States
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingVar, setEditingVar] = useState(null);
     const [formData, setFormData] = useState({
-        project_id: '',
-        variation_no: '',
-        name: '',
-        proposed_value: '',
-        approved_value: '',
-        status: 'Chờ duyệt',
-        approval_date: '',
-        reason: ''
+        project_id: '', variation_no: '', name: '', proposed_value: '', approved_value: '',
+        status: 'Chờ duyệt', approval_date: '', reason: ''
     });
-
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [historyLogs, setHistoryLogs] = useState([]);
     const [selectedVarName, setSelectedVarName] = useState('');
 
-    const fetchData = React.useCallback(async () => {
-        setLoading(true);
-        try {
-            const { data: projData, error: projError } = await supabase.from('projects').select('id, name, code, internal_code, vat_percentage').order('created_at', { ascending: false });
-            if (projError) console.error("Error fetching projects:", projError);
-            
-            const { data: varData, error: varError } = await supabase.from('contract_variations').select(`*, projects (name, code, internal_code)`).order('created_at', { ascending: false });
-            if (varError) console.error("Error fetching variations:", varError);
-            
-            setProjects(projData || []);
-            setVariations(varData || []);
-        } catch (error) {
-            console.error('Error fetching variations data:', error);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+    const queryClient = useQueryClient();
+    const invalidateVariations = () => queryClient.invalidateQueries({ queryKey: ['variationsData'] });
 
+    // Realtime subscription
     useEffect(() => {
-        fetchData();
-        // Set up real-time subscription for variations
         const subscription = supabase
             .channel('public:contract_variations')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'contract_variations' }, _payload => {
-                fetchData();
-            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'contract_variations' }, () => invalidateVariations())
             .subscribe();
-
         return () => supabase.removeChannel(subscription);
-    }, [fetchData]);
+    }, []);
+
+    // ── React Query: Projects + Variations ──
+    const { data: queryData, isLoading: loading } = useQuery({
+        queryKey: ['variationsData'],
+        queryFn: async () => {
+            const [projRes, varRes] = await Promise.all([
+                supabase.from('projects').select('id, name, code, internal_code, vat_percentage').order('created_at', { ascending: false }),
+                supabase.from('contract_variations').select('*, projects (name, code, internal_code)').order('created_at', { ascending: false }),
+            ]);
+            return { projects: projRes.data || [], variations: varRes.data || [] };
+        },
+        staleTime: 2 * 60 * 1000,
+    });
+
+    const projects = queryData?.projects || [];
+    const variations = queryData?.variations || [];
 
     const handleProjectSelection = (e) => {
         const pId = e.target.value;
@@ -180,7 +166,7 @@ export default function VariationsManagement() {
             }
             
             setIsFormOpen(false);
-            fetchData();
+            invalidateVariations();
         } catch (error) {
             console.error('Lỗi lưu phát sinh:', error);
             smartToast('Có lỗi xảy ra khi lưu phát sinh');
@@ -324,7 +310,7 @@ export default function VariationsManagement() {
                             <option value="All">Trạng thái (Tất cả)</option>
                             {statusOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
-                        <button onClick={fetchData} className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 transition-all">
+                        <button onClick={invalidateVariations} className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 transition-all">
                             <span className="material-symbols-outlined block text-[18px]">refresh</span>
                         </button>
                     </div>

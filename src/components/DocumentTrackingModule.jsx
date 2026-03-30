@@ -56,8 +56,9 @@ export default function DocumentTrackingModule() {
         internalVat: '8'
     });
 
-    // ── React Query: Payments data ──
-    const { data: data = [], isLoading: loading, refetch: fetchData } = useQuery({
+    const invalidateDocTracking = () => queryClient.invalidateQueries({ queryKey: ['docTrackingPayments'] });
+
+    const { data: data = [], isLoading: loading } = useQuery({
         queryKey: ['docTrackingPayments'],
         queryFn: async () => {
             const { data: payments, error } = await supabase
@@ -180,7 +181,7 @@ export default function DocumentTrackingModule() {
             toast.success('Đã xóa hồ sơ thanh toán');
             setShowDeleteConfirm(false);
             setItemToDelete(null);
-            fetchData();
+            invalidateDocTracking();
         }
     };
 
@@ -321,7 +322,7 @@ export default function DocumentTrackingModule() {
             setShowModal(false);
             setIsEditing(false);
             setEditingId(null);
-            fetchData();
+            invalidateDocTracking();
             setForm({
                 projectId: '', paymentCode: '', stageName: '',
                 requestAmount: '', invoiceAmount: '', invoiceStatus: 'Chưa xuất',
@@ -461,7 +462,7 @@ export default function DocumentTrackingModule() {
                         </button>
                     )}
 
-                    <button onClick={fetchData} className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors text-slate-600">
+                    <button onClick={invalidateDocTracking} className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors text-slate-600">
                          <span className="material-symbols-outlined notranslate block" translate="no">refresh</span>
                     </button>
                 </div>
