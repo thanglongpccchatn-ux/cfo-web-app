@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { fmt, fmtB } from '../utils/formatters';
+import SkeletonTable from './ui/SkeletonTable';
+import { EmptyState } from './ui/SkeletonTable';
 
 const DEFAULT_DOCS = [
     { doc_type: 'bien_ban_nghiem_thu', doc_name: 'Biên bản nghiệm thu hoàn thành' },
@@ -276,16 +278,9 @@ export default function SettlementManagement() {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {isLoading ? (
-                                [1,2,3].map(i => <tr key={i} className="animate-pulse"><td colSpan={11} className="px-4 py-5"><div className="h-10 bg-slate-100 rounded-xl"></div></td></tr>)
+                                <tr><td colSpan={11}><SkeletonTable rows={5} cols={8} mode="table" /></td></tr>
                             ) : filtered.length === 0 ? (
-                                <tr><td colSpan={11} className="px-6 py-20 text-center">
-                                    <div className="flex flex-col items-center gap-3">
-                                        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
-                                            <span className="material-symbols-outlined text-4xl">gavel</span>
-                                        </div>
-                                        <p className="text-slate-500 font-bold">Chưa có dự án hoàn thành nào cần quyết toán</p>
-                                    </div>
-                                </td></tr>
+                                <tr><td colSpan={11}><EmptyState icon="gavel" title="Chưa có dự án hoàn thành" description="Các dự án đã hoàn thành sẽ hiển thị ở đây để theo dõi quyết toán" /></td></tr>
                             ) : filtered.map(p => {
                                 const isExpanded = expandedId === p.id;
                                 const isEditing = editingId === p.id;

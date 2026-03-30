@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { logAudit } from '../lib/auditLog';
 import SearchableSelect from './common/SearchableSelect';
 import { smartToast } from '../utils/globalToast';
+import SkeletonTable from './ui/SkeletonTable';
+import { EmptyState } from './ui/SkeletonTable';
 
 export default function UserManagement() {
     const { hasPermission, profile: currentProfile } = useAuth();
@@ -222,9 +224,9 @@ export default function UserManagement() {
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                             {isLoading ? (
-                                <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-500 animate-pulse">Đang tải...</td></tr>
+                                <tr><td colSpan="5"><SkeletonTable rows={5} cols={5} mode="table" /></td></tr>
                             ) : users.length === 0 ? (
-                                <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400">Chưa có người dùng</td></tr>
+                                <tr><td colSpan="5"><EmptyState icon="group" title="Chưa có người dùng" description="Thêm người dùng đầu tiên để bắt đầu quản lý nhân sự" actionLabel="Thêm người dùng" onAction={() => handleOpenModal()} /></td></tr>
                             ) : (
                                 users.map(user => (
                                     <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
