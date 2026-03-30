@@ -1,82 +1,93 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { fmt, fmtB, fmtDate } from '../utils/formatters';
+
+// ── Query functions ──
+async function fetchAllProjectsSummary() {
+    const { data: projects } = await supabase
+        .from('projects')
+        .select('*, partners!projects_partner_id_fkey(name)')
+        .order('created_at', { ascending: false });
+
+    if (!projects || projects.length === 0) return [];
+
+    const ids = projects.map(p => p.id);
+    const [stagesRes, matsRes, laborsRes, expsRes] = await Promise.all([
+        supabase.from('payments').select('project_id, payment_request_amount, external_income, due_date').in('project_id', ids),
+        supabase.from('expense_materials').select('project_id, total_amount').in('project_id', ids),
+        supabase.from('expense_labor').select('project_id, approved_amount').in('project_id', ids),
+        supabase.from('expenses').select('project_id, amount, paid_amount').in('project_id', ids),
+    ]);
+
+    const stages = stagesRes.data || [];
+    const mats = matsRes.data || [];
+    const labors = laborsRes.data || [];
+    const exps = expsRes.data || [];
+
+    return projects.map(p => {
+        const pStages = stages.filter(s => s.project_id === p.id);
+        const pMats = mats.filter(m => m.project_id === p.id);
+        const pLabors = labors.filter(l => l.project_id === p.id);
+        const pExps = exps.filter(e => e.project_id === p.id);
+
+        const contractValue = Number(p.original_value || 0);
+        const satecoRatio = Number(p.sateco_actual_ratio || p.sateco_contract_ratio || 100) / 100;
+        const plannedExpense = contractValue * satecoRatio;
+
+        const actualRevenue = pStages.reduce((s, st) => s + Number(st.external_income || 0), 0);
+        const actualMat = pMats.reduce((s, m) => s + Number(m.total_amount || 0), 0);
+        const actualLabor = pLabors.reduce((s, l) => s + Number(l.approved_amount || 0), 0);
+        const actualGenExp = pExps.reduce((s, e) => s + Number(e.paid_amount || e.amount || 0), 0);
+        const actualExpense = actualMat + actualLabor + actualGenExp;
+
+        const plannedProfit = contractValue - plannedExpense;
+        const actualProfit = actualRevenue - actualExpense;
+
+        const today = new Date(); today.setHours(0,0,0,0);
+        const overdueCount = pStages.filter(st =>
+            st.due_date && new Date(st.due_date) < today && Number(st.external_income || 0) < Number(st.payment_request_amount || 0)
+        ).length;
+
+        return {
+            ...p,
+            contractValue, plannedExpense, plannedProfit,
+            actualRevenue, actualExpense, actualProfit,
+            revPct: contractValue > 0 ? (actualRevenue / contractValue * 100) : 0,
+            expPct: plannedExpense > 0 ? (actualExpense / plannedExpense * 100) : 0,
+            stageCount: pStages.length,
+            overdueCount,
+            partner: p.partners?.name || '—',
+        };
+    });
+}
+
+async function fetchProjectDetail(projectId) {
+    const [stagesRes, matsRes, laborsRes, expsRes] = await Promise.all([
+        supabase.from('payments').select('*').eq('project_id', projectId).order('created_at'),
+        supabase.from('expense_materials').select('*').eq('project_id', projectId),
+        supabase.from('expense_labor').select('*').eq('project_id', projectId),
+        supabase.from('expenses').select('*').eq('project_id', projectId),
+    ]);
+    return {
+        stages: stagesRes.data || [],
+        materials: matsRes.data || [],
+        labors: laborsRes.data || [],
+        expenses: expsRes.data || [],
+    };
+}
 
 
 // ─────────────────────────────────────────────
 // LEVEL 1: Bảng tổng hợp tất cả dự án
 // ─────────────────────────────────────────────
 function AllProjectsSummary({ onSelect }) {
-    const [rows, setRows] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const { data: rows = [], isLoading: loading } = useQuery({
+        queryKey: ['plan-actual-summary'],
+        queryFn: fetchAllProjectsSummary,
+        staleTime: 2 * 60 * 1000,
+    });
     const [sort, setSort] = useState({ col: 'name', asc: true });
-
-    useEffect(() => { loadAll(); }, []);
-
-    async function loadAll() {
-        setLoading(true);
-        // Load projects with partner
-        const { data: projects } = await supabase
-            .from('projects')
-            .select('*, partners!projects_partner_id_fkey(name)')
-            .order('created_at', { ascending: false });
-
-        if (!projects || projects.length === 0) { setRows([]); setLoading(false); return; }
-
-        // Load all sub-data in parallel
-        const ids = projects.map(p => p.id);
-        const [stagesRes, matsRes, laborsRes, expsRes] = await Promise.all([
-            supabase.from('payments').select('project_id, payment_request_amount, external_income, due_date').in('project_id', ids),
-            supabase.from('expense_materials').select('project_id, total_amount').in('project_id', ids),
-            supabase.from('expense_labor').select('project_id, approved_amount').in('project_id', ids),
-            supabase.from('expenses').select('project_id, amount, paid_amount').in('project_id', ids),
-        ]);
-
-        const stages = stagesRes.data || [];
-        const mats = matsRes.data || [];
-        const labors = laborsRes.data || [];
-        const exps = expsRes.data || [];
-
-        const enriched = projects.map(p => {
-            const pStages = stages.filter(s => s.project_id === p.id);
-            const pMats = mats.filter(m => m.project_id === p.id);
-            const pLabors = labors.filter(l => l.project_id === p.id);
-            const pExps = exps.filter(e => e.project_id === p.id);
-
-            const contractValue = Number(p.original_value || 0);
-            const satecoRatio = Number(p.sateco_actual_ratio || p.sateco_contract_ratio || 100) / 100;
-            const plannedExpense = contractValue * satecoRatio;
-
-            const actualRevenue = pStages.reduce((s, st) => s + Number(st.external_income || 0), 0);
-            const actualMat = pMats.reduce((s, m) => s + Number(m.total_amount || 0), 0);
-            const actualLabor = pLabors.reduce((s, l) => s + Number(l.approved_amount || 0), 0);
-            const actualGenExp = pExps.reduce((s, e) => s + Number(e.paid_amount || e.amount || 0), 0);
-            const actualExpense = actualMat + actualLabor + actualGenExp;
-
-            const plannedProfit = contractValue - plannedExpense;
-            const actualProfit = actualRevenue - actualExpense;
-
-            // Overdue stages
-            const today = new Date(); today.setHours(0,0,0,0);
-            const overdueCount = pStages.filter(st =>
-                st.due_date && new Date(st.due_date) < today && Number(st.external_income || 0) < Number(st.payment_request_amount || 0)
-            ).length;
-
-            return {
-                ...p,
-                contractValue, plannedExpense, plannedProfit,
-                actualRevenue, actualExpense, actualProfit,
-                revPct: contractValue > 0 ? (actualRevenue / contractValue * 100) : 0,
-                expPct: plannedExpense > 0 ? (actualExpense / plannedExpense * 100) : 0,
-                stageCount: pStages.length,
-                overdueCount,
-                partner: p.partners?.name || '—',
-            };
-        });
-
-        setRows(enriched);
-        setLoading(false);
-    };
 
     // Sort
     const sorted = [...rows].sort((a, b) => {
@@ -242,29 +253,16 @@ function AllProjectsSummary({ onSelect }) {
 // LEVEL 2: Chi tiết từng dự án
 // ─────────────────────────────────────────────
 function ProjectDetail({ project, onBack }) {
-    const [loading, setLoading] = useState(false);
+    const { data: detailData, isLoading: loading } = useQuery({
+        queryKey: ['project-detail', project.id],
+        queryFn: () => fetchProjectDetail(project.id),
+        staleTime: 2 * 60 * 1000,
+    });
     const [activeView, setActiveView] = useState('overview');
-    const [stages, setStages] = useState([]);
-    const [materials, setMaterials] = useState([]);
-    const [labors, setLabors] = useState([]);
-    const [expenses, setExpenses] = useState([]);
-
-    useEffect(() => { loadDetail(); }, [project.id]);
-
-    async function loadDetail() {
-        setLoading(true);
-        const [stagesRes, matsRes, laborsRes, expsRes] = await Promise.all([
-            supabase.from('payments').select('*').eq('project_id', project.id).order('created_at'),
-            supabase.from('expense_materials').select('*').eq('project_id', project.id),
-            supabase.from('expense_labor').select('*').eq('project_id', project.id),
-            supabase.from('expenses').select('*').eq('project_id', project.id),
-        ]);
-        setStages(stagesRes.data || []);
-        setMaterials(matsRes.data || []);
-        setLabors(laborsRes.data || []);
-        setExpenses(expsRes.data || []);
-        setLoading(false);
-    };
+    const stages = detailData?.stages || [];
+    const materials = detailData?.materials || [];
+    const labors = detailData?.labors || [];
+    const expenses = detailData?.expenses || [];
 
     const contractValue = Number(project.original_value || 0);
     const satecoRatio = Number(project.sateco_actual_ratio || project.sateco_contract_ratio || 100) / 100;
