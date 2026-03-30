@@ -101,7 +101,7 @@ function ProtectedRoute({ children, requiredPerms = [] }) {
 }
 
 function MainLayout() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 768);
   const location = useLocation();
   const path = location.pathname.substring(1) || 'dashboard';
   const [fullscreenView, setFullscreenView] = useState({ type: null, data: null });

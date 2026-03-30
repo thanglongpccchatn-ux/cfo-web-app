@@ -507,3 +507,47 @@ h6 {
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+/* ── Mobile Table Responsive (P0) ── */
+@media (max-width: 767px) {
+  /* Wrap all tables in scrollable container */
+  .glass-panel table,
+  .bg-white table,
+  div > table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+
+  /* Ensure table headers and bodies are block for scroll */
+  .glass-panel table thead,
+  .glass-panel table tbody,
+  .bg-white table thead,
+  .bg-white table tbody {
+    display: table;
+    width: 100%;
+    min-width: 600px;
+  }
+
+  /* Touch target minimum 44px */
+  button, a, select, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Exception for inline status badges/pills */
+  select.appearance-none {
+    min-height: 28px;
+    min-width: unset;
+  }
+
+  /* Mobile font size floor */
+  .text-\[9px\], .text-\[10px\] {
+    font-size: 11px !important;
+  }
+
+  .text-\[7px\], .text-\[8px\] {
+    font-size: 10px !important;
+  }
+}
