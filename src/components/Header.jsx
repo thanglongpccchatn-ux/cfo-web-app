@@ -21,7 +21,21 @@ export default function Header({ title, subtitle, onAction, isSidebarOpen, setIs
                 </button>
                 <div>
                     <h2 className="text-base md:text-lg font-bold text-slate-900 dark:text-white truncate max-w-[150px] sm:max-w-none">{title}</h2>
-                    <p className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-[150px] sm:max-w-none">{subtitle}</p>
+                    <nav className="flex items-center gap-1 mt-0.5" aria-label="Breadcrumb">
+                        <button 
+                            onClick={() => navigate('/dashboard')} 
+                            className="text-[10px] md:text-xs text-blue-500 hover:text-blue-700 font-semibold transition-colors cursor-pointer"
+                            aria-label="Về trang tổng quan"
+                        >
+                            Tổng quan
+                        </button>
+                        {title !== 'Tổng quan Dòng tiền' && (
+                            <>
+                                <span className="material-symbols-outlined notranslate text-[10px] text-slate-300" translate="no">chevron_right</span>
+                                <span className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 truncate max-w-[120px] sm:max-w-none font-medium">{subtitle}</span>
+                            </>
+                        )}
+                    </nav>
                 </div>
             </div>
 
