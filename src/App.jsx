@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import Login from './components/Login';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
+import ModuleErrorBoundary from './components/common/ModuleErrorBoundary';
 import { applyBrandTheme, currentTheme } from './config/brand';
 import { supabase } from './lib/supabase';
 
@@ -80,15 +81,23 @@ function LoadingSpinner() {
   );
 }
 
-function ProtectedRoute({ children, requiredPerms = [] }) {
+function ProtectedRoute({ children, requiredPerms = [], moduleName }) {
   const { user, hasPermission, profile, loading } = useAuth();
+  const location = useLocation();
   
   if (loading) return <LoadingSpinner />;
   if (!user) return <Navigate to="/login" replace />;
 
   const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
   if (isAdmin || requiredPerms.length === 0 || requiredPerms.some(p => hasPermission(p))) {
-    return <Suspense fallback={<LoadingSpinner />}>{children}</Suspense>;
+    const name = moduleName || location.pathname.substring(1).replace(/_/g, ' ') || 'Module';
+    return (
+      <Suspense fallback={<LoadingSpinner />}>
+        <ModuleErrorBoundary moduleName={name} key={location.pathname}>
+          {children}
+        </ModuleErrorBoundary>
+      </Suspense>
+    );
   }
 
   return (
