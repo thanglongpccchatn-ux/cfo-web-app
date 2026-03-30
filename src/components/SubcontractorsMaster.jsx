@@ -1,17 +1,50 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
 import { useToast } from '../context/ToastContext';
 import { smartToast } from '../utils/globalToast';
 import { fmt, formatBillion } from '../utils/formatters';
 
+// ── Query functions (outside component) ──
+async function fetchSubcontractorsAggregated() {
+    const [subsRes, laborsRes] = await Promise.all([
+        supabase.from('subcontractors').select('*').order('name', { ascending: true }),
+        supabase.from('expense_labor').select('subcontractor_id, contract_value, approved_amount, paid_amount, project_id'),
+    ]);
+    if (subsRes.error) throw subsRes.error;
+
+    const map = {};
+    (subsRes.data || []).forEach(s => {
+        map[s.id] = { ...s, totalContract: 0, totalApproved: 0, totalPaid: 0, projectIds: new Set() };
+    });
+    (laborsRes.data || []).forEach(lab => {
+        if (lab.subcontractor_id && map[lab.subcontractor_id]) {
+            const subRef = map[lab.subcontractor_id];
+            subRef.totalApproved += Number(lab.approved_amount || 0);
+            subRef.totalPaid += Number(lab.paid_amount || 0);
+            if (Number(lab.contract_value) > subRef.totalContract) {
+                subRef.totalContract = Number(lab.contract_value);
+            }
+            subRef.projectIds.add(lab.project_id);
+        }
+    });
+    return Object.values(map)
+        .map(s => ({ ...s, totalDebt: s.totalApproved - s.totalPaid, projectCount: s.projectIds ? s.projectIds.size : 0 }))
+        .sort((a, b) => b.totalDebt - a.totalDebt);
+}
+
+async function fetchProjectsList() {
+    const { data, error } = await supabase.from('projects').select('id, name, code, internal_code').order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+}
+
 export default function SubcontractorsMaster() {
-    const [subcontractorsData, setSubcontractorsData] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [searchQuery, setSearchQuery] = useState('');
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [projects, setProjects] = useState([]);
     const toast = useToast();
 
     const [paymentForm, setPaymentForm] = useState({
@@ -19,7 +52,20 @@ export default function SubcontractorsMaster() {
         requestedAmount: '', approvedAmount: '', paymentDate: '', paidAmount: '', priority: 'Bình thường', notes: ''
     });
 
+    // ── React Query hooks ──
+    const { data: subcontractorsData = [], isLoading: loading } = useQuery({
+        queryKey: ['subcontractors-master'],
+        queryFn: fetchSubcontractorsAggregated,
+        staleTime: 2 * 60 * 1000,
+    });
 
+    const { data: projects = [] } = useQuery({
+        queryKey: ['projects-list'],
+        queryFn: fetchProjectsList,
+        staleTime: 5 * 60 * 1000,
+    });
+
+    const refetchAll = () => queryClient.invalidateQueries({ queryKey: ['subcontractors-master'] });
 
     // Định nghĩa cấu hình Import cho Thầu Phụ
     const subMapping = {
@@ -37,74 +83,9 @@ export default function SubcontractorsMaster() {
         notes: "Loại hình"
     };
 
-    useEffect(() => {
-        fetchData();
-        fetchProjects();
-    }, []);
-
-    async function fetchProjects() {
-        const { data } = await supabase.from('projects').select('id, name, code, internal_code').order('created_at', { ascending: false });
-        setProjects(data || []);
-    };
-
-    async function fetchData() {
-        setLoading(true);
-
-        // Lấy danh mục Thầu phụ gốc
-        const { data: subs, error: supError } = await supabase
-            .from('subcontractors')
-            .select('*')
-            .order('name', { ascending: true });
-
-        if (supError) {
-            console.error("Lỗi tải Thầu phụ:", supError);
-            setLoading(false);
-            return;
-        }
-
-        // Lấy dữ liệu labor expenses
-        const { data: labors, error } = await supabase
-            .from('expense_labor')
-            .select('subcontractor_id, contract_value, approved_amount, paid_amount, project_id');
-
-        if (error) {
-            console.error("Lỗi tải chi phí nhân công:", error);
-        }
-
-        // Aggregate 
-        const map = {};
-        (subs || []).forEach(s => {
-            map[s.id] = { ...s, totalContract: 0, totalApproved: 0, totalPaid: 0, projectIds: new Set() };
-        });
-
-        (labors || []).forEach(lab => {
-            if (lab.subcontractor_id && map[lab.subcontractor_id]) {
-                const subRef = map[lab.subcontractor_id];
-                subRef.totalApproved += Number(lab.approved_amount || 0);
-                subRef.totalPaid += Number(lab.paid_amount || 0);
-                if (Number(lab.contract_value) > subRef.totalContract) {
-                    subRef.totalContract = Number(lab.contract_value);
-                }
-                subRef.projectIds.add(lab.project_id);
-            }
-        });
-
-        const arr = Object.values(map).map(s => ({
-            ...s,
-            totalDebt: s.totalApproved - s.totalPaid,
-            projectCount: s.projectIds ? s.projectIds.size : 0
-        }));
-
-        // Sort by Debt descending
-        arr.sort((a, b) => b.totalDebt - a.totalDebt);
-
-        setSubcontractorsData(arr);
-        setLoading(false);
-    };
-
     const handleImportSuccess = (count) => {
         smartToast(`Đã import thành công ${count} thầu phụ/tổ đội!`);
-        fetchData();
+        refetchAll();
     };
 
     const handleNumChange = (field, value) => {
@@ -138,7 +119,7 @@ export default function SubcontractorsMaster() {
             toast.success('Đã ghi nhận thanh toán nhân công');
             setShowPaymentModal(false);
             setPaymentForm({ subcontractorId: '', projectId: '', paymentStage: 'Tạm ứng', contractValue: '', requestDate: new Date().toISOString().split('T')[0], requestedAmount: '', approvedAmount: '', paymentDate: '', paidAmount: '', priority: 'Bình thường', notes: '' });
-            fetchData();
+            refetchAll();
         }
     };
 
