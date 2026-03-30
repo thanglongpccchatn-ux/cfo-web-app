@@ -5,9 +5,11 @@ import SkeletonLoader from './common/SkeletonLoader';
 import MaterialTracking from './MaterialTracking';
 import LaborTracking from './LaborTracking';
 import * as drive from '../lib/googleDrive';
-import DriveFileUploader from './common/DriveFileUploader';
 import { smartToast } from '../utils/globalToast';
 import { fmt, fmtB, fmtDate } from '../utils/formatters';
+import ContractExpenseTab from './contract/ContractExpenseTab';
+import ContractAddendaTab from './contract/ContractAddendaTab';
+import ContractDriveTab from './contract/ContractDriveTab';
 
 const TABS = [
     { id: 'overview', label: 'Tổng quan Dự án', icon: 'dashboard', color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -30,10 +32,7 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
     const [selectedSubfolder, setSelectedSubfolder] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    const [newExpenseType, setNewExpenseType] = useState('Chi phí chung');
-    const [newExpenseDate, setNewExpenseDate] = useState('');
-    const [newExpenseAmount, setNewExpenseAmount] = useState('');
-    const [newExpenseNotes, setNewExpenseNotes] = useState('');
+
 
     // === Dual Ratios Logic ===
     const SATECO_CONTRACT_RATIO = project && project.sateco_contract_ratio ? parseFloat(project.sateco_contract_ratio) / 100 : 0.98;
@@ -77,25 +76,7 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
         }
     }, [project, activeTab, fetchDashboardData, fetchSubfolders]);
 
-    async function handleAddExpense() {
-        if (!newExpenseDate || !newExpenseAmount) return;
-        const { error } = await supabase.from('expenses').insert([{
-            project_id: project.id,
-            expense_type: newExpenseType,
-            expense_date: newExpenseDate,
-            amount: Number(newExpenseAmount),
-            description: newExpenseNotes
-        }]);
-        if (error) { smartToast('Lỗi khi thêm chi phí'); return; }
-        setNewExpenseDate(''); setNewExpenseAmount(''); setNewExpenseNotes('');
-        fetchDashboardData();
-    };
 
-    const handleDeleteExpense = async (id) => {
-        if (!window.confirm('Xóa chi phí này?')) return;
-        await supabase.from('expenses').delete().eq('id', id);
-        fetchDashboardData();
-    };
 
 
 
@@ -566,310 +547,16 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
 
             {/* ── Tab: Chi phí khác ── */}
             {activeTab === 'expense' && (
-                <div className="glass-panel shadow-sm border border-slate-200/60 overflow-hidden bg-white/70">
-                    <div className="p-6 border-b border-slate-200/60 bg-indigo-50/50">
-                         <h3 className="font-bold text-lg mb-2 flex items-center gap-3">
-                            <span className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-200/50">
-                                <span className="material-symbols-outlined notranslate text-[22px]" translate="no">receipt_long</span>
-                            </span>
-                            Quản lý Chi phí Khác (Chỉ ngân Sateco)
-                        </h3>
-                        <p className="text-sm font-medium text-slate-500 ml-14">Hạch toán trực tiếp vào chi phí vận hành Của Sateco tại công trường.</p>
-                    </div>
-                   
-                   <div className="p-6">
-                        <div className="flex flex-wrap items-end gap-5 mb-8 bg-white p-5 rounded-2xl shadow-card border border-slate-200/60">
-                            <div className="flex-1 min-w-[140px]">
-                                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2">Ngày</label>
-                                <input type="date" value={newExpenseDate} onChange={e => setNewExpenseDate(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all shadow-sm" />
-                            </div>
-                            <div className="flex-[1.5] min-w-[160px]">
-                                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2">Mục Chi</label>
-                                <select value={newExpenseType} onChange={e => setNewExpenseType(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all shadow-sm appearance-none">
-                                    <option>BCH công trường (VPTT, điện nước...)</option>
-                                    <option>Máy thi công & Xăng dầu</option>
-                                    <option>Nghiệm thu & Thẩm duyệt</option>
-                                    <option>Tiếp khách & Giao tế</option>
-                                    <option>Lương cứng BQL</option>
-                                    <option>Chi phí Chung (Khác)</option>
-                                </select>
-                            </div>
-                            <div className="flex-[1.5] min-w-[140px]">
-                                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2">Số tiền (VNĐ)</label>
-                                <div className="relative">
-                                    <input type="number" value={newExpenseAmount} onChange={e => setNewExpenseAmount(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pr-8 text-sm font-black text-indigo-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all shadow-sm" placeholder="0" />
-                                    <span className="absolute right-4 top-3 text-indigo-400 font-bold">₫</span>
-                                </div>
-                            </div>
-                            <div className="flex-[2] min-w-[180px]">
-                                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2">Diễn giải</label>
-                                <input type="text" value={newExpenseNotes} onChange={e => setNewExpenseNotes(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all shadow-sm" placeholder="Mô tả cụ thể khoản chi..." />
-                            </div>
-                            <button onClick={handleAddExpense} className="btn bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md shadow-indigo-500/20 px-6 py-3 h-[46px]">Hạch toán</button>
-                        </div>
-                        
-                        {expenses.length === 0 ? (
-                            <div className="text-center py-12 bg-slate-50 border border-dashed border-slate-300 rounded-2xl flex flex-col items-center">
-                                 <div className="w-16 h-16 bg-white rounded-full shadow-sm border border-slate-100 flex items-center justify-center mb-4">
-                                     <span className="material-symbols-outlined notranslate text-slate-300 text-3xl" translate="no">receipt_long</span>
-                                 </div>
-                                <p className="font-bold text-slate-600 mb-1">Chưa có khoản chi phí khác nào</p>
-                                <p className="text-xs text-slate-400">Các khoản chi nhỏ lẻ sẽ hiển thị tại đây.</p>
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto ring-1 ring-slate-200 rounded-2xl bg-white shadow-sm">
-                                <table className="w-full text-sm text-left whitespace-nowrap">
-                                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 tracking-widest uppercase font-black text-[10px]">
-                                        <tr>
-                                            <th className="px-6 py-4">Ngày ghi nhận</th>
-                                            <th className="px-6 py-4">Hạng mục chi phí</th>
-                                            <th className="px-6 py-4 w-full">Diễn giải</th>
-                                            <th className="px-6 py-4 text-right">Giá trị (VNĐ)</th>
-                                            <th className="px-6 py-4 w-16 text-center">Tác vụ</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {expenses.map(e => (
-                                            <tr key={e.id} className="hover:bg-slate-50/80 transition-colors group">
-                                                <td className="px-6 py-4 font-semibold text-slate-600">{fmtDate(e.expense_date)}</td>
-                                                <td className="px-6 py-4">
-                                                    <span className="inline-flex px-2.5 py-1 rounded bg-indigo-50 text-indigo-700 font-bold text-xs border border-indigo-100">
-                                                        {e.expense_type}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-slate-600 font-medium truncate max-w-[400px]">{e.description || '—'}</td>
-                                                <td className="px-6 py-4 text-right font-black text-indigo-600 text-[15px]">{fmt(e.amount)}</td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <button onClick={() => handleDeleteExpense(e.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all opacity-0 group-hover:opacity-100">
-                                                        <span className="material-symbols-outlined notranslate text-[18px]" translate="no">delete</span>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                    <tfoot className="bg-slate-50/80 font-black text-sm border-t-2 border-slate-200">
-                                        <tr>
-                                            <td colSpan={3} className="px-6 py-5 text-slate-600 uppercase tracking-widest text-[11px]">Tổng cộng Nhóm chi phí khác</td>
-                                            <td className="px-6 py-5 text-right text-indigo-700 text-[18px] tabular-nums">{fmt(totalGenericExpenses)}</td>
-                                            <td></td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        )}
-                   </div>
-                </div>
+                <ContractExpenseTab project={project} expenses={expenses} totalGenericExpenses={totalGenericExpenses} onRefresh={fetchDashboardData} />
             )}
 
             {/* ── Tab: Phụ lục ── */}
             {activeTab === 'addenda' && (
-                 <div className="glass-panel shadow-sm border border-slate-200/60 overflow-hidden bg-white/70">
-                    <div className="flex justify-between items-center p-6 border-b border-slate-200/60 bg-rose-50/50">
-                        <div>
-                             <h3 className="font-bold text-lg mb-1 flex items-center gap-3">
-                                <span className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600 shadow-sm border border-rose-200/50">
-                                    <span className="material-symbols-outlined notranslate text-[22px]" translate="no">post_add</span>
-                                </span>
-                                Lịch sử Phụ lục phát sinh ({addendas.length})
-                            </h3>
-                            <p className="text-sm font-medium text-slate-500 ml-14">Quản lý nâng/giảm giá trị Hợp đồng pháp lý gốc.</p>
-                        </div>
-                        <button onClick={() => onOpenFullscreen('addenda_new', project)} className="btn bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold shadow-md shadow-rose-500/20 flex items-center gap-2">
-                            <span className="material-symbols-outlined notranslate text-[18px]" translate="no">add</span> Thêm phụ lục mới
-                        </button>
-                    </div>
-                    
-                    <div className="p-8">
-                        {addendas.length === 0 ? (
-                            <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200 flex flex-col items-center">
-                                <div className="w-20 h-20 bg-slate-50 border border-slate-100 rounded-full flex items-center justify-center mb-5">
-                                    <span className="material-symbols-outlined notranslate text-5xl text-slate-300" translate="no">post_add</span>
-                                </div>
-                                <p className="font-bold text-slate-600 text-lg mb-1">Dự án chưa có phát sinh</p>
-                                <p className="text-sm text-slate-400 font-medium">Bấm "Thêm phụ lục mới" để ghi nhận biến động giá trị.</p>
-                            </div>
-                        ) : (
-                            <div className="relative">
-                                {/* Timeline line */}
-                                <div className="absolute left-[39px] top-6 bottom-6 w-0.5 bg-slate-200" />
-                                <div className="space-y-8 ml-[14px]">
-                                    {addendas.map((a, i) => (
-                                        <div key={a.id} className="relative flex items-start gap-6 group pl-[26px]">
-                                            {/* Timeline dot */}
-                                            <div className={`absolute -left-1.5 top-5 w-[22px] h-[22px] rounded-full border-[4px] border-white shadow-sm z-10 transition-transform group-hover:scale-125 ${a.status === 'Đã duyệt' ? 'bg-emerald-500' : a.status === 'Chờ duyệt' ? 'bg-orange-400' : 'bg-slate-400'}`} />
-                                            
-                                            <div className="glass-panel w-full bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                                                <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-4">
-                                                    <div>
-                                                        <div className="font-black text-lg text-slate-800 mb-0.5 flex items-center gap-2">
-                                                            <span className="text-rose-600">#{addendas.length - i}</span> Phụ lục Hợp đồng
-                                                        </div>
-                                                        <div className="text-sm font-medium text-slate-500 flex items-center gap-1.5">
-                                                            <span className="material-symbols-outlined notranslate text-[16px]" translate="no">event</span> {fmtDate(a.created_at)}
-                                                        </div>
-                                                    </div>
-                                                    <span className={`px-4 py-1.5 rounded-md text-[11px] font-black uppercase tracking-widest border ${a.status === 'Đã duyệt' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : a.status === 'Chờ duyệt' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
-                                                        {a.status}
-                                                    </span>
-                                                </div>
-
-                                                {a.description && (
-                                                    <p className="text-sm font-medium text-slate-600 mb-5 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">{a.description}</p>
-                                                )}
-
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mt-2">
-                                                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 flex flex-col justify-center">
-                                                        <div className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">Giá trị tăng thêm (Yêu cầu)</div>
-                                                        <div className="font-black text-slate-800 text-xl">{fmt(a.requested_value)} ₫</div>
-                                                    </div>
-                                                    <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100/50 flex flex-col justify-center relative overflow-hidden">
-                                                        <div className="absolute top-0 right-0 w-16 h-16 bg-blue-100 rounded-full blur-[20px]"></div>
-                                                        <div className="text-[10px] font-black text-blue-500 mb-1 uppercase tracking-widest relative z-10">Tự động phân quỹ Sateco ({project.sateco_contract_ratio || 98}%)</div>
-                                                        <div className="font-black text-blue-700 text-xl relative z-10">{fmt(Number(a.requested_value) * SATECO_CONTRACT_RATIO)} ₫</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Summary */}
-                                <div className="mt-8 ml-[56px] bg-slate-50 rounded-2xl border border-slate-200 p-6 flex justify-between items-center shadow-sm relative overflow-hidden">
-                                     <div className="absolute top-0 right-0 w-32 h-32 bg-orange-100 rounded-full blur-[40px] -z-0"></div>
-                                    <div className="text-sm font-medium text-slate-600 relative z-10">
-                                        Đã phê duyệt <span className="font-black text-rose-600 text-lg mx-1">{approvedAddendas.length}</span> / {addendas.length} phụ lục
-                                    </div>
-                                    <div className="text-right relative z-10">
-                                        <div className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1">Tổng tiền phát sinh đã duyệt</div>
-                                        <div className="font-black text-rose-600 text-3xl tabular-nums tracking-tight">+{fmt(totalAddendasValue)} ₫</div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <ContractAddendaTab project={project} addendas={addendas} approvedAddendas={approvedAddendas} totalAddendasValue={totalAddendasValue} satecoContractRatio={SATECO_CONTRACT_RATIO} onOpenFullscreen={onOpenFullscreen} />
             )}
             {/* ── Tab: Tài liệu ── */}
             {activeTab === 'doc' && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    <div className="lg:col-span-4">
-                        <div className="glass-panel p-6 shadow-sm border border-slate-200/60 h-full">
-                            <h3 className="font-bold text-sm mb-5 flex items-center gap-2 border-b border-slate-100 pb-3">
-                                <span className="material-symbols-outlined notranslate text-emerald-500 text-[20px]" translate="no">folder_shared</span>Cấu trúc thư mục
-                            </h3>
-                            
-                            {!project.google_drive_folder_id ? (
-                                <div className="text-center py-10 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-                                    <span className="material-symbols-outlined notranslate text-slate-300 text-4xl mb-3" translate="no">link_off</span>
-                                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Chưa kết nối Drive</p>
-                                    <p className="text-[11px] text-slate-400 mt-2 px-6">Hãy cập nhật thông tin dự án để khởi tạo thư mục Drive tự động.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    {subfolders.map(f => (
-                                        <button
-                                            key={f.id}
-                                            onClick={() => setSelectedSubfolder(f)}
-                                            className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all border ${
-                                                selectedSubfolder?.id === f.id
-                                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm'
-                                                    : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50 hover:border-slate-200'
-                                            }`}
-                                        >
-                                            <span className={`material-symbols-outlined notranslate text-[20px] ${selectedSubfolder?.id === f.id ? 'filled' : ''}`}>
-                                                {selectedSubfolder?.id === f.id ? 'folder_open' : 'folder'}
-                                            </span>
-                                            <span className="text-sm font-bold truncate">{f.name}</span>
-                                            {selectedSubfolder?.id === f.id && (
-                                                <span className="material-symbols-outlined notranslate text-[16px] ml-auto animate-pulse" translate="no">chevron_right</span>
-                                            )}
-                                        </button>
-                                    ))}
-                                    
-                                    <div className="mt-8 pt-6 border-t border-slate-100">
-                                        <a 
-                                            href={`https://drive.google.com/drive/folders/${project.google_drive_folder_id}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg"
-                                        >
-                                            <img src="https://www.gstatic.com/images/branding/product/1x/drive_2020q4_48dp.png" className="w-4 h-4" alt="Drive" />
-                                            Mở toàn bộ trên Drive
-                                        </a>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    
-                    <div className="lg:col-span-8">
-                        <div className="glass-panel p-8 shadow-sm border border-slate-200/60 bg-white/40 min-h-[400px] flex flex-col items-center justify-center">
-                            {!project.google_drive_folder_id ? (
-                                <div className="text-center max-w-sm">
-                                    <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                                        <span className="material-symbols-outlined notranslate text-emerald-400 text-4xl" translate="no">add_to_drive</span>
-                                    </div>
-                                    <h3 className="text-lg font-black text-slate-800 mb-2">Khởi tạo không gian lưu trữ</h3>
-                                    <p className="text-sm text-slate-500 font-medium leading-relaxed mb-6">Bạn cần khởi tạo cấu trúc thư mục dự án trên Google Drive trước khi có thể tải tài liệu lên.</p>
-                                    <button 
-                                        onClick={() => onOpenFullscreen('contract_form', project)}
-                                        className="px-8 py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-all uppercase text-xs tracking-widest"
-                                    >
-                                        Chỉnh sửa & Kết nối Drive
-                                    </button>
-                                </div>
-                            ) : selectedSubfolder ? (
-                                <div className="w-full h-full flex flex-col">
-                                    <div className="mb-8 flex items-center gap-4">
-                                        <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-200/50">
-                                            <span className="material-symbols-outlined notranslate text-[28px]" translate="no">upload_file</span>
-                                        </div>
-                                        <div>
-                                            <h3 className="text-xl font-black text-slate-800 tracking-tight">Tải tài liệu lên</h3>
-                                            <p className="text-sm font-medium text-slate-500">
-                                                Tài liệu sẽ được đưa vào thư mục <span className="text-emerald-600 font-bold">"{selectedSubfolder.name}"</span>
-                                            </p>
-                                        </div>
-                                    </div>
-                                    
-                                    <DriveFileUploader 
-                                        parentId={selectedSubfolder.id} 
-                                        folderName={selectedSubfolder.name}
-                                        onUploadSuccess={() => {
-                                            // Optional: Show a success toast or message
-                                            // Upload success
-                                        }}
-                                    />
-                                    
-                                    <div className="mt-12 p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <div className="w-1.5 h-6 bg-emerald-500 rounded-full"></div>
-                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Hướng dẫn</h4>
-                                        </div>
-                                        <ul className="space-y-3">
-                                            {[
-                                                'Chọn thư mục đích bên tay trái (Hợp đồng, Bản vẽ...).',
-                                                'Kéo thả file hoặc nhấn vào vùng tải lên để chọn tài liệu.',
-                                                'Hỗ trợ tất cả định dạng file (PDF, Excel, Ảnh, Bản vẽ...).',
-                                                'File sau khi tải lên sẽ khả dụng ngay lập tức cho tất cả nhân sự có quyền truy cập.'
-                                            ].map((text, i) => (
-                                                <li key={i} className="flex gap-3 text-sm font-medium text-slate-600">
-                                                    <span className="text-emerald-500 font-black">{i + 1}.</span>
-                                                    {text}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="text-center">
-                                    <div className="animate-spin w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-                                    <p className="text-sm font-bold text-slate-500">Đang tải cấu trúc thư mục...</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                <ContractDriveTab project={project} subfolders={subfolders} selectedSubfolder={selectedSubfolder} onSelectSubfolder={setSelectedSubfolder} onOpenFullscreen={onOpenFullscreen} />
             )}
         </div>
     );
