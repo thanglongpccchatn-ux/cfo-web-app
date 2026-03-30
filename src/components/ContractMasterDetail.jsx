@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import ContractDetailedDashboard from './ContractDetailedDashboard';
@@ -85,8 +85,10 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
         }
     };
 
+    const invalidateContracts = () => queryClient.invalidateQueries({ queryKey: ['contractsData'] });
+
     // ── React Query: Single query for all contract data ──
-    const { data: rawData, isLoading: loading, refetch: fetchProjects } = useQuery({
+    const { data: rawData, isLoading: loading } = useQuery({
         queryKey: ['contractsData'],
         queryFn: async () => {
             const [projRes, addRes, pmtRes] = await Promise.all([
@@ -247,7 +249,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
 
     const handleImportSuccess = (count) => {
         toast.success(`Đã import thành công ${count} dự án!`);
-        fetchProjects();
+        invalidateContracts();
     };
 
     const [signatureFilter, setSignatureFilter] = useState('All');
@@ -337,7 +339,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
             <ContractDetailedDashboard
                 project={selectedProject}
                 isInternalView={isInternalView}
-                onBack={() => { setView('list'); fetchProjects(); }}
+                onBack={() => { setView('list'); invalidateContracts(); }}
                 onOpenFullscreen={onOpenFullscreen}
             />
         );
@@ -495,7 +497,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                         </select>
 
                         <button 
-                            onClick={fetchProjects}
+                            onClick={invalidateContracts}
                             className="p-2 md:p-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 transition-all shadow-sm active:scale-95 flex-shrink-0"
                         >
                             <span className="material-symbols-outlined notranslate block text-[18px] md:text-[24px]" translate="no">refresh</span>
