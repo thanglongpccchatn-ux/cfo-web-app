@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useInventory } from '../../context/InventoryContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import SkeletonTable from '../ui/SkeletonTable';
 
 const STATUS_CONFIG = {
     'DRAFT':       { label: 'Nháp',         color: 'bg-slate-100 text-slate-600 border-slate-200',   icon: 'edit_note',      step: 0 },
@@ -113,7 +114,7 @@ export default function InventoryRequestList({ onCreateNew }) {
     const canApproveL1 = roleCode === 'ROLE07' || roleCode === 'ROLE01';
     const canApproveL2 = roleCode === 'ROLE04' || roleCode === 'ROLE01';
 
-    if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Đang tải danh sách đề nghị...</div>;
+    if (loading) return <SkeletonTable rows={4} cols={5} mode="card" />;
 
     return (
         <div className="space-y-5 animate-fade-in">

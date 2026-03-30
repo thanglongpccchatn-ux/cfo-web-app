@@ -5,6 +5,7 @@ import ExcelImportModal from './ExcelImportModal';
 import { useToast } from '../context/ToastContext';
 import { smartToast } from '../utils/globalToast';
 import { fmt, formatBillion } from '../utils/formatters';
+import SkeletonTable from './ui/SkeletonTable';
 
 // ── Query functions (outside component) ──
 async function fetchSubcontractorsAggregated() {
@@ -133,7 +134,7 @@ export default function SubcontractorsMaster() {
     const globalTotalDebt = globalTotalApproved - globalTotalPaid;
 
     if (loading) {
-        return <div className="p-12 text-center text-slate-500 animate-pulse">Đang tải dữ liệu Sổ cái Thầu phụ...</div>;
+        return <SkeletonTable rows={5} cols={6} />;
     }
 
     return (

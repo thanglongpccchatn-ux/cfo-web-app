@@ -7,6 +7,7 @@ import MaterialTracking from './MaterialTracking';
 import { smartToast } from '../utils/globalToast';
 import { fmt, formatBillion } from '../utils/formatters';
 import ReceiveGoodsModal from './supplier/ReceiveGoodsModal';
+import SkeletonTable from './ui/SkeletonTable';
 
 const EMPTY_LINE = () => ({ _key: Date.now() + Math.random(), materialId: '', productName: '', unit: 'Cái', quantity: '', unitPrice: '', vatRate: '8', notes: '', _showSuggestions: false });
 
@@ -275,7 +276,7 @@ export default function SuppliersMaster() {
     const globalTotalDebt = globalTotalValue - globalTotalPaid;
 
     if (loading) {
-        return <div className="p-12 text-center text-slate-500 animate-pulse">Đang tải dữ liệu Sổ cái Nhà cung cấp...</div>;
+        return <SkeletonTable rows={5} cols={7} />;
     }
 
     return (

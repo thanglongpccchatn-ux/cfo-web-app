@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { fmtDash as fmt, fmtDate, formatBillion } from '../utils/formatters';
+import SkeletonTable from './ui/SkeletonTable';
 
 // Helper functions (reused from PaymentTracking)
 function getPaymentStatus(stage, lastExternalPaymentDate) {
@@ -82,7 +83,7 @@ export default function PaymentsMaster() {
     const totalRemainingDebtSateco = totalDebtActualSateco - totalPaidSateco;
 
     if (loading && stages.length === 0) {
-        return <div className="p-12 text-center text-slate-500 animate-pulse">Đang tải dữ liệu thanh toán tổng hợp...</div>;
+        return <SkeletonTable rows={5} cols={8} />;
     }
 
     return (

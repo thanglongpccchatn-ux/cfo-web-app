@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { fmt } from '../../utils/formatters';
+import SkeletonTable from '../ui/SkeletonTable';
 
 const STATUS_MAP = {
     'ORDERED':   { label: 'Đã đặt', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: 'local_shipping' },
@@ -57,7 +58,7 @@ export default function PurchaseOrderList({ onCreateNew, onViewTab }) {
 
     const filteredPOs = pos.filter(po => filter === 'all' || po.status === filter);
 
-    if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Đang tải đơn đặt hàng...</div>;
+    if (loading) return <SkeletonTable rows={4} cols={6} />;
 
     return (
         <div className="space-y-5 animate-fade-in">

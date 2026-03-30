@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
-import { fmt } from '../../utils/formatters';
+import { fmt, formatBillion } from '../../utils/formatters';
+import SkeletonTable from '../ui/SkeletonTable';
 
 export default function SupplierDebtOverview() {
     const [expandedId, setExpandedId] = useState(null);
@@ -50,7 +51,7 @@ export default function SupplierDebtOverview() {
     const grandPaid = suppliers.reduce((s, sp) => s + sp.totalPaid, 0);
     const grandDebt = grandTotal - grandPaid;
 
-    if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Đang tải công nợ NCC...</div>;
+    if (loading) return <SkeletonTable rows={4} cols={5} />;
 
     return (
         <div className="space-y-5 animate-fade-in">
