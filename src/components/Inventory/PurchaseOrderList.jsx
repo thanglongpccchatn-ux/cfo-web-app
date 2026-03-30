@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -21,37 +22,37 @@ const fmt = (v) => v ? Number(v).toLocaleString('vi-VN') : '0';
 export default function PurchaseOrderList({ onCreateNew, onViewTab }) {
     const { profile } = useAuth();
     const { error: toastError } = useToast();
-    const [pos, setPOs] = useState([]);
-    const [approvedRequests, setApprovedRequests] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
     const [expandedId, setExpandedId] = useState(null);
 
     const canCreatePO = profile?.role_code === 'ROLE03' || profile?.role_code === 'ROLE01';
 
-    const fetchData = async () => {
-        setLoading(true);
-        const [poRes, reqRes] = await Promise.all([
-            supabase.from('purchase_orders')
-                .select('*, purchase_order_items(*), partners(name, code), projects(name, code, internal_code), po_payments(*)')
-                .order('created_at', { ascending: false }),
-            supabase.from('inventory_requests')
-                .select('id, code, project_id, notes, inventory_request_items(id, quantity, unit, product_name, material_name_manual)')
-                .eq('status', 'APPROVED')
-                .order('created_at', { ascending: false })
-        ]);
+    // ── React Query: POs + Approved Requests ──
+    const { data: queryData, isLoading: loading, refetch: fetchData } = useQuery({
+        queryKey: ['purchaseOrderList'],
+        queryFn: async () => {
+            const [poRes, reqRes] = await Promise.all([
+                supabase.from('purchase_orders')
+                    .select('*, purchase_order_items(*), partners(name, code), projects(name, code, internal_code), po_payments(*)')
+                    .order('created_at', { ascending: false }),
+                supabase.from('inventory_requests')
+                    .select('id, code, project_id, notes, inventory_request_items(id, quantity, unit, product_name, material_name_manual)')
+                    .eq('status', 'APPROVED')
+                    .order('created_at', { ascending: false })
+            ]);
 
-        if (poRes.error) console.warn('PO fetch error:', poRes.error);
-        setPOs(poRes.data || []);
+            if (poRes.error) console.warn('PO fetch error:', poRes.error);
+            const pos = poRes.data || [];
+            const poRequestIds = pos.map(po => po.request_id).filter(Boolean);
+            const approvedRequests = (reqRes.data || []).filter(r => !poRequestIds.includes(r.id));
 
-        // Filter: only show approved requests that DON'T have a PO yet
-        const poRequestIds = (poRes.data || []).map(po => po.request_id).filter(Boolean);
-        const available = (reqRes.data || []).filter(r => !poRequestIds.includes(r.id));
-        setApprovedRequests(available);
-        setLoading(false);
-    };
+            return { pos, approvedRequests };
+        },
+        staleTime: 5 * 60 * 1000,
+    });
 
-    useEffect(() => { fetchData(); }, []);
+    const pos = queryData?.pos || [];
+    const approvedRequests = queryData?.approvedRequests || [];
 
     const filteredPOs = pos.filter(po => filter === 'all' || po.status === filter);
 

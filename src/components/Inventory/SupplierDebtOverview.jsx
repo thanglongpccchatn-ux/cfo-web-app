@@ -1,53 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 
 const fmt = (v) => v ? Number(v).toLocaleString('vi-VN') : '0';
 
 export default function SupplierDebtOverview() {
-    const [suppliers, setSuppliers] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState(null);
     const [search, setSearch] = useState('');
 
-    const fetchData = async () => {
-        setLoading(true);
+    // ── React Query: Supplier debt data ──
+    const { data: suppliers = [], isLoading: loading } = useQuery({
+        queryKey: ['supplierDebtOverview'],
+        queryFn: async () => {
+            const { data: poData, error } = await supabase
+                .from('purchase_orders')
+                .select('*, partners(id, code, name), projects(name, code, internal_code), purchase_order_items(quantity_ordered, quantity_received, unit_price, material_name), po_payments(amount, payment_date)')
+                .neq('status', 'CANCELLED')
+                .order('created_at', { ascending: false });
 
-        // Get all POs with their payments grouped by supplier
-        const { data: poData, error } = await supabase
-            .from('purchase_orders')
-            .select('*, partners(id, code, name), projects(name, code, internal_code), purchase_order_items(quantity_ordered, quantity_received, unit_price, material_name), po_payments(amount, payment_date)')
-            .neq('status', 'CANCELLED')
-            .order('created_at', { ascending: false });
+            if (error) { console.warn('Supplier debt fetch error:', error); return []; }
 
-        if (error) { console.warn('Supplier debt fetch error:', error); setLoading(false); return; }
+            const supplierMap = {};
+            (poData || []).forEach(po => {
+                const sid = po.supplier_id;
+                if (!sid) return;
+                if (!supplierMap[sid]) {
+                    supplierMap[sid] = {
+                        id: sid,
+                        name: po.partners?.name || 'N/A',
+                        code: po.partners?.code || '',
+                        pos: [],
+                        totalAmount: 0,
+                        totalPaid: 0,
+                    };
+                }
+                const totalPaid = (po.po_payments || []).reduce((s, p) => s + Number(p.amount || 0), 0);
+                supplierMap[sid].pos.push({ ...po, paid: totalPaid });
+                supplierMap[sid].totalAmount += Number(po.total_amount || 0);
+                supplierMap[sid].totalPaid += totalPaid;
+            });
 
-        // Group by supplier
-        const supplierMap = {};
-        (poData || []).forEach(po => {
-            const sid = po.supplier_id;
-            if (!sid) return;
-            if (!supplierMap[sid]) {
-                supplierMap[sid] = {
-                    id: sid,
-                    name: po.partners?.name || 'N/A',
-                    code: po.partners?.code || '',
-                    pos: [],
-                    totalAmount: 0,
-                    totalPaid: 0,
-                };
-            }
-            const totalPaid = (po.po_payments || []).reduce((s, p) => s + Number(p.amount || 0), 0);
-            supplierMap[sid].pos.push({ ...po, paid: totalPaid });
-            supplierMap[sid].totalAmount += Number(po.total_amount || 0);
-            supplierMap[sid].totalPaid += totalPaid;
-        });
-
-        const sorted = Object.values(supplierMap).sort((a, b) => (b.totalAmount - b.totalPaid) - (a.totalAmount - a.totalPaid));
-        setSuppliers(sorted);
-        setLoading(false);
-    };
-
-    useEffect(() => { fetchData(); }, []);
+            return Object.values(supplierMap).sort((a, b) => (b.totalAmount - b.totalPaid) - (a.totalAmount - a.totalPaid));
+        },
+        staleTime: 5 * 60 * 1000,
+    });
 
     const filtered = suppliers.filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || (s.code && s.code.toLowerCase().includes(search.toLowerCase())));
 

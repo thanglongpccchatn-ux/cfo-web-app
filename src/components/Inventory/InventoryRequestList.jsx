@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useInventory } from '../../context/InventoryContext';
 import { useAuth } from '../../context/AuthContext';
@@ -43,8 +44,6 @@ export default function InventoryRequestList({ onCreateNew }) {
     const { approveRequestL1, approveRequestL2, rejectRequest } = useInventory();
     const { profile } = useAuth();
     const { success, error: toastError } = useToast();
-    const [requests, setRequests] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState('all');
     const [expandedId, setExpandedId] = useState(null);
     const [rejectModalId, setRejectModalId] = useState(null);
@@ -53,28 +52,27 @@ export default function InventoryRequestList({ onCreateNew }) {
 
     const roleCode = profile?.role_code;
 
-    const fetchRequests = async () => {
-        setLoading(true);
-        const { data, error: err } = await supabase
-            .from('inventory_requests')
-            .select('*, inventory_request_items(*), projects(name, code, internal_code), creator:profiles!inventory_requests_created_by_fkey(full_name), approver_l1:profiles!inventory_requests_approved_by_l1_fkey(full_name), approver_l2:profiles!inventory_requests_approved_by_l2_fkey(full_name)')
-            .order('created_at', { ascending: false });
-        
-        if (err) {
-            console.warn('Fetch requests error:', err);
-            // Fallback: simple fetch without joins
-            const { data: simpleData } = await supabase
+    // ── React Query: Inventory Requests ──
+    const { data: requests = [], isLoading: loading, refetch: fetchRequests } = useQuery({
+        queryKey: ['inventoryRequestList'],
+        queryFn: async () => {
+            const { data, error: err } = await supabase
                 .from('inventory_requests')
-                .select('*, inventory_request_items(*)')
+                .select('*, inventory_request_items(*), projects(name, code, internal_code), creator:profiles!inventory_requests_created_by_fkey(full_name), approver_l1:profiles!inventory_requests_approved_by_l1_fkey(full_name), approver_l2:profiles!inventory_requests_approved_by_l2_fkey(full_name)')
                 .order('created_at', { ascending: false });
-            setRequests(simpleData || []);
-        } else {
-            setRequests(data || []);
-        }
-        setLoading(false);
-    };
-
-    useEffect(() => { fetchRequests(); }, []);
+            
+            if (err) {
+                console.warn('Fetch requests error:', err);
+                const { data: simpleData } = await supabase
+                    .from('inventory_requests')
+                    .select('*, inventory_request_items(*)')
+                    .order('created_at', { ascending: false });
+                return simpleData || [];
+            }
+            return data || [];
+        },
+        staleTime: 5 * 60 * 1000,
+    });
 
     const handleApproveL1 = async (id) => {
         setProcessing(true);
