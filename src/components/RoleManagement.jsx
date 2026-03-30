@@ -80,7 +80,7 @@ export default function RoleManagement() {
         if(window.confirm(`Bạn có chắc chắn muốn xóa vai trò ${code}?`)) {
             const { error } = await supabase.from('roles').delete().eq('code', code);
             if(error) smartToast('Lỗi xóa vai trò: ' + error.message);
-            else fetchData();
+            else invalidateRoles();
         }
     };
 
