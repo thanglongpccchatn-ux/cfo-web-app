@@ -164,6 +164,7 @@ function MainLayout() {
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden font-sans relative">
+      <a href="#main-content" className="skip-to-content">Bỏ qua đến nội dung chính</a>
       {isSidebarOpen && (
         <div 
           className="md:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-30 transition-opacity"
@@ -182,7 +183,7 @@ function MainLayout() {
           subtitle={subtitle}
         />
 
-        <div className="flex-1 overflow-y-auto p-3 md:p-6 scroll-smooth">
+        <div id="main-content" role="main" className="flex-1 overflow-y-auto p-3 md:p-6 scroll-smooth">
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             

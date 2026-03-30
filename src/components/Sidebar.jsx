@@ -103,7 +103,8 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
                 if (window.innerWidth < 768 && setIsSidebarOpen) setIsSidebarOpen(false);
             }}
             title={!isSidebarOpen ? item.label : undefined}
-            className={({ isActive }) => `w-full flex items-center py-2 rounded-lg transition-all ${isSidebarOpen ? 'px-3 gap-2.5' : 'justify-center px-0'
+            aria-label={item.label}
+            className={({ isActive }) => `w-full flex items-center py-2 rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${isSidebarOpen ? 'px-3 gap-2.5' : 'justify-center px-0'
                 } ${isActive || (activeTab === item.id)
                     ? 'bg-primary/10 text-primary font-semibold'
                     : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white group font-medium'
@@ -170,7 +171,10 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
                             {isSidebarOpen ? (
                                 <button
                                     onClick={() => toggleGroup(group.key)}
-                                    className={`w-full flex items-center justify-between px-3 py-1.5 mb-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer ${
+                                    aria-expanded={!isCollapsed}
+                                    aria-controls={`nav-group-${group.key}`}
+                                    aria-label={`${isCollapsed ? 'Mở rộng' : 'Thu gọn'} ${group.label}`}
+                                    className={`w-full flex items-center justify-between px-3 py-1.5 mb-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
                                         hasActiveChild ? 'text-primary' : 'text-slate-400 hover:text-slate-600'
                                     }`}
                                 >
@@ -190,7 +194,7 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
 
                             {/* Group Items */}
                             {(!isCollapsed || !isSidebarOpen) && (
-                                <div className={`space-y-0.5 ${isSidebarOpen ? 'ml-0' : ''} transition-all`}>
+                                <div id={`nav-group-${group.key}`} role="group" aria-label={group.label} className={`space-y-0.5 ${isSidebarOpen ? 'ml-0' : ''} transition-all`}>
                                     {group.items.map(item => (
                                         <NavItem key={item.id} item={item} />
                                     ))}

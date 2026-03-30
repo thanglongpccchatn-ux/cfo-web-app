@@ -503,9 +503,28 @@ h6 {
 
 /* ── Focus Visible (Accessibility) ── */
 *:focus-visible {
-  outline: 2px solid var(--color-primary, #005faf);
+  outline: 2px solid var(--color-primary, #3b82f6);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* Skip-to-content link for keyboard navigation */
+.skip-to-content {
+  position: absolute;
+  top: -100%;
+  left: 16px;
+  z-index: 9999;
+  padding: 12px 24px;
+  background: #1e293b;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: 0 0 12px 12px;
+  text-decoration: none;
+  transition: top 0.2s ease;
+}
+.skip-to-content:focus {
+  top: 0;
 }
 
 /* ── Mobile Table Responsive (P0) ── */
