@@ -16,6 +16,7 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [profile, setProfile] = useState(null);
     const [permissions, setPermissions] = useState([]);
+    const [userRoles, setUserRoles] = useState([]);
     const [loading, setLoading] = useState(true);
     const isFetchingProfile = useRef(false);
 
@@ -48,6 +49,14 @@ export const AuthProvider = ({ children }) => {
                 setProfile(profileData);
             }
 
+            // Fetch all roles for this user from user_roles table
+            const { data: rolesData } = await supabase
+                .from('user_roles')
+                .select('role_code, roles:role_code(name, code)')
+                .eq('user_id', userId);
+            setUserRoles(rolesData || []);
+
+            // Permissions are aggregated from ALL roles via updated RPC
             const { data: permData } = await supabase.rpc('get_user_permissions', { p_user_id: userId });
             setPermissions(permData ? permData.map(p => p.permission_code) : []);
         } catch (error) {
@@ -84,6 +93,7 @@ export const AuthProvider = ({ children }) => {
                 setUser(null);
                 setProfile(null);
                 setPermissions([]);
+                setUserRoles([]);
             } else if (session?.user) {
                 setUser(session.user);
                 
@@ -103,10 +113,11 @@ export const AuthProvider = ({ children }) => {
     const login = (email, password) => supabase.auth.signInWithPassword({ email, password });
     const logout = () => supabase.auth.signOut();
     const hasPermission = (p) => permissions.includes(p);
+    const hasRole = (roleCode) => userRoles.some(r => r.role_code === roleCode);
     const refreshProfile = () => user && fetchUserProfileAndPermissions(user.id);
 
     return (
-        <AuthContext.Provider value={{ user, profile, permissions, loading, login, logout, hasPermission, refreshProfile }}>
+        <AuthContext.Provider value={{ user, profile, permissions, userRoles, loading, login, logout, hasPermission, hasRole, refreshProfile }}>
             {children}
         </AuthContext.Provider>
     );

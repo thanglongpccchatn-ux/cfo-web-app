@@ -13,7 +13,7 @@ export default function UserManagement() {
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
-    const [form, setForm] = useState({ full_name: '', email: '', password: '', role_code: 'GUEST', status: 'Hoạt động' });
+    const [form, setForm] = useState({ full_name: '', email: '', password: '', role_codes: [], status: 'Hoạt động' });
     const [isSaving, setIsSaving] = useState(false);
 
     // Assignment modal
@@ -61,8 +61,20 @@ export default function UserManagement() {
                 if (!assignMap[a.user_id]) assignMap[a.user_id] = [];
                 assignMap[a.user_id].push(a.project);
             });
+
+            // Fetch all user_roles
+            const { data: userRolesData } = await supabase.from('user_roles')
+                .select('user_id, role_code, roles:role_code(name, code)');
+            const userRolesMap = {};
+            (userRolesData || []).forEach(ur => {
+                if (!userRolesMap[ur.user_id]) userRolesMap[ur.user_id] = [];
+                userRolesMap[ur.user_id].push(ur);
+            });
             
-            usersData.forEach(u => { u.active_projects = assignMap[u.id] || []; });
+            usersData.forEach(u => {
+                u.active_projects = assignMap[u.id] || [];
+                u.user_roles = userRolesMap[u.id] || [];
+            });
 
             return {
                 users: usersData,
@@ -80,10 +92,11 @@ export default function UserManagement() {
     const handleOpenModal = (user = null) => {
         if (user) {
             setEditingUser(user);
-            setForm({ full_name: user.full_name || '', email: user.email || '', password: '', role_code: user.role_code || 'GUEST', status: user.status || 'Hoạt động' });
+            const existingRoleCodes = (user.user_roles || []).map(ur => ur.role_code);
+            setForm({ full_name: user.full_name || '', email: user.email || '', password: '', role_codes: existingRoleCodes.length > 0 ? existingRoleCodes : [user.role_code || 'GUEST'], status: user.status || 'Hoạt động' });
         } else {
             setEditingUser(null);
-            setForm({ full_name: '', email: '', password: '', role_code: 'GUEST', status: 'Hoạt động' });
+            setForm({ full_name: '', email: '', password: '', role_codes: ['GUEST'], status: 'Hoạt động' });
         }
         setIsModalOpen(true);
     };
@@ -92,17 +105,33 @@ export default function UserManagement() {
         e.preventDefault();
         setIsSaving(true);
         try {
+            const primaryRole = form.role_codes[0] || 'GUEST';
             if (editingUser) {
+                // Update profile (primary role)
                 const { error } = await supabase.from('profiles').update({
-                    full_name: form.full_name, role_code: form.role_code, status: form.status, updated_at: new Date().toISOString()
+                    full_name: form.full_name, role_code: primaryRole, status: form.status, updated_at: new Date().toISOString()
                 }).eq('id', editingUser.id);
                 if (error) throw error;
+
+                // Sync user_roles: delete all then re-insert
+                await supabase.from('user_roles').delete().eq('user_id', editingUser.id);
+                if (form.role_codes.length > 0) {
+                    const inserts = form.role_codes.map(rc => ({ user_id: editingUser.id, role_code: rc }));
+                    const { error: rolesErr } = await supabase.from('user_roles').insert(inserts);
+                    if (rolesErr) throw rolesErr;
+                }
                 smartToast('Cập nhật thông tin thành công!');
             } else {
                 if (!form.password || form.password.length < 6) throw new Error('Mật khẩu phải dài ít nhất 6 ký tự.');
-                const { data, error } = await supabase.rpc('admin_create_user', { p_email: form.email, p_password: form.password, p_full_name: form.full_name, p_role_code: form.role_code });
+                const { data, error } = await supabase.rpc('admin_create_user', { p_email: form.email, p_password: form.password, p_full_name: form.full_name, p_role_code: primaryRole });
                 if (error) throw error;
                 if (data && data.success === false) throw new Error(data.error || 'Lỗi tạo người dùng.');
+
+                // After creating, also insert additional roles if more than 1
+                if (data?.user_id && form.role_codes.length > 1) {
+                    const extraRoles = form.role_codes.slice(1).map(rc => ({ user_id: data.user_id, role_code: rc }));
+                    await supabase.from('user_roles').insert(extraRoles);
+                }
                 smartToast('Thêm tài khoản mới thành công!');
             }
             setIsModalOpen(false);
@@ -245,9 +274,19 @@ export default function UserManagement() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[12px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                                                {user.roles?.name || user.role_code || 'GUEST'}
-                                            </span>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {(user.user_roles && user.user_roles.length > 0) ? (
+                                                    user.user_roles.map((ur, i) => (
+                                                        <span key={i} className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[12px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                                                            {ur.roles?.name || ur.role_code}
+                                                        </span>
+                                                    ))
+                                                ) : (
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[12px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                                                        {user.roles?.name || user.role_code || 'GUEST'}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             {user.active_projects && user.active_projects.length > 0 ? (
@@ -315,11 +354,39 @@ export default function UserManagement() {
                                 </div>
                             )}
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Vai trò</label>
-                                <select value={form.role_code} onChange={e => setForm({...form, role_code: e.target.value})} className="w-full px-3 py-2.5 border rounded-xl bg-white">
-                                    <option value="GUEST">GUEST</option>
-                                    {roles.map(r => <option key={r.code} value={r.code}>{r.name} ({r.code})</option>)}
-                                </select>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Vai trò (chọn nhiều)</label>
+                                <div className="max-h-[180px] overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1 bg-slate-50">
+                                    {roles.map(r => {
+                                        const isChecked = form.role_codes.includes(r.code);
+                                        return (
+                                            <label key={r.code} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${isChecked ? 'bg-blue-50 border border-blue-200' : 'hover:bg-white border border-transparent'}`}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() => {
+                                                        setForm(prev => ({
+                                                            ...prev,
+                                                            role_codes: isChecked
+                                                                ? prev.role_codes.filter(c => c !== r.code)
+                                                                : [...prev.role_codes, r.code]
+                                                        }));
+                                                    }}
+                                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-semibold text-slate-800">{r.name}</div>
+                                                    <div className="text-[10px] text-slate-400 uppercase tracking-wider">{r.code}</div>
+                                                </div>
+                                                {form.role_codes.indexOf(r.code) === 0 && isChecked && (
+                                                    <span className="text-[9px] font-bold uppercase tracking-wider text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">Chính</span>
+                                                )}
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                                {form.role_codes.length === 0 && (
+                                    <p className="text-[11px] text-red-500 mt-1 font-medium">Phải chọn ít nhất 1 vai trò</p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Trạng thái</label>
@@ -330,7 +397,7 @@ export default function UserManagement() {
                             </div>
                             <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
                                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 rounded-xl text-slate-500 hover:bg-slate-100 font-medium">Hủy</button>
-                                <button type="submit" disabled={isSaving} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium shadow-sm active:scale-95 disabled:opacity-70 flex items-center gap-2">
+                                <button type="submit" disabled={isSaving || form.role_codes.length === 0} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium shadow-sm active:scale-95 disabled:opacity-70 flex items-center gap-2">
                                     {isSaving && <span className="material-symbols-outlined notranslate animate-spin" translate="no">sync</span>}
                                     {editingUser ? 'Lưu' : 'Tạo tài khoản'}
                                 </button>

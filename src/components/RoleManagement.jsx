@@ -19,15 +19,15 @@ export default function RoleManagement() {
     const { data: queryData, isLoading } = useQuery({
         queryKey: ['rolesManagement'],
         queryFn: async () => {
-            const [rolesRes, permsRes, profilesRes] = await Promise.all([
+            const [rolesRes, permsRes, userRolesRes] = await Promise.all([
                 supabase.from('roles').select('*').order('code', { ascending: true }),
                 supabase.from('permissions').select('*').order('module', { ascending: true }),
-                supabase.from('profiles').select('role_code')
+                supabase.from('user_roles').select('role_code')
             ]);
             if (rolesRes.error) throw rolesRes.error;
             const counts = {};
-            (profilesRes.data || []).forEach(p => {
-                if (p.role_code) counts[p.role_code] = (counts[p.role_code] || 0) + 1;
+            (userRolesRes.data || []).forEach(ur => {
+                if (ur.role_code) counts[ur.role_code] = (counts[ur.role_code] || 0) + 1;
             });
             return {
                 roles: rolesRes.data || [],
