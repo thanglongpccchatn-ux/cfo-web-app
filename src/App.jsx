@@ -12,6 +12,9 @@ import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import ModuleErrorBoundary from './components/common/ModuleErrorBoundary';
 import { applyBrandTheme, currentTheme } from './config/brand';
 import { supabase } from './lib/supabase';
+import { EventBus } from './lib/eventBus';
+import { Metrics } from './lib/metrics';
+import { destroyAuditLogger } from './lib/auditLog';
 
 // Lazy load components for code splitting & better initial load performance
 const DashboardOverview = lazy(() => import('./components/DashboardOverview'));
@@ -249,6 +252,16 @@ function AppContent() {
 
     return () => clearTimeout(timer);
   }, [loading, themeLoaded]);
+
+  // Initialize EventBus realtime bridge & cleanup on unmount
+  useEffect(() => {
+    EventBus.initRealtimeBridge();
+    return () => {
+      EventBus.destroy();
+      Metrics.destroy();
+      destroyAuditLogger();
+    };
+  }, []);
 
   useEffect(() => {
     const loadTheme = async () => {
