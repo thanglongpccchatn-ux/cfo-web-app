@@ -71,6 +71,7 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
             items: [
                 { id: 'expense_tracking', icon: 'receipt_long', label: 'Chi phí Chung', perms: ['view_expenses', 'manage_expenses'] },
                 { id: 'loans', icon: 'account_balance_wallet', label: 'Vay vốn', perms: ['view_loans', 'manage_loans'] },
+                { id: 'treasury', icon: 'monetization_on', label: 'Sổ Quỹ Tổng', perms: ['manage_treasury'] },
             ]
         },
         {

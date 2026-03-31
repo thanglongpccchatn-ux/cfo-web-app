@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
@@ -14,7 +14,6 @@ const EXPENSE_TYPES = [
 ];
 
 export default function ExpenseTracking() {
-    const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [filterProject, setFilterProject] = useState('all');
@@ -22,15 +21,21 @@ export default function ExpenseTracking() {
     const toast = useToast();
     const queryClient = useQueryClient();
 
-    const [form, setForm] = useState({
+    const emptyRow = () => ({
+        _key: Date.now() + Math.random(),
         projectId: '',
         expenseType: 'BCH công trường',
         amount: '',
         paidAmount: '',
+        requestedDate: '',
         expenseDate: new Date().toISOString().split('T')[0],
         paidDate: new Date().toISOString().split('T')[0],
+        recipientId: '',
         description: ''
     });
+
+    const [draftRows, setDraftRows] = useState([]);
+    const [editForm, setEditForm] = useState(null); // for editing existing row
 
     // ── React Query: Expenses ──
     const { data: expenses = [], isLoading: loading } = useQuery({
@@ -38,7 +43,7 @@ export default function ExpenseTracking() {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('expenses')
-                .select('*, projects(name, code)')
+                .select('*, projects(name, code, internal_code), recipient:profiles!expenses_recipient_id_fkey(full_name)')
                 .order('expense_date', { ascending: false });
             if (error) throw error;
             return data || [];
@@ -50,47 +55,78 @@ export default function ExpenseTracking() {
     const { data: projects = [] } = useQuery({
         queryKey: ['expenseProjects'],
         queryFn: async () => {
-            const { data } = await supabase.from('projects').select('id, name, code');
+            const { data } = await supabase.from('projects').select('id, name, code, internal_code');
             return data || [];
         },
         staleTime: 5 * 60 * 1000,
     });
 
-    const handleNumChange = (field, value) => {
-        const clean = value.replace(/[^0-9]/g, '');
-        setForm(prev => ({ ...prev, [field]: clean }));
+    // ── React Query: Employees ──
+    const { data: employees = [] } = useQuery({
+        queryKey: ['expenseEmployees'],
+        queryFn: async () => {
+            const { data } = await supabase.from('profiles').select('id, full_name').eq('status', 'Hoạt động').order('full_name');
+            return data || [];
+        },
+        staleTime: 5 * 60 * 1000,
+    });
+
+    const updateDraft = (key, field, value) => {
+        setDraftRows(prev => prev.map(r => r._key === key ? { ...r, [field]: value } : r));
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        const payload = {
-            project_id: form.projectId,
-            expense_type: form.expenseType,
-            amount: Number(form.amount) || 0,
-            paid_amount: Number(form.paidAmount) || 0,
-            expense_date: form.expenseDate,
-            paid_date: form.paidAmount > 0 ? (form.paidDate || form.expenseDate) : null,
-            description: form.description
-        };
+    const updateDraftNum = (key, field, value) => {
+        const clean = value.replace(/[^0-9]/g, '');
+        setDraftRows(prev => prev.map(r => r._key === key ? { ...r, [field]: clean } : r));
+    };
 
-        let err;
-        if (isEditing) {
-            const { error } = await supabase.from('expenses').update(payload).eq('id', editingId);
-            err = error;
-        } else {
-            const { error } = await supabase.from('expenses').insert([payload]);
-            err = error;
-        }
+    const removeDraft = (key) => {
+        setDraftRows(prev => prev.filter(r => r._key !== key));
+    };
 
-        if (err) {
-            toast.error('Lỗi khi lưu: ' + err.message);
+    const handleSaveAll = async () => {
+        const valid = draftRows.filter(r => r.projectId && (Number(r.amount) > 0 || Number(r.paidAmount) > 0));
+        if (valid.length === 0) { toast.warning('Không có dòng hợp lệ để lưu'); return; }
+        const payloads = valid.map(r => ({
+            project_id: r.projectId,
+            expense_type: r.expenseType,
+            amount: Number(r.amount) || 0,
+            paid_amount: Number(r.paidAmount) || 0,
+            requested_date: r.requestedDate || null,
+            expense_date: r.expenseDate,
+            paid_date: Number(r.paidAmount) > 0 ? (r.paidDate || r.expenseDate) : null,
+            recipient_id: r.recipientId || null,
+            description: r.description
+        }));
+        const { error } = await supabase.from('expenses').insert(payloads);
+        if (error) {
+            toast.error('Lỗi: ' + error.message);
         } else {
-            toast.success('Đã lưu chi phí');
-            setShowModal(false);
-            setIsEditing(false);
-            setEditingId(null);
+            toast.success(`Đã lưu ${valid.length} dòng chi phí`);
+            setDraftRows([]);
             queryClient.invalidateQueries({ queryKey: ['expenses'] });
-            setForm({ projectId: '', expenseType: 'BCH công trường', amount: '', paidAmount: '', expenseDate: new Date().toISOString().split('T')[0], paidDate: new Date().toISOString().split('T')[0], description: '' });
+        }
+    };
+
+    const handleEditSubmit = async () => {
+        if (!editForm) return;
+        const payload = {
+            project_id: editForm.projectId,
+            expense_type: editForm.expenseType,
+            amount: Number(editForm.amount) || 0,
+            paid_amount: Number(editForm.paidAmount) || 0,
+            requested_date: editForm.requestedDate || null,
+            expense_date: editForm.expenseDate,
+            paid_date: Number(editForm.paidAmount) > 0 ? (editForm.paidDate || editForm.expenseDate) : null,
+            recipient_id: editForm.recipientId || null,
+            description: editForm.description
+        };
+        const { error } = await supabase.from('expenses').update(payload).eq('id', editingId);
+        if (error) { toast.error('Lỗi: ' + error.message); }
+        else {
+            toast.success('Đã cập nhật');
+            setEditForm(null); setEditingId(null); setIsEditing(false);
+            queryClient.invalidateQueries({ queryKey: ['expenses'] });
         }
     };
 
@@ -108,6 +144,61 @@ export default function ExpenseTracking() {
 
     const filtered = expenses.filter(x => filterProject === 'all' || x.project_id === filterProject);
 
+    // ── Sort ──
+    const [sortCol, setSortCol] = useState(null);
+    const [sortDir, setSortDir] = useState('asc');
+    const handleSort = (col) => {
+        if (sortCol === col) {
+            setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortCol(col);
+            setSortDir('asc');
+        }
+    };
+    const sorted = [...filtered].sort((a, b) => {
+        if (!sortCol) return 0;
+        let va, vb;
+        switch (sortCol) {
+            case 'requested_date': va = a.requested_date || ''; vb = b.requested_date || ''; break;
+            case 'project': va = a.projects?.internal_code || a.projects?.name || ''; vb = b.projects?.internal_code || b.projects?.name || ''; break;
+            case 'expense_type': va = a.expense_type; vb = b.expense_type; break;
+            case 'amount': return sortDir === 'asc' ? a.amount - b.amount : b.amount - a.amount;
+            case 'paid_amount': return sortDir === 'asc' ? a.paid_amount - b.paid_amount : b.paid_amount - a.paid_amount;
+            case 'paid_date': va = a.paid_date || ''; vb = b.paid_date || ''; break;
+            case 'recipient': va = a.recipient?.full_name || ''; vb = b.recipient?.full_name || ''; break;
+            default: return 0;
+        }
+        return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    });
+
+    // ── Column Resize ──
+    const [colWidths, setColWidths] = useState({ requestedDate: 130, project: 100, expenseType: 130, amount: 120, paidAmount: 120, paidDate: 130, recipient: 120, description: 200, actions: 80 });
+    const resizing = useRef(null);
+    const startResize = useCallback((colKey, e) => {
+        e.preventDefault();
+        const startX = e.clientX;
+        const startW = colWidths[colKey];
+        const onMove = (ev) => {
+            const diff = ev.clientX - startX;
+            setColWidths(prev => ({ ...prev, [colKey]: Math.max(60, startW + diff) }));
+        };
+        const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    }, [colWidths]);
+
+    const cols = [
+        { key: 'requestedDate', sortKey: 'requested_date', label: 'Ngày ĐN', align: 'left' },
+        { key: 'project', sortKey: 'project', label: 'Dự án', align: 'left' },
+        { key: 'expenseType', sortKey: 'expense_type', label: 'Loại chi phí', align: 'left' },
+        { key: 'amount', sortKey: 'amount', label: 'Kế hoạch', align: 'right' },
+        { key: 'paidAmount', sortKey: 'paid_amount', label: 'Thực chi', align: 'right' },
+        { key: 'paidDate', sortKey: 'paid_date', label: 'Ngày thực chi', align: 'left' },
+        { key: 'recipient', sortKey: 'recipient', label: 'Người nhận', align: 'left' },
+        { key: 'description', sortKey: null, label: 'Ghi chú', align: 'left' },
+        { key: 'actions', sortKey: null, label: 'Thao tác', align: 'center' },
+    ];
+
 
 
     return (
@@ -117,13 +208,6 @@ export default function ExpenseTracking() {
                     <h2 className="text-2xl font-black text-slate-800">Quản lý Chi phí Chung</h2>
                     <p className="text-sm text-slate-500">Dành cho bộ phận Kế toán nội bộ, Nhân sự, Thuế</p>
                 </div>
-                <button 
-                    onClick={() => { setIsEditing(false); setShowModal(true); }}
-                    className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all"
-                >
-                    <span className="material-symbols-outlined notranslate" translate="no">add</span>
-                    Ghi nhận chi phí mới
-                </button>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -219,175 +303,127 @@ export default function ExpenseTracking() {
                 </div>
 
                 <div className="hidden xl:block overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm" style={{tableLayout:'fixed'}}>
                         <thead className="bg-slate-50 text-slate-400 font-bold text-[10px] uppercase tracking-wider">
                             <tr>
-                                <th className="px-6 py-3 text-left w-32">Ngày</th>
-                                <th className="px-6 py-3 text-left">Dự án</th>
-                                <th className="px-6 py-3 text-left">Loại chi phí</th>
-                                <th className="px-6 py-3 text-right">Kế hoạch (Phải chi)</th>
-                                <th className="px-6 py-3 text-right">Thực chi</th>
-                                <th className="px-6 py-3 text-left">Ngày thực chi</th>
-                                <th className="px-6 py-3 text-right">Thao tác</th>
+                                {cols.map(col => (
+                                    <th key={col.key} className={`px-4 py-3 text-${col.align} relative select-none group/th`} style={{width: colWidths[col.key]}}>
+                                        <span className={`cursor-pointer hover:text-slate-600 inline-flex items-center gap-0.5 ${col.sortKey ? '' : 'cursor-default'}`} onClick={() => col.sortKey && handleSort(col.sortKey)}>
+                                            {col.label}
+                                            {sortCol === col.sortKey && <span className="material-symbols-outlined text-[12px] text-indigo-500">{sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'}</span>}
+                                        </span>
+                                        <div onMouseDown={(e) => startResize(col.key, e)} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-indigo-400/40 opacity-0 group-hover/th:opacity-100 transition-opacity" />
+                                    </th>
+                                ))}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {loading ? (
-                                <tr><td colSpan={7} className="py-10 text-center text-slate-400 font-medium">Đang tải...</td></tr>
-                            ) : filtered.length === 0 ? (
-                                <tr><td colSpan={7} className="py-10 text-center text-slate-400 font-medium">Chưa có dữ liệu chi phí</td></tr>
-                            ) : filtered.map(item => (
+                                <tr><td colSpan={9} className="py-10 text-center text-slate-400 font-medium">Đang tải...</td></tr>
+                            ) : sorted.length === 0 && draftRows.length === 0 ? (
+                                <tr><td colSpan={9} className="py-10 text-center text-slate-400 font-medium">Chưa có dữ liệu chi phí</td></tr>
+                            ) : sorted.map(item => (
                                 <tr key={item.id} className="hover:bg-slate-50/50 group transition-colors">
-                                    <td className="px-6 py-4 font-medium text-slate-600 font-mono text-xs">{new Date(item.expense_date).toLocaleDateString('vi-VN')}</td>
-                                    <td className="px-6 py-4">
-                                        <p className="font-bold text-slate-800">{item.projects?.name}</p>
-                                        <p className="text-[10px] text-slate-400 uppercase font-bold">{item.projects?.code}</p>
+                                    <td className="px-4 py-3 font-mono text-xs text-slate-400">{item.requested_date ? new Date(item.requested_date).toLocaleDateString('vi-VN') : <span className="text-slate-200">—</span>}</td>
+                                    <td className="px-4 py-3">
+                                        <p className="font-bold text-slate-800 text-xs">{item.projects?.internal_code || item.projects?.name}</p>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter bg-slate-100 text-slate-600`}>
+                                    <td className="px-4 py-3">
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-slate-100 text-slate-600">
                                             {item.expense_type}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-right font-bold text-slate-700">{fmt(item.amount)}</td>
-                                    <td className="px-6 py-4 text-right font-black text-rose-600 bg-rose-50/30">{fmt(item.paid_amount)}</td>
-                                    <td className="px-6 py-4 font-mono text-xs text-slate-500">
+                                    <td className="px-4 py-3 text-right font-bold text-slate-700 text-xs">{fmt(item.amount)}</td>
+                                    <td className="px-4 py-3 text-right font-black text-rose-600 bg-rose-50/30 text-xs">{fmt(item.paid_amount)}</td>
+                                    <td className="px-4 py-3 font-mono text-[10px] text-slate-500">
                                         {item.paid_date ? new Date(item.paid_date).toLocaleDateString('vi-VN') : '—'}
                                     </td>
-                                    <td className="px-6 py-4 text-right">
+                                    <td className="px-4 py-3 text-xs text-slate-600 font-medium truncate">{item.recipient?.full_name || <span className="text-slate-200">—</span>}</td>
+                                    <td className="px-4 py-3 text-xs text-slate-500 truncate" title={item.description}>{item.description || ''}</td>
+                                    <td className="px-4 py-3 text-right">
                                         <button 
                                             onClick={() => {
                                                 setEditingId(item.id);
                                                 setIsEditing(true);
-                                                setForm({
+                                                setEditForm({
                                                     projectId: item.project_id,
                                                     expenseType: item.expense_type,
                                                     amount: String(item.amount),
                                                     paidAmount: String(item.paid_amount),
+                                                    requestedDate: item.requested_date || '',
                                                     expenseDate: item.expense_date,
                                                     paidDate: item.paid_date || item.expense_date,
+                                                    recipientId: item.recipient_id || '',
                                                     description: item.description || ''
                                                 });
-                                                setShowModal(true);
                                             }}
-                                            className="p-1 px-2 text-indigo-600 hover:bg-indigo-50 rounded-lg font-bold"
+                                            className="p-1 px-2 text-indigo-600 hover:bg-indigo-50 rounded-lg font-bold text-xs"
                                         >
                                             Sửa
                                         </button>
                                         <button 
                                             onClick={() => setDeleteConfirm(item)}
-                                            className="p-1 px-2 text-rose-600 hover:bg-rose-50 rounded-lg font-bold"
+                                            className="p-1 px-2 text-rose-600 hover:bg-rose-50 rounded-lg font-bold text-xs"
                                         >
                                             Xóa
                                         </button>
                                     </td>
                                 </tr>
                             ))}
+                            {/* Draft rows for new entries */}
+                            {draftRows.map(row => (
+                                <tr key={row._key} className="bg-indigo-50/50 border-t border-indigo-100">
+                                    <td className="px-2 py-1.5"><input type="date" value={row.requestedDate} onChange={e => updateDraft(row._key, 'requestedDate', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none" /></td>
+                                    <td className="px-2 py-1.5">
+                                        <select value={row.projectId} onChange={e => updateDraft(row._key, 'projectId', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+                                            <option value="">Chọn DA...</option>
+                                            {projects.map(p => <option key={p.id} value={p.id}>{p.internal_code || p.name}</option>)}
+                                        </select>
+                                    </td>
+                                    <td className="px-2 py-1.5">
+                                        <select value={row.expenseType} onChange={e => updateDraft(row._key, 'expenseType', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+                                            {EXPENSE_TYPES.map(t => <option key={t.value} value={t.value}>{t.value}</option>)}
+                                        </select>
+                                    </td>
+                                    <td className="px-2 py-1.5"><input placeholder="0" value={fmt(row.amount)} onChange={e => updateDraftNum(row._key, 'amount', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right font-bold focus:ring-1 focus:ring-indigo-500 outline-none" /></td>
+                                    <td className="px-2 py-1.5"><input placeholder="0" value={fmt(row.paidAmount)} onChange={e => updateDraftNum(row._key, 'paidAmount', e.target.value)} className="w-full bg-rose-50 border border-rose-200 rounded-lg px-2 py-1.5 text-xs text-right font-black text-rose-600 focus:ring-1 focus:ring-rose-500 outline-none" /></td>
+                                    <td className="px-2 py-1.5"><input type="date" value={row.paidDate} onChange={e => updateDraft(row._key, 'paidDate', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none" /></td>
+                                    <td className="px-2 py-1.5">
+                                        <select value={row.recipientId} onChange={e => updateDraft(row._key, 'recipientId', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+                                            <option value="">Chọn...</option>
+                                            {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                                        </select>
+                                    </td>
+                                    <td className="px-2 py-1.5"><input placeholder="Ghi chú..." value={row.description} onChange={e => updateDraft(row._key, 'description', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none" /></td>
+                                    <td className="px-2 py-1.5 text-center">
+                                        <button onClick={() => removeDraft(row._key)} className="p-1 text-slate-400 hover:text-rose-500 transition-colors"><span className="material-symbols-outlined text-[16px]">close</span></button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {/* + Thêm dòng + Lưu */}
+                            <tr>
+                                <td colSpan={9} className="px-4 py-2">
+                                    <div className="flex items-center gap-3">
+                                        <button onClick={() => setDraftRows(prev => [...prev, emptyRow()])} className="text-indigo-600 hover:text-indigo-800 font-bold text-xs flex items-center gap-1 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors">
+                                            <span className="material-symbols-outlined text-[16px]">add</span> Thêm dòng
+                                        </button>
+                                        {draftRows.length > 0 && (
+                                            <>
+                                                <button onClick={handleSaveAll} className="bg-indigo-600 text-white font-bold text-xs flex items-center gap-1 px-4 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
+                                                    <span className="material-symbols-outlined text-[14px]">check</span> Lưu tất cả ({draftRows.length})
+                                                </button>
+                                                <button onClick={() => setDraftRows([])} className="text-slate-400 hover:text-slate-600 font-bold text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+                                                    Hủy bỏ
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
-
-            {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowModal(false)} onKeyDown={(e) => e.key === 'Escape' && setShowModal(false)}>
-                    <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden animate-slide-up" onClick={(e) => e.stopPropagation()}>
-                        <div className="px-8 pt-8 pb-4">
-                            <h3 className="text-2xl font-black text-slate-800">{isEditing ? 'Cập nhật chi phí' : 'Ghi nhận chi phí mới'}</h3>
-                            <p className="text-slate-500 text-sm">Nhập thông tin chi phí và số tiền thực chi.</p>
-                        </div>
-                        <form onSubmit={handleSubmit} className="px-8 pb-8 space-y-4">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dự án</label>
-                                <select 
-                                    required
-                                    value={form.projectId} 
-                                    onChange={(e) => setForm({...form, projectId: e.target.value})}
-                                    className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500"
-                                >
-                                    <option value="">Chọn dự án...</option>
-                                    {projects.map(p => <option key={p.id} value={p.id}>[{p.code}] {p.name}</option>)}
-                                </select>
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Loại chi phí (Bộ phận)</label>
-                                <select 
-                                    value={form.expenseType} 
-                                    onChange={(e) => setForm({...form, expenseType: e.target.value})}
-                                    className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500"
-                                >
-                                    {EXPENSE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                                </select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ngày chi</label>
-                                    <input 
-                                        type="date" 
-                                        required
-                                        value={form.expenseDate} 
-                                        onChange={(e) => setForm({...form, expenseDate: e.target.value})}
-                                        className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Số tiền (Kế hoạch)</label>
-                                    <input 
-                                        placeholder="0"
-                                        value={fmt(form.amount)}
-                                        onChange={(e) => handleNumChange('amount', e.target.value)}
-                                        className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 font-bold"
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-rose-600 uppercase tracking-widest ml-1">Số tiền Thực chi</label>
-                                    <input 
-                                        placeholder="0"
-                                        value={fmt(form.paidAmount)}
-                                        onChange={(e) => handleNumChange('paidAmount', e.target.value)}
-                                        className="w-full bg-rose-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-rose-500 font-black text-rose-600"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ngày thực chi</label>
-                                    <input 
-                                        type="date" 
-                                        value={form.paidDate} 
-                                        onChange={(e) => setForm({...form, paidDate: e.target.value})}
-                                        className="w-full bg-rose-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-rose-500"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ghi chú</label>
-                                <input 
-                                    placeholder="Nội dung chi phí..."
-                                    value={form.description} 
-                                    onChange={(e) => setForm({...form, description: e.target.value})}
-                                    className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500"
-                                />
-                            </div>
-
-                            <div className="flex gap-3 pt-4">
-                                <button 
-                                    type="button" 
-                                    onClick={() => setShowModal(false)}
-                                    className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200"
-                                >
-                                    Hủy
-                                </button>
-                                <button 
-                                    type="submit"
-                                    className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 shadow-lg shadow-indigo-100"
-                                >
-                                    Lưu lại
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
 
             {/* Delete Confirm Modal */}
             {deleteConfirm && (

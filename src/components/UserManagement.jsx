@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -24,6 +24,13 @@ export default function UserManagement() {
     const [allAssignments, setAllAssignments] = useState([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [isTransferring, setIsTransferring] = useState(false);
+
+    // Import modal
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importData, setImportData] = useState([]);
+    const [isImporting, setIsImporting] = useState(false);
+    const [importResults, setImportResults] = useState(null);
+    const fileInputRef = useRef(null);
 
     const canTransfer = hasPermission('manage_staff_assignment') || currentProfile?.role_code === 'ROLE01';
 
@@ -148,6 +155,120 @@ export default function UserManagement() {
         }
     };
 
+    // =================== DELETE USER ===================
+    const handleDeleteUser = async (user) => {
+        if (user.id === currentProfile?.id) {
+            smartToast('Không thể xóa chính mình!');
+            return;
+        }
+        const confirmText = `Xóa vĩnh viễn "${user.full_name || user.email}"?\n\nHành động này sẽ xóa tài khoản, vai trò, và tất cả dữ liệu gán dự án. Không thể hoàn tác.`;
+        if (!window.confirm(confirmText)) return;
+
+        try {
+            // 1. Delete user_roles
+            await supabase.from('user_roles').delete().eq('user_id', user.id);
+            // 2. Delete staff_assignments
+            await supabase.from('staff_assignments').delete().eq('user_id', user.id);
+            // 3. Delete profile
+            await supabase.from('profiles').delete().eq('id', user.id);
+            // 4. Delete auth user via admin RPC
+            const { error } = await supabase.rpc('admin_delete_user', { p_user_id: user.id });
+            if (error) console.warn('Auth user deletion:', error.message);
+
+            logAudit('profiles', user.id, 'DELETE', { email: user.email, full_name: user.full_name });
+            smartToast(`Đã xóa "${user.full_name || user.email}"`);
+            invalidateUsers();
+        } catch (err) {
+            smartToast('Lỗi xóa: ' + err.message);
+        }
+    };
+
+    // =================== BULK IMPORT ===================
+    const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const text = evt.target.result;
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+            if (lines.length < 2) { smartToast('File rỗng hoặc thiếu header'); return; }
+
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            const emailIdx = headers.findIndex(h => h === 'email');
+            const nameIdx = headers.findIndex(h => h.includes('name') || h.includes('tên') || h.includes('ten') || h === 'ho_ten' || h === 'full_name');
+            const passIdx = headers.findIndex(h => h.includes('password') || h.includes('mật') || h.includes('mat_khau'));
+            const roleIdx = headers.findIndex(h => h.includes('role') || h.includes('vai'));
+
+            if (emailIdx === -1) { smartToast('Thiếu cột "email" trong file CSV'); return; }
+
+            const parsed = [];
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',').map(c => c.trim());
+                if (!cols[emailIdx]) continue;
+                parsed.push({
+                    email: cols[emailIdx],
+                    full_name: nameIdx >= 0 ? cols[nameIdx] : '',
+                    password: passIdx >= 0 ? cols[passIdx] : 'Sateco@123',
+                    role_codes: roleIdx >= 0 ? cols[roleIdx].split(';').map(r => r.trim()).filter(Boolean) : ['GUEST'],
+                    status: 'pending'
+                });
+            }
+            setImportData(parsed);
+            setImportResults(null);
+        };
+        reader.readAsText(file, 'UTF-8');
+    };
+
+    const handleBulkImport = async () => {
+        if (importData.length === 0) return;
+        setIsImporting(true);
+        const results = { success: 0, failed: 0, errors: [] };
+
+        for (let i = 0; i < importData.length; i++) {
+            const row = importData[i];
+            try {
+                const primaryRole = row.role_codes[0] || 'GUEST';
+                const { data, error } = await supabase.rpc('admin_create_user', {
+                    p_email: row.email,
+                    p_password: row.password || 'Sateco@123',
+                    p_full_name: row.full_name || row.email.split('@')[0],
+                    p_role_code: primaryRole
+                });
+                if (error) throw error;
+                if (data?.success === false) throw new Error(data.error);
+
+                // Insert additional roles
+                if (data?.user_id && row.role_codes.length > 1) {
+                    const extraRoles = row.role_codes.slice(1).map(rc => ({ user_id: data.user_id, role_code: rc }));
+                    await supabase.from('user_roles').insert(extraRoles);
+                }
+
+                importData[i].status = 'success';
+                results.success++;
+            } catch (err) {
+                importData[i].status = 'error';
+                importData[i].errorMsg = err.message;
+                results.failed++;
+                results.errors.push(`${row.email}: ${err.message}`);
+            }
+            setImportData([...importData]);
+        }
+
+        setImportResults(results);
+        setIsImporting(false);
+        if (results.success > 0) invalidateUsers();
+    };
+
+    const downloadTemplate = () => {
+        const csv = 'email,full_name,password,role_codes\nnguyen.van.a@email.com,Nguyễn Văn A,Sateco@123,ROLE06\ntran.thi.b@email.com,Trần Thị B,Sateco@123,ROLE04;ROLE05\nle.van.c@email.com,Lê Văn C,Sateco@123,KETOAN';
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'import_users_template.csv'; a.click();
+        URL.revokeObjectURL(url);
+    };
+
     // =================== ASSIGNMENT (Multi-project) ===================
     const openAssignModal = async (user) => {
         setTransferUser(user);
@@ -236,10 +357,16 @@ export default function UserManagement() {
                     <h2 className="text-2xl font-bold tracking-tight text-slate-800 dark:text-white">Quản lý người dùng</h2>
                     <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Quản lý nhân sự, phân quyền và gán dự án.</p>
                 </div>
-                <button onClick={() => handleOpenModal()} className="h-10 flex items-center gap-2 px-4 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 active:scale-95 transition-all shadow-sm">
-                    <span className="material-symbols-outlined notranslate text-[18px]" translate="no">person_add</span>
-                    Thêm người dùng
-                </button>
+                <div className="flex items-center gap-2">
+                    <button onClick={() => { setImportData([]); setImportResults(null); setShowImportModal(true); }} className="h-10 flex items-center gap-2 px-4 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 active:scale-95 transition-all shadow-sm">
+                        <span className="material-symbols-outlined notranslate text-[18px]" translate="no">upload_file</span>
+                        Import CSV
+                    </button>
+                    <button onClick={() => handleOpenModal()} className="h-10 flex items-center gap-2 px-4 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 active:scale-95 transition-all shadow-sm">
+                        <span className="material-symbols-outlined notranslate text-[18px]" translate="no">person_add</span>
+                        Thêm người dùng
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden">
@@ -317,6 +444,11 @@ export default function UserManagement() {
                                                 {canTransfer && (
                                                     <button onClick={() => openAssignModal(user)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-orange-600 hover:bg-orange-50 transition-colors" title="Gán dự án">
                                                         <span className="material-symbols-outlined notranslate text-[18px]" translate="no">swap_horiz</span>
+                                                    </button>
+                                                )}
+                                                {user.id !== currentProfile?.id && (
+                                                    <button onClick={() => handleDeleteUser(user)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Xóa">
+                                                        <span className="material-symbols-outlined notranslate text-[18px]" translate="no">delete</span>
                                                     </button>
                                                 )}
                                             </div>
@@ -512,6 +644,133 @@ export default function UserManagement() {
                         {/* Footer */}
                         <div className="px-6 py-3 border-t border-slate-100 shrink-0 flex justify-end">
                             <button onClick={() => setShowTransferModal(false)} className="px-5 py-2 rounded-xl text-slate-500 hover:bg-slate-100 font-medium text-sm">Đóng</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Import CSV */}
+            {showImportModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden animate-slide-in flex flex-col max-h-[90vh]">
+                        <div className="px-6 py-4 border-b border-slate-100 bg-emerald-50/50 shrink-0">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="font-bold text-lg text-slate-800">Import người dùng hàng loạt</h3>
+                                    <p className="text-xs text-slate-500 mt-1">Upload file CSV để tạo nhiều tài khoản cùng lúc</p>
+                                </div>
+                                <button onClick={() => setShowImportModal(false)} className="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400">
+                                    <span className="material-symbols-outlined notranslate text-[20px]" translate="no">close</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-6 space-y-5 overflow-y-auto">
+                            {/* Template + Upload */}
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <button onClick={downloadTemplate} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-medium text-sm transition-colors">
+                                    <span className="material-symbols-outlined notranslate text-[18px]" translate="no">download</span>
+                                    Tải file mẫu CSV
+                                </button>
+                                <label className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-blue-300 text-blue-700 hover:bg-blue-50 cursor-pointer font-medium text-sm transition-colors">
+                                    <span className="material-symbols-outlined notranslate text-[18px]" translate="no">upload_file</span>
+                                    {importData.length > 0 ? `${importData.length} dòng đã đọc` : 'Chọn file CSV'}
+                                    <input ref={fileInputRef} type="file" accept=".csv,.txt" onChange={handleFileUpload} className="hidden" />
+                                </label>
+                            </div>
+
+                            {/* Format guide */}
+                            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[12px] text-amber-800 space-y-1">
+                                <div className="font-bold flex items-center gap-1">
+                                    <span className="material-symbols-outlined notranslate text-[14px]" translate="no">info</span>
+                                    Định dạng CSV
+                                </div>
+                                <div><b>Cột bắt buộc:</b> email</div>
+                                <div><b>Cột tùy chọn:</b> full_name, password (mặc định: Sateco@123), role_codes</div>
+                                <div><b>Nhiều vai trò:</b> dùng dấu <code className="bg-amber-100 px-1 rounded">;</code> (ví dụ: <code className="bg-amber-100 px-1 rounded">ROLE04;ROLE05</code>)</div>
+                            </div>
+
+                            {/* Preview table */}
+                            {importData.length > 0 && (
+                                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                                    <div className="overflow-x-auto max-h-[300px]">
+                                        <table className="w-full text-left text-sm">
+                                            <thead className="bg-slate-50 sticky top-0">
+                                                <tr className="text-[10px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200">
+                                                    <th className="px-3 py-2">Email</th>
+                                                    <th className="px-3 py-2">Họ tên</th>
+                                                    <th className="px-3 py-2">Vai trò</th>
+                                                    <th className="px-3 py-2 text-center w-16">TT</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {importData.map((row, idx) => (
+                                                    <tr key={idx} className={`${row.status === 'success' ? 'bg-emerald-50' : row.status === 'error' ? 'bg-red-50' : ''}`}>
+                                                        <td className="px-3 py-2 text-[12px] font-medium text-slate-700">{row.email}</td>
+                                                        <td className="px-3 py-2 text-[12px] text-slate-600">{row.full_name || '-'}</td>
+                                                        <td className="px-3 py-2">
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {row.role_codes.map((rc, i) => (
+                                                                    <span key={i} className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">{rc}</span>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-3 py-2 text-center">
+                                                            {row.status === 'pending' && <span className="w-2 h-2 rounded-full bg-slate-300 inline-block"></span>}
+                                                            {row.status === 'success' && <span className="material-symbols-outlined notranslate text-emerald-500 text-[16px]" translate="no">check_circle</span>}
+                                                            {row.status === 'error' && (
+                                                                <span className="material-symbols-outlined notranslate text-red-500 text-[16px]" translate="no" title={row.errorMsg}>error</span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Results summary */}
+                            {importResults && (
+                                <div className={`p-4 rounded-xl border ${importResults.failed > 0 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                                    <div className="flex items-center gap-3">
+                                        <span className={`material-symbols-outlined notranslate text-[24px] ${importResults.failed > 0 ? 'text-amber-600' : 'text-emerald-600'}`} translate="no">
+                                            {importResults.failed > 0 ? 'warning' : 'task_alt'}
+                                        </span>
+                                        <div>
+                                            <div className="font-bold text-sm text-slate-800">
+                                                Thành công: {importResults.success} • Lỗi: {importResults.failed}
+                                            </div>
+                                            {importResults.errors.length > 0 && (
+                                                <div className="mt-2 space-y-1">
+                                                    {importResults.errors.map((err, i) => (
+                                                        <div key={i} className="text-[11px] text-red-600">{err}</div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-3 border-t border-slate-100 shrink-0 flex justify-between items-center">
+                            <div className="text-[11px] text-slate-400">{importData.length > 0 ? `${importData.length} tài khoản sẽ được tạo` : ''}</div>
+                            <div className="flex gap-3">
+                                <button onClick={() => setShowImportModal(false)} className="px-5 py-2 rounded-xl text-slate-500 hover:bg-slate-100 font-medium text-sm">Đóng</button>
+                                <button
+                                    onClick={handleBulkImport}
+                                    disabled={importData.length === 0 || isImporting || importResults?.success > 0}
+                                    className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-bold text-sm shadow-sm active:scale-95 disabled:opacity-50 flex items-center gap-2 transition-all"
+                                >
+                                    {isImporting ? (
+                                        <><span className="material-symbols-outlined notranslate animate-spin text-[16px]" translate="no">sync</span>Đang import...</>
+                                    ) : (
+                                        <><span className="material-symbols-outlined notranslate text-[16px]" translate="no">group_add</span>Import {importData.length} tài khoản</>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

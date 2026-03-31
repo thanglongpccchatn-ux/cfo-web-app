@@ -32,6 +32,7 @@ const PartnerManagement = lazy(() => import('./components/PartnerManagement'));
 const UserManagement = lazy(() => import('./components/UserManagement'));
 const RoleManagement = lazy(() => import('./components/RoleManagement'));
 const BankManagement = lazy(() => import('./components/BankManagement'));
+const TreasuryManagement = lazy(() => import('./components/TreasuryManagement'));
 const DocumentTrackingModule = lazy(() => import('./components/DocumentTrackingModule'));
 const PaymentReceiptsModule = lazy(() => import('./components/PaymentReceiptsModule'));
 const WarrantyTracking = lazy(() => import('./components/WarrantyTracking'));
@@ -220,6 +221,7 @@ function MainLayout() {
             <Route path="/permissions" element={<ProtectedRoute><RoleManagement /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
             <Route path="/banks" element={<ProtectedRoute><BankManagement /></ProtectedRoute>} />
+            <Route path="/treasury" element={<ProtectedRoute requiredPermission={['manage_treasury', '*']}><TreasuryManagement /></ProtectedRoute>} />
             
             {/* App Settings */}
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

@@ -59,7 +59,7 @@ export const EXPORT_CONFIGS = {
         { key: 'internal_code', label: 'Mã DA' },
         { key: 'code', label: 'Mã HĐ' },
         { key: 'name', label: 'Tên dự án' },
-        { key: item => item.partners?.short_name || item.partners?.name || '', label: 'Chủ đầu tư' },
+        { key: item => item.partners?.name || item.partners?.short_name || '', label: 'CĐT/ Tổng thầu' },
         { key: 'totalValuePreVat', label: 'Giá trị trước VAT', format: 'currency' },
         { key: 'vat_percentage', label: 'VAT (%)', format: 'number' },
         { key: 'totalValuePostVat', label: 'Giá trị sau VAT', format: 'currency' },
