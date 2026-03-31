@@ -109,7 +109,7 @@ export default function UserManagement() {
             if (editingUser) {
                 // Update profile (primary role)
                 const { error } = await supabase.from('profiles').update({
-                    full_name: form.full_name, role_code: primaryRole, status: form.status, updated_at: new Date().toISOString()
+                    full_name: form.full_name, role_code: primaryRole, status: form.status
                 }).eq('id', editingUser.id);
                 if (error) throw error;
 
