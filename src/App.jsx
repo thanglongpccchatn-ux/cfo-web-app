@@ -203,9 +203,9 @@ function MainLayout() {
             <Route path="/site_diary" element={<ProtectedRoute><SiteDiary /></ProtectedRoute>} />
             <Route path="/warranty_tracking" element={<ProtectedRoute requiredPerms={['view_contracts']}><WarrantyTracking /></ProtectedRoute>} />
             <Route path="/settlement" element={<ProtectedRoute requiredPerms={['view_contracts']}><SettlementManagement /></ProtectedRoute>} />
-            <Route path="/labor_tracking" element={<ProtectedRoute requiredPerms={['view_payments']}><LaborTracking /></ProtectedRoute>} />
-            <Route path="/material_tracking" element={<ProtectedRoute requiredPerms={['view_payments']}><MaterialTracking /></ProtectedRoute>} />
-            <Route path="/expense_tracking" element={<ProtectedRoute requiredPerms={['view_payments']}><ExpenseTracking /></ProtectedRoute>} />
+            <Route path="/labor_tracking" element={<ProtectedRoute requiredPerms={['view_labor', 'manage_labor']}><LaborTracking /></ProtectedRoute>} />
+            <Route path="/material_tracking" element={<ProtectedRoute requiredPerms={['view_materials', 'manage_materials_tracking', 'manage_materials']}><MaterialTracking /></ProtectedRoute>} />
+            <Route path="/expense_tracking" element={<ProtectedRoute requiredPerms={['view_expenses', 'manage_expenses']}><ExpenseTracking /></ProtectedRoute>} />
             
             {/* Financial & Inventory Modules */}
             <Route path="/payments" element={<ProtectedRoute requiredPerms={['view_payments']}><PaymentsMaster /></ProtectedRoute>} />
@@ -221,13 +221,13 @@ function MainLayout() {
             <Route path="/permissions" element={<ProtectedRoute><RoleManagement /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
             <Route path="/banks" element={<ProtectedRoute><BankManagement /></ProtectedRoute>} />
-            <Route path="/treasury" element={<ProtectedRoute requiredPermission={['manage_treasury', '*']}><TreasuryManagement /></ProtectedRoute>} />
+            <Route path="/treasury" element={<ProtectedRoute requiredPerms={['manage_treasury']}><TreasuryManagement /></ProtectedRoute>} />
             
             {/* App Settings */}
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
             <Route path="/guide" element={<ProtectedRoute><UserGuide /></ProtectedRoute>} />
-            <Route path="/loans" element={<ProtectedRoute requiredPerms={['view_loans']}><LoanManagement /></ProtectedRoute>} />
+            <Route path="/loans" element={<ProtectedRoute requiredPerms={['view_loans', 'manage_loans']}><LoanManagement /></ProtectedRoute>} />
             <Route path="/audit_trail" element={<ProtectedRoute requiredPerms={['manage_users']}><AuditTrailViewer /></ProtectedRoute>} />
             
             {/* Fallback */}
