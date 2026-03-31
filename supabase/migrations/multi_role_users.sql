@@ -38,7 +38,7 @@ SECURITY DEFINER
 AS $$
 BEGIN
     RETURN QUERY
-    SELECT DISTINCT rp.permission_code
+    SELECT DISTINCT rp.permission_code::TEXT
     FROM public.user_roles ur
     JOIN public.role_permissions rp ON ur.role_code = rp.role_code
     WHERE ur.user_id = p_user_id;
