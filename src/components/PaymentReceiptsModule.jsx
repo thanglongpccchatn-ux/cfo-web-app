@@ -4,9 +4,12 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { fmt } from '../utils/formatters';
 import ReceiptFormModal from './payments/ReceiptFormModal';
+import { useAuth } from '../context/AuthContext';
 
 export default function PaymentReceiptsModule() {
-    const [activeTab, setActiveTab] = useState('external');
+    const { profile } = useAuth();
+    const isKeToanNoiBo = profile?.role_code === 'KETOAN';
+    const [activeTab, setActiveTab] = useState(isKeToanNoiBo ? 'internal' : 'external');
     const [availablePayments, setAvailablePayments] = useState([]);
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -418,13 +421,15 @@ export default function PaymentReceiptsModule() {
             {/* Tabs Navigation */}
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner overflow-x-auto w-full md:w-fit scrollbar-none">
-                    <button 
-                        onClick={() => setActiveTab('external')}
-                        className={`flex items-center gap-1.5 md:gap-2 px-4 md:px-6 py-2 rounded-xl text-xs md:text-sm font-black transition-all whitespace-nowrap ${activeTab === 'external' ? 'bg-white text-orange-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                        <span className="material-symbols-outlined notranslate text-[18px] md:text-[20px]" translate="no">account_balance_wallet</span>
-                        1. Thu CĐT
-                    </button>
+                    {!isKeToanNoiBo && (
+                        <button 
+                            onClick={() => setActiveTab('external')}
+                            className={`flex items-center gap-1.5 md:gap-2 px-4 md:px-6 py-2 rounded-xl text-xs md:text-sm font-black transition-all whitespace-nowrap ${activeTab === 'external' ? 'bg-white text-orange-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <span className="material-symbols-outlined notranslate text-[18px] md:text-[20px]" translate="no">account_balance_wallet</span>
+                            1. Thu CĐT
+                        </button>
+                    )}
                     <button 
                         onClick={() => setActiveTab('internal')}
                         className={`flex items-center gap-1.5 md:gap-2 px-4 md:px-6 py-2 rounded-xl text-xs md:text-sm font-black transition-all whitespace-nowrap ${activeTab === 'internal' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
