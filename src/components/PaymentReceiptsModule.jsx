@@ -81,7 +81,7 @@ export default function PaymentReceiptsModule() {
         queryFn: async () => {
             const { data } = await supabase
                 .from('projects')
-                .select('id, code, internal_code, name, sateco_contract_ratio, acting_entity_key, partners!projects_partner_id_fkey(id, name, code, short_name)')
+                .select('id, code, internal_code, name, sateco_contract_ratio, sateco_actual_ratio, acting_entity_key, partners!projects_partner_id_fkey(id, name, code, short_name)')
                 .order('internal_code', { ascending: true });
             return data || [];
         },

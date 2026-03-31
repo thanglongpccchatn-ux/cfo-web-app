@@ -315,6 +315,29 @@ export default function ContractCreate({ onBack, project }) {
         }
         setIsSaving(true);
 
+        // ── Uniqueness Checks ──
+        if (code?.trim()) {
+            let query = supabase.from('projects').select('id, code').eq('code', code.trim());
+            if (project?.id) query = query.neq('id', project.id);
+            const { data: codeCheck } = await query;
+            if (codeCheck && codeCheck.length > 0) {
+                toast.error(`Mã Hợp đồng/Dự án "${code}" đã tồn tại trong hệ thống!`);
+                setIsSaving(false);
+                return;
+            }
+        }
+        
+        if (internalCode?.trim()) {
+            let query = supabase.from('projects').select('id, internal_code').eq('internal_code', internalCode.trim());
+            if (project?.id) query = query.neq('id', project.id);
+            const { data: internalCheck } = await query;
+            if (internalCheck && internalCheck.length > 0) {
+                toast.error(`Mã nội bộ "${internalCode}" đã tồn tại trong hệ thống!`);
+                setIsSaving(false);
+                return;
+            }
+        }
+
         await supabase.from('company_settings').upsert([
             { company_key: 'thanglong', company_name: 'CÔNG TY TNHH THĂNG LONG', bank_account: tlBank.account, bank_name: tlBank.name, bank_branch: tlBank.branch, account_holder: tlBank.holder },
             { company_key: 'thanhphat', company_name: 'CÔNG TY TNHH THÀNH PHÁT', bank_account: tpBank.account, bank_name: tpBank.name, bank_branch: tpBank.branch, account_holder: tpBank.holder },

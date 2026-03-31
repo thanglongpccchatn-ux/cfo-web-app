@@ -5,7 +5,7 @@ import PaymentHistoryRow from './PaymentHistoryRow';
 /**
  * DocTrackingMobileCard — renders a single payment item as a mobile card
  */
-function DocTrackingMobileCard({ item, activeEntity, expandedId, toggleExpansion, historyLoading, paymentHistory, hasPermission, onEdit, onDelete }) {
+function DocTrackingMobileCard({ item, activeEntity, activeTab, expandedId, toggleExpansion, historyLoading, paymentHistory, hasPermission, onEdit, onDelete, onQuickReceipt }) {
     const status = getDocStatus(item);
     const isInternalSatecoView = activeEntity === 'sateco' && (item.projects?.acting_entity_key || 'thanglong').toLowerCase() !== 'sateco';
     const invoiceAmt = isInternalSatecoView ? Number(item.internal_debt_invoice || 0) : Number(item.invoice_amount || 0);
@@ -50,6 +50,11 @@ function DocTrackingMobileCard({ item, activeEntity, expandedId, toggleExpansion
                     <div className="flex justify-between items-center mb-2">
                         <span className="text-[10px] font-black text-slate-500">LỊCH SỬ THANH TOÁN</span>
                         <div className="flex gap-1">
+                            {hasPermission('edit_payments') && activeTab !== 'cdt' && Number(item.internal_paid || 0) < Number(item.internal_debt_actual || 0) && (
+                                <button onClick={(e) => { e.stopPropagation(); onQuickReceipt(item); }} className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600" title="Chuyển tiền">
+                                    <span className="material-symbols-outlined text-[16px]">payments</span>
+                                </button>
+                            )}
                             {hasPermission('edit_payments') && (
                                 <button onClick={(e) => { e.stopPropagation(); onEdit(item); }} className="p-1.5 rounded-lg bg-blue-50 text-blue-600"><span className="material-symbols-outlined text-[16px]">edit</span></button>
                             )}
@@ -81,7 +86,7 @@ function DocTrackingMobileCard({ item, activeEntity, expandedId, toggleExpansion
 /**
  * DocTrackingDesktopRow — renders a single payment item as a desktop table row
  */
-function DocTrackingDesktopRow({ item, activeEntity, activeTab, entityShort, expandedId, toggleExpansion, historyLoading, paymentHistory, generateHistory, hasPermission, onEdit, onDelete }) {
+function DocTrackingDesktopRow({ item, activeEntity, activeTab, entityShort, expandedId, toggleExpansion, historyLoading, paymentHistory, generateHistory, hasPermission, onEdit, onDelete, onQuickReceipt }) {
     const isInternalSatecoView = activeEntity === 'sateco' && (item.projects?.acting_entity_key || 'thanglong').toLowerCase() !== 'sateco';
     const status = getDocStatus(item);
     const rawInvoiceAmt = Number(item.invoice_amount || 0);
@@ -198,31 +203,32 @@ function DocTrackingDesktopRow({ item, activeEntity, activeTab, entityShort, exp
                         const paid = Number(item.internal_paid || 0);
                         
                         const tlDebtTax = Math.max(0, targetTax - paid);
-                        const satecoDebtInternal = paid >= targetTax ? Math.max(0, paid - targetActual) : 0;
-                        const totalDebt = tlDebtTax + satecoDebtInternal;
+                        const totalDebt = Math.max(0, targetActual - paid);
 
                         return (
                             <>
                                 <td className="px-3 py-4 text-right bg-blue-50/20">
-                                    <span className={`tabular-nums font-black ${tlDebtTax > 0 ? 'text-blue-600' : 'text-slate-400'}`}>
-                                        {fmt(tlDebtTax)}
+                                    <span className={`tabular-nums font-black ${targetTax > 0 ? 'text-blue-600' : 'text-slate-400'}`}>
+                                        {fmt(targetTax)}
                                     </span>
                                 </td>
                                 <td className="px-3 py-4 text-right bg-indigo-50/20">
-                                    <span className={`tabular-nums font-black ${satecoDebtInternal > 0 ? 'text-indigo-600' : 'text-slate-400'}`}>
-                                        {fmt(satecoDebtInternal)}
+                                    <span className={`tabular-nums font-black ${targetActual > 0 ? 'text-indigo-600' : 'text-slate-400'}`}>
+                                        {fmt(targetActual)}
                                     </span>
                                 </td>
                                 <td className="px-3 py-4 text-right">
-                                    <span className={`tabular-nums font-black ${totalDebt > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
-                                        {fmt(totalDebt)}
+                                    <span className={`tabular-nums font-black ${paid > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                        {fmt(paid)}
                                     </span>
                                 </td>
                                 <td className="px-3 py-4 text-right">
-                                    <span className="tabular-nums text-emerald-600 font-black">{fmt(paid)}</span>
+                                    <span className={`tabular-nums font-black ${tlDebtTax > 0 ? 'text-rose-600' : 'text-slate-400 font-medium'}`}>
+                                        {fmt(tlDebtTax)}
+                                    </span>
                                 </td>
                                 <td className="px-3 py-4 text-right">
-                                    <span className={`tabular-nums font-black ${totalDebt > 0 ? (tlDebtTax > 0 ? 'text-rose-600' : 'text-indigo-600') : 'text-slate-400'}`}>
+                                    <span className={`tabular-nums font-black ${totalDebt > 0 ? 'text-rose-600' : 'text-slate-400 font-medium'}`}>
                                         {fmt(totalDebt)}
                                     </span>
                                 </td>
@@ -231,16 +237,27 @@ function DocTrackingDesktopRow({ item, activeEntity, activeTab, entityShort, exp
                     })()
                 )}
                 <td className="px-3 py-4 text-center">
-                    {hasPermission('edit_payments') && (<div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {hasPermission('edit_payments') && (<div className="flex items-center justify-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {activeTab !== 'cdt' && Number(item.internal_paid || 0) < Number(item.internal_debt_actual || 0) && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onQuickReceipt(item); }}
+                                className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-white flex items-center justify-center transition-all"
+                                title="Chuyển tiền"
+                            >
+                                <span className="material-symbols-outlined notranslate text-[14px]" translate="no">payments</span>
+                            </button>
+                        )}
                         <button 
                             onClick={(e) => { e.stopPropagation(); onEdit(item); }}
-                            className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-white flex items-center justify-center transition-all border border-indigo-100"
+                            className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 hover:bg-white flex items-center justify-center transition-all border border-blue-100"
+                            title="Chỉnh sửa hồ sơ"
                         >
                             <span className="material-symbols-outlined notranslate text-[14px]" translate="no">edit</span>
                         </button>
                         <button 
                             onClick={(e) => { e.stopPropagation(); onDelete(item); }}
                             className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 hover:bg-white flex items-center justify-center transition-all border border-rose-100"
+                            title="Xóa hồ sơ"
                         >
                             <span className="material-symbols-outlined notranslate text-[14px]" translate="no">delete</span>
                         </button>

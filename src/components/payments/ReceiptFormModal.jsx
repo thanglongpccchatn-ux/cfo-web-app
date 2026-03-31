@@ -16,6 +16,33 @@ export default function ReceiptFormModal({
 }) {
     if (!showModal) return null;
 
+    let contextInfo = null;
+    if (activeTab === 'internal' && form.paymentId && form.projectId) {
+        const selectedPayment = availablePayments.find(p => String(p.id) === String(form.paymentId));
+        const selectedProject = projects.find(p => String(p.id) === String(form.projectId));
+
+        if (selectedPayment && selectedProject) {
+            const extInc = Number(selectedPayment.external_income || 0);
+            const taxRatio = selectedProject.sateco_contract_ratio != null ? selectedProject.sateco_contract_ratio : 98;
+            const actualRatio = selectedProject.sateco_actual_ratio != null ? selectedProject.sateco_actual_ratio : 95.5;
+
+            contextInfo = (
+                <div className="bg-slate-50 border border-slate-100 p-3 rounded-2xl mt-3 animate-fade-in shadow-inner flex flex-col gap-2">
+                    <p className="text-[11px] text-slate-500 font-bold flex justify-between items-center">
+                        TL đã thu từ CĐT: <span className="text-emerald-600 font-black tabular-nums bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded shadow-sm">{formatNum(extInc)} ₫</span>
+                    </p>
+                    <div className="flex justify-between items-center text-[10px] whitespace-nowrap overflow-x-auto gap-2">
+                        <span className="text-slate-400 font-medium">Tỷ lệ Nội bộ:</span>
+                        <div className="flex gap-2">
+                            <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold border border-blue-100">HĐ: {taxRatio}%</span>
+                            <span className="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-bold border border-indigo-100">Dòng tiền: {actualRatio}%</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+    }
+
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowModal(false)}></div>
@@ -43,7 +70,7 @@ export default function ReceiptFormModal({
                             {projects
                                 .filter(p => activeEntity === 'all' || (p.acting_entity_key || 'thanglong').toLowerCase() === activeEntity)
                                 .map(p => (
-                                    <option key={p.id} value={p.id}>{p.internal_code || p.code} - {p.name}</option>
+                                    <option key={p.id} value={p.id}>{p.internal_code || p.code}</option>
                                 ))
                             }
                         </select>
@@ -59,9 +86,22 @@ export default function ReceiptFormModal({
                             disabled={!form.projectId}
                         >
                             <option value="">-- Chọn mã thanh toán --</option>
-                            {availablePayments.map(p => (
+                            {availablePayments
+                                .filter(p => {
+                                    // Bắt buộc giữ lại item đang chọn trong trường hợp Edit
+                                    if (isEditing && form.paymentId === p.id) return true;
+                                    
+                                    // Kiểm tra xem đã thanh toán đủ hay chưa tuỳ theo Tab đối ngoại / nội bộ
+                                    const req = activeTab === 'external' ? Number(p.payment_request_amount || 0) : Number(p.internal_debt_actual || 0);
+                                    const paid = activeTab === 'external' ? Number(p.external_income || 0) : Number(p.internal_paid || 0);
+                                    const isFullyPaid = paid >= req && req > 0;
+                                    
+                                    // Nếu đã thu đủ thì ẩn đi khỏi danh sách
+                                    return !isFullyPaid;
+                                })
+                                .map(p => (
                                     <option key={p.id} value={p.id} className="font-bold">
-                                        {p.payment_code} ({p.stage_name})
+                                        {p.payment_code}
                                     </option>
                                 ))
                             }
@@ -87,6 +127,7 @@ export default function ReceiptFormModal({
                             />
                             <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₫</span>
                         </div>
+                        {contextInfo}
                     </div>
 
                     <div className="space-y-1.5">

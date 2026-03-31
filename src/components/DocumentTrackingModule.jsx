@@ -10,7 +10,33 @@ import SummaryCards from './documentTracking/SummaryCards';
 import PaymentHistoryRow from './documentTracking/PaymentHistoryRow';
 import DeleteConfirmModal from './documentTracking/DeleteConfirmModal';
 import PaymentFormModal from './documentTracking/PaymentFormModal';
+import ReceiptFormModal from './payments/ReceiptFormModal';
 import { DocTrackingMobileCard, DocTrackingDesktopRow } from './documentTracking/DocTrackingRows';
+
+const Th = ({ label, sortKey, align = 'left', extraClass = '', sortConfig, onSort }) => {
+    return (
+        <th 
+            className={`px-3 py-3 whitespace-nowrap text-${align} ${extraClass} select-none cursor-pointer group bg-slate-50 sticky top-0 z-20 shadow-[0_1px_2px_rgba(0,0,0,0.05)] bg-clip-padding`}
+            style={{ resize: 'horizontal', overflow: 'hidden', minWidth: '100px', maxWidth: '350px' }}
+            onClick={(e) => {
+                // Ignore click if it's on the resize handle (rightmost 20px)
+                const rect = e.currentTarget.getBoundingClientRect();
+                if (e.clientX > rect.right - 20) return;
+                
+                if (sortKey) onSort(sortKey);
+            }}
+        >
+            <div className={`flex items-center justify-${align === 'right' ? 'end' : align === 'center' ? 'center' : 'start'} gap-1`}>
+                <span className="truncate">{label}</span>
+                {sortKey && (
+                    <span className={`material-symbols-outlined text-[14px] transition-opacity flex-shrink-0 ${sortConfig?.key === sortKey ? 'opacity-100 text-blue-600' : 'opacity-0 group-hover:opacity-50 text-slate-400'}`}>
+                        {sortConfig?.key === sortKey ? (sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'swap_vert'}
+                    </span>
+                )}
+            </div>
+        </th>
+    );
+};
 
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
@@ -32,6 +58,11 @@ export default function DocumentTrackingModule() {
     const [filterMonth, setFilterMonth] = useState('all');
     const [activeTab, setActiveTab] = useState('cdt');
     const [activeEntity, setActiveEntity] = useState('all');
+
+    // Quick Receipt State
+    const [showReceiptModal, setShowReceiptModal] = useState(false);
+    const [quickReceiptForm, setQuickReceiptForm] = useState({ projectId: '', paymentId: '', amount: '', date: new Date().toISOString().split('T')[0], description: '' });
+    const [quickReceiptPayments, setQuickReceiptPayments] = useState([]);
     
     const entityShort = activeEntity === 'thanhphat' ? 'TP' : activeEntity === 'sateco' ? 'ST' : 'TL';
     const entityLabel = activeEntity === 'thanhphat' ? 'Thành Phát' : activeEntity === 'sateco' ? 'Sateco' : 'Thăng Long';
@@ -70,6 +101,8 @@ export default function DocumentTrackingModule() {
                         code, 
                         internal_code,
                         name,
+                        sateco_contract_ratio,
+                        sateco_actual_ratio,
                         acting_entity_key,
                         partners!projects_partner_id_fkey (id, name, code, short_name)
                     )
@@ -184,6 +217,88 @@ export default function DocumentTrackingModule() {
             invalidateDocTracking();
         }
     };
+
+    // --- QUICK RECEIPT HANDLERS ---
+    const onQuickReceipt = async (item) => {
+        let debtToPay = 0;
+        
+        if (activeTab === 'cdt') {
+            debtToPay = Math.max(0, Number(item.payment_request_amount || 0) - Number(item.external_income || 0));
+        } else {
+            const extInc = Number(item.external_income || 0);
+            const internalPaid = Number(item.internal_paid || 0);
+            
+            if (extInc > 0) {
+                // Thăng Long đã thu được tiền từ CĐT -> Gợi ý thanh toán theo tỷ lệ Hợp đồng của số tiền thực nhận
+                const ratio = Number(item.projects?.sateco_contract_ratio ?? 98) / 100;
+                debtToPay = Math.max(0, Math.round(extInc * ratio) - internalPaid);
+            } else {
+                // Thăng Long chưa nhận được tiền từ CĐT -> Gợi ý nợ Thuế gốc
+                const targetTax = Number(item.internal_debt_invoice || 0);
+                debtToPay = Math.max(0, targetTax - internalPaid);
+            }
+        }
+
+        // Fetch latest CĐT payment date to suggest for internal transfers
+        let defaultDate = new Date().toISOString().split('T')[0];
+        try {
+            const { data: extDocs } = await supabase
+                .from('external_payment_history')
+                .select('payment_date')
+                .eq('payment_stage_id', item.id)
+                .order('payment_date', { ascending: false })
+                .limit(1);
+
+            if (extDocs && extDocs.length > 0 && extDocs[0].payment_date) {
+                defaultDate = extDocs[0].payment_date;
+            }
+        } catch (e) {
+            console.error('Lỗi lấy ngày thu CĐT', e);
+        }
+
+        setQuickReceiptForm({
+            projectId: item.project_id,
+            paymentId: item.id,
+            amount: String(debtToPay),
+            date: defaultDate,
+            description: ''
+        });
+        setQuickReceiptPayments([{ ...item, payment_code: item.payment_code }]); // Mocking format for dropdown
+        setShowReceiptModal(true);
+    };
+
+    const handleQuickReceiptSubmit = async (e) => {
+        e.preventDefault();
+        if (!quickReceiptForm.paymentId) return;
+
+        const table = activeTab === 'cdt' ? 'external_payment_history' : 'internal_payment_history';
+        const payload = {
+            payment_stage_id: quickReceiptForm.paymentId,
+            amount: parseNum(quickReceiptForm.amount),
+            payment_date: quickReceiptForm.date,
+            description: quickReceiptForm.description
+        };
+
+        const { error } = await supabase.from(table).insert([payload]);
+        if (error) {
+            toast.error('Lỗi khi lưu nhận tiền: ' + error.message);
+        } else {
+            if (activeTab === 'cdt') {
+                const { data } = await supabase.from('external_payment_history').select('amount').eq('payment_stage_id', payload.payment_stage_id);
+                const sum = (data || []).reduce((s, i) => s + (Number(i.amount) || 0), 0);
+                await supabase.from('payments').update({ external_income: sum }).eq('id', payload.payment_stage_id);
+            } else {
+                const { data } = await supabase.from('internal_payment_history').select('amount').eq('payment_stage_id', payload.payment_stage_id);
+                const sum = (data || []).reduce((s, i) => s + (Number(i.amount) || 0), 0);
+                await supabase.from('payments').update({ internal_paid: sum }).eq('id', payload.payment_stage_id);
+            }
+
+            toast.success(activeTab === 'cdt' ? 'Đã thu tiền CĐT!' : 'Đã thanh toán nội bộ!');
+            setShowReceiptModal(false);
+            invalidateDocTracking();
+        }
+    };
+    // ----------------------------
 
     const handleRequestDateChange = (date) => {
         if (!date) return;
@@ -334,6 +449,16 @@ export default function DocumentTrackingModule() {
         }
     };
 
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+    const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
     const filtered = data.filter(item => {
         const matchesSearch = 
             item.projects?.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -361,8 +486,51 @@ export default function DocumentTrackingModule() {
         return matchesSearch && matchesEntity && matchesDate;
     });
 
+    if (sortConfig.key) {
+        filtered.sort((a, b) => {
+            const getVal = (item, key) => {
+                const isInternalSatecoView = activeEntity === 'sateco' && Math.abs((item.projects?.sateco_contract_ratio || 98) - 100) > 0.1 && (item.projects?.acting_entity_key || 'thanglong').toLowerCase() !== 'sateco';
+                
+                const rawInvoiceAmt = Number(item.invoice_amount || 0);
+                const rawRequestAmt = Number(item.payment_request_amount || 0);
+                const rawActualAmt = Number(item.external_income || 0);
+                const invoiceAmt = isInternalSatecoView ? Number(item.internal_debt_invoice || 0) : rawInvoiceAmt;
+                const requestAmt = isInternalSatecoView ? Number(item.internal_debt_actual || 0) : rawRequestAmt;
+                const actualAmt = isInternalSatecoView ? Number(item.internal_paid || 0) : rawActualAmt;
+
+                if (key === 'proj_code') return item.projects?.code || '';
+                if (key === 'partner_code') return item.projects?.partners?.code || item.projects?.partners?.short_name || item.projects?.client || '';
+                
+                if (key === 'invoice_amount') return invoiceAmt;
+                if (key === 'request_amount') return requestAmt;
+                if (key === 'external_income') return actualAmt;
+                
+                if (key === 'external_diff') return invoiceAmt - actualAmt;
+                if (key === 'remaining_amount') return Math.max(0, requestAmt - actualAmt);
+                
+                if (key === 'payment_status') {
+                    const status = actualAmt >= requestAmt && requestAmt > 0 ? 1 : 0;
+                    return status;
+                }
+                
+                if (key === 'due_date' || key === 'invoice_date') {
+                    return item[key] ? new Date(item[key]).getTime() : 0;
+                }
+                
+                return item[key] || '';
+            };
+
+            let aVal = getVal(a, sortConfig.key);
+            let bVal = getVal(b, sortConfig.key);
+
+            if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+
     return (
-        <div className="p-6 max-w-[1600px] mx-auto animate-fade-in space-y-6">
+        <div className="p-4 lg:p-6 w-full max-w-full mx-auto animate-fade-in space-y-6">
             {/* Entity Navigation Bar */}
             <div className="flex items-center gap-4 md:gap-6 mb-2 overflow-x-auto pb-1">
                 {[
@@ -508,41 +676,42 @@ export default function DocumentTrackingModule() {
                             hasPermission={hasPermission}
                             onEdit={handleEdit}
                             onDelete={(itm) => { setItemToDelete(itm); setShowDeleteConfirm(true); }}
+                            onQuickReceipt={onQuickReceipt}
                         />
                     ))}
                 </div>
 
                 {/* Desktop Table View */}
-                <div className="hidden lg:block overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                <div className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)]">
+                    <table className="w-full text-left border-collapse relative">
                         <thead>
                             <tr className="bg-slate-50 border-b border-slate-100 text-[12px] font-bold text-slate-500 uppercase tracking-tight">
-                                <th className="px-3 py-3 whitespace-nowrap">Mã hợp đồng {entityShort}</th>
-                                {activeTab === 'cdt' && <th className="px-3 py-3 whitespace-nowrap">Mã đối tác</th>}
-                                <th className="px-3 py-3 whitespace-nowrap">Đợt thanh toán</th>
+                                <Th label={`Mã hợp đồng ${entityShort}`} sortKey="proj_code" sortConfig={sortConfig} onSort={handleSort} />
+                                {activeTab === 'cdt' && <Th label="Mã đối tác" sortKey="partner_code" sortConfig={sortConfig} onSort={handleSort} />}
+                                <Th label="Đợt thanh toán" sortKey="stage_name" sortConfig={sortConfig} onSort={handleSort} />
                                 
                                 {activeTab === 'cdt' ? (
                                     <>
-                                        <th className="px-3 py-3 whitespace-nowrap text-right">Giá trị xuất HĐ</th>
-                                        <th className="px-3 py-3 whitespace-nowrap">Ngày xuất HĐ</th>
-                                        <th className="px-3 py-3 whitespace-nowrap">Trạng thái HĐ</th>
-                                        <th className="px-3 py-3 whitespace-nowrap text-right">Giá trị ĐNTT</th>
-                                        <th className="px-3 py-3 whitespace-nowrap text-right">Thực thu</th>
-                                        <th className="px-3 py-3 whitespace-nowrap text-right">Chênh lệch HĐ</th>
-                                        <th className="px-3 py-3 whitespace-nowrap">Trạng thái trả</th>
-                                        <th className="px-3 py-3 whitespace-nowrap">Ngày đến hạn</th>
-                                        <th className="px-3 py-3 whitespace-nowrap text-right">Còn lại</th>
+                                        <Th label="Giá trị xuất HĐ" sortKey="invoice_amount" align="right" sortConfig={sortConfig} onSort={handleSort} />
+                                        <Th label="Ngày xuất HĐ" sortKey="invoice_date" sortConfig={sortConfig} onSort={handleSort} />
+                                        <Th label="Trạng thái HĐ" sortKey="invoice_status" sortConfig={sortConfig} onSort={handleSort} />
+                                        <Th label="Giá trị ĐNTT" sortKey="request_amount" align="right" sortConfig={sortConfig} onSort={handleSort} />
+                                        <Th label="Thực thu" sortKey="external_income" align="right" sortConfig={sortConfig} onSort={handleSort} />
+                                        <Th label="Chênh lệch HĐ" sortKey="external_diff" align="right" sortConfig={sortConfig} onSort={handleSort} />
+                                        <Th label="Trạng thái trả" sortKey="payment_status" sortConfig={sortConfig} onSort={handleSort} />
+                                        <Th label="Ngày đến hạn" sortKey="due_date" sortConfig={sortConfig} onSort={handleSort} />
+                                        <Th label="Khoản Còn lại" sortKey="days_left" align="right" sortConfig={sortConfig} onSort={handleSort} />
                                     </>
                                 ) : (
                                     <>
-                                        <th className="px-3 py-3 whitespace-nowrap text-right bg-blue-50/50 text-blue-700">{entityShort} Nợ (Thuế)</th>
-                                        <th className="px-3 py-3 whitespace-nowrap text-right bg-indigo-50/50 text-indigo-700">Sateco Nợ (Nội bộ)</th>
-                                        <th className="px-3 py-3 whitespace-nowrap text-right font-black">Tổng Công nợ</th>
-                                        <th className="px-3 py-3 whitespace-nowrap text-right text-emerald-600">{entityShort} Đã chuyển</th>
-                                        <th className="px-3 py-3 whitespace-nowrap text-right text-rose-600">Còn nợ Tổng</th>
+                                        <Th label={`Sateco ĐNTT (Thuế)`} sortKey="internal_debt_invoice" align="right" extraClass="text-blue-700 bg-blue-50/50" sortConfig={sortConfig} onSort={handleSort} />
+                                        <Th label="Sateco ĐNTT (Thực tế)" sortKey="internal_debt_actual" align="right" extraClass="text-indigo-700 bg-indigo-50/50" sortConfig={sortConfig} onSort={handleSort} />
+                                        <Th label={`${entityShort} Đã chuyển`} sortKey="internal_paid" align="right" extraClass="text-emerald-600" sortConfig={sortConfig} onSort={handleSort} />
+                                        <Th label="Còn nợ Thuế" sortKey="remaining_tax" align="right" extraClass="text-slate-600" sortConfig={sortConfig} onSort={handleSort} />
+                                        <Th label="Còn nợ Tổng" sortKey="remaining_total" align="right" extraClass="text-rose-600" sortConfig={sortConfig} onSort={handleSort} />
                                     </>
                                 )}
-                                <th className="px-3 py-3 whitespace-nowrap text-center">Thao tác</th>
+                                <th className="px-3 py-3 whitespace-nowrap text-center bg-slate-50 sticky top-0 z-20 shadow-[0_1px_2px_rgba(0,0,0,0.05)] bg-clip-padding">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -576,6 +745,7 @@ export default function DocumentTrackingModule() {
                                     hasPermission={hasPermission}
                                     onEdit={handleEdit}
                                     onDelete={(itm) => { setItemToDelete(itm); setShowDeleteConfirm(true); }}
+                                    onQuickReceipt={onQuickReceipt}
                                 />
                              ))}
                          </tbody>
@@ -591,6 +761,25 @@ export default function DocumentTrackingModule() {
                  handleProjectChange={handleProjectChange} handleStageChange={handleStageChange}
                  handleNumChange={handleNumChange} handleRequestDateChange={handleRequestDateChange}
                  handleSubmit={handleSubmit} duplicateWarning={duplicateWarning}
+             />
+
+             <ReceiptFormModal
+                 showModal={showReceiptModal}
+                 setShowModal={setShowReceiptModal}
+                 activeTab={activeTab === 'cdt' ? 'external' : 'internal'}
+                 activeEntity={activeEntity}
+                 isEditing={false}
+                 form={quickReceiptForm}
+                 setForm={setQuickReceiptForm}
+                 projects={projects}
+                 availablePayments={quickReceiptPayments}
+                 handleProjectChange={() => {}} 
+                 handlePaymentChange={() => {}}
+                 handleSubmit={handleQuickReceiptSubmit}
+                 formatNum={(num) => {
+                    if (num === '' || num === null || num === undefined) return '';
+                    return Number(parseNum(num)).toLocaleString('vi-VN');
+                 }}
              />
 
              <DeleteConfirmModal

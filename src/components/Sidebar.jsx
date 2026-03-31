@@ -44,15 +44,24 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
             ]
         },
         {
+            key: 'bidding_group',
+            label: 'Báo giá & Đấu thầu',
+            icon: 'assignment_turned_in',
+            items: [
+                { id: 'bidding', icon: 'receipt_long', label: 'Quản lý Đấu thầu', perms: ['view_bids'] },
+            ]
+        },
+        {
             key: 'contracts',
             label: 'Hợp đồng & Dự án',
             icon: 'work',
             items: [
-                { id: 'bidding', icon: 'assignment_turned_in', label: 'Đấu thầu', perms: ['view_bids'] },
                 { id: 'contracts', icon: 'description', label: 'Hợp đồng', perms: ['view_contracts', 'create_contracts', 'edit_contracts', 'delete_contracts'] },
                 { id: 'variations', icon: 'playlist_add', label: 'Phát sinh', perms: ['view_variations', 'manage_variations'] },
                 { id: 'warranty_tracking', icon: 'security', label: 'Bảo hành', perms: ['view_warranty', 'manage_warranty'] },
                 { id: 'settlement', icon: 'gavel', label: 'Quyết Toán', perms: ['view_settlement', 'manage_settlement'] },
+                { id: 'doc_tracking', icon: 'folder_managed', label: 'Hồ sơ & Thanh toán', perms: ['view_payments', 'create_payments', 'edit_payments', 'delete_payments'] },
+                { id: 'payment_receipts', icon: 'receipt_long', label: 'Lịch sử thu tiền', perms: ['view_payments'] },
             ]
         },
         {
@@ -60,8 +69,6 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
             label: 'Tài chính',
             icon: 'account_balance',
             items: [
-                { id: 'doc_tracking', icon: 'folder_managed', label: 'Hồ sơ & Thanh toán', perms: ['view_payments', 'create_payments', 'edit_payments', 'delete_payments'] },
-                { id: 'payment_receipts', icon: 'receipt_long', label: 'Lịch sử thu tiền', perms: ['view_payments'] },
                 { id: 'expense_tracking', icon: 'receipt_long', label: 'Chi phí Chung', perms: ['view_expenses', 'manage_expenses'] },
                 { id: 'loans', icon: 'account_balance_wallet', label: 'Vay vốn', perms: ['view_loans', 'manage_loans'] },
             ]
@@ -105,7 +112,7 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
             }}
             title={!isSidebarOpen ? item.label : undefined}
             aria-label={item.label}
-            className={({ isActive }) => `w-full flex items-center py-2 rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${isSidebarOpen ? 'px-3 gap-2.5' : 'justify-center px-0'
+            className={({ isActive }) => `w-full flex items-center py-2 rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${isSidebarOpen ? 'pl-6 pr-3 gap-2.5' : 'justify-center px-0'
                 } ${isActive || (activeTab === item.id)
                     ? 'bg-primary/10 text-primary font-semibold'
                     : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white group font-medium'
@@ -175,15 +182,15 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
                                     aria-expanded={!isCollapsed}
                                     aria-controls={`nav-group-${group.key}`}
                                     aria-label={`${isCollapsed ? 'Mở rộng' : 'Thu gọn'} ${group.label}`}
-                                    className={`w-full flex items-center justify-between px-3 py-1.5 mb-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
-                                        hasActiveChild ? 'text-primary' : 'text-slate-400 hover:text-slate-600'
+                                    className={`w-full flex items-center justify-between px-3 pt-6 pb-2 mb-1 text-xs font-black uppercase tracking-widest transition-colors cursor-pointer outline-none ${
+                                        hasActiveChild ? 'text-primary' : 'text-slate-400 hover:text-slate-700'
                                     }`}
                                 >
-                                    <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-[14px]">{group.icon}</span>
-                                        <span>{group.label}</span>
+                                    <div className="flex items-center gap-2.5">
+                                        <span className="material-symbols-outlined font-medium text-[20px]">{group.icon}</span>
+                                        <span className="mt-0.5">{group.label}</span>
                                     </div>
-                                    <span className={`material-symbols-outlined text-[14px] transition-transform ${isCollapsed ? '-rotate-90' : ''}`}>
+                                    <span className={`material-symbols-outlined text-[16px] transition-transform ${isCollapsed ? '-rotate-90' : ''}`}>
                                         expand_more
                                     </span>
                                 </button>
@@ -207,8 +214,8 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
             </nav>
 
             {/* System / Administration Section */}
-            <div className={`border-t border-slate-100 dark:border-slate-700/50 py-3 space-y-0.5 ${isSidebarOpen ? 'px-3' : 'px-2'} max-h-[30vh] overflow-y-auto no-scrollbar`}>
-                {isSidebarOpen && <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Hệ Thống</p>}
+            <div className={`border-t border-slate-100 dark:border-slate-700/50 pt-5 pb-3 space-y-0.5 ${isSidebarOpen ? 'px-3' : 'px-2'} max-h-[30vh] overflow-y-auto no-scrollbar`}>
+                {isSidebarOpen && <p className="px-3 text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Hệ Thống</p>}
                 {systemTabs.map(item => (
                     <NavItem key={item.id} item={item} />
                 ))}

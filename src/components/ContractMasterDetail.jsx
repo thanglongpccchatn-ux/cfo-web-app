@@ -604,19 +604,19 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                             <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl mb-3 border border-slate-100">
                                                 <div>
                                                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Giá trị HĐ (Sau VAT)</p>
-                                                    <p className="text-sm font-black text-blue-700">{formatBillion(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue : proj.totalValuePostVat)}</p>
+                                                    <p className="text-sm font-black text-blue-700">{fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue : proj.totalValuePostVat)}</p>
                                                 </div>
                                                 <div>
                                                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Đã Thu</p>
-                                                    <p className="text-sm font-black text-emerald-600">{formatBillion(proj.totalIncome)}</p>
+                                                    <p className="text-sm font-black text-emerald-600">{fmt(proj.totalIncome)}</p>
                                                 </div>
                                                 <div>
                                                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Công nợ Hóa Đơn</p>
-                                                    <p className={`text-sm font-black ${proj.debtInvoice > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{formatBillion(proj.debtInvoice)}</p>
+                                                    <p className={`text-sm font-black ${proj.debtInvoice > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{fmt(proj.debtInvoice)}</p>
                                                 </div>
                                                 <div>
                                                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Công nợ Đề Nghị</p>
-                                                    <p className={`text-sm font-black ${(proj.totalRequested - proj.totalIncome) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{formatBillion(proj.totalRequested - proj.totalIncome)}</p>
+                                                    <p className={`text-sm font-black ${(proj.totalRequested - proj.totalIncome) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{fmt(proj.totalRequested - proj.totalIncome)}</p>
                                                 </div>
                                             </div>
 
@@ -664,45 +664,43 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                     className={`hover:bg-blue-50/50 transition-colors cursor-pointer group ${proj.vat_percentage === 0 ? 'bg-yellow-50/50' : ''}`}
                                                 >
                                                     <td className="px-2 py-2">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <div className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter ${
-                                                                activeEntity === 'sateco' ? 'bg-emerald-100 text-emerald-700' :
-                                                                (proj.acting_entity_key || '').toLowerCase() === 'thanhphat' ? 'bg-amber-100 text-amber-700' : 
-                                                                (proj.acting_entity_key || '').toLowerCase() === 'sateco' ? 'bg-emerald-100 text-emerald-700' : 
-                                                                'bg-blue-100 text-blue-700'
-                                                            }`}>
-                                                                {activeEntity === 'sateco' ? 'ST' : 
-                                                                 (proj.acting_entity_key || '').toLowerCase() === 'thanhphat' ? 'TP' : 
-                                                                 (proj.acting_entity_key || '').toLowerCase() === 'sateco' ? 'ST' : 'TL'}
-                                                            </div>
-                                                            <div>
+                                                        <div className="flex flex-col gap-1.5">
+                                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                                <div className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter ${
+                                                                    activeEntity === 'sateco' ? 'bg-emerald-100 text-emerald-700' :
+                                                                    (proj.acting_entity_key || '').toLowerCase() === 'thanhphat' ? 'bg-amber-100 text-amber-700' : 
+                                                                    (proj.acting_entity_key || '').toLowerCase() === 'sateco' ? 'bg-emerald-100 text-emerald-700' : 
+                                                                    'bg-blue-100 text-blue-700'
+                                                                }`}>
+                                                                    {activeEntity === 'sateco' ? 'ST' : 
+                                                                     (proj.acting_entity_key || '').toLowerCase() === 'thanhphat' ? 'TP' : 
+                                                                     (proj.acting_entity_key || '').toLowerCase() === 'sateco' ? 'ST' : 'TL'}
+                                                                </div>
                                                                 <div className="font-mono text-[12px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded inline-block border border-blue-100">
                                                                     {proj.internal_code || proj.code}
                                                                 </div>
-                                                                {proj.internal_code && proj.code && (
-                                                                    <div className="text-[10px] text-slate-400 mt-0.5 font-medium">#{proj.code}</div>
+                                                                {activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? (
+                                                                    <span className="flex items-center gap-1 text-[11px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                                                        <span className="material-symbols-outlined text-[13px] text-emerald-600">sync_alt</span>
+                                                                        {proj.acting_entity_key === 'thanhphat' ? 'THÀNH PHÁT (NB)' : 'THĂNG LONG (NB)'}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span
+                                                                        onClick={(e) => { e.stopPropagation(); handleOpenPartnerDetail(proj); }}
+                                                                        className="font-mono text-[11px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded inline-block border border-emerald-100 cursor-pointer hover:bg-emerald-100 hover:text-emerald-700 transition-colors whitespace-nowrap"
+                                                                        title={`Click xem chi tiết: ${proj.partners?.name || proj.client}`}
+                                                                    >
+                                                                        {proj.partners?.code || proj.partners?.short_name || proj.client || '—'}
+                                                                    </span>
                                                                 )}
                                                             </div>
-                                                        </div>
-                                                        <div className="mt-1">
-                                                            {activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? (
-                                                                <span className="flex items-center gap-1 text-[11px] font-bold text-slate-600">
-                                                                    <span className="material-symbols-outlined text-[13px] text-emerald-600">sync_alt</span>
-                                                                    {proj.acting_entity_key === 'thanhphat' ? 'THÀNH PHÁT (NB)' : 'THĂNG LONG (NB)'}
-                                                                </span>
-                                                            ) : (
-                                                                <span
-                                                                    onClick={(e) => { e.stopPropagation(); handleOpenPartnerDetail(proj); }}
-                                                                    className="font-mono text-[12px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded inline-block border border-emerald-100 cursor-pointer hover:bg-emerald-100 hover:text-emerald-700 transition-colors"
-                                                                    title={`Click xem chi tiết: ${proj.partners?.name || proj.client}`}
-                                                                >
-                                                                    {proj.partners?.code || proj.partners?.short_name || proj.client || '—'}
-                                                                </span>
+                                                            {proj.internal_code && proj.code && (
+                                                                <div className="text-[10px] text-slate-400 font-medium ml-1">#{proj.code}</div>
                                                             )}
                                                         </div>
                                                     </td>
                                                     <td className="px-1.5 py-1.5 text-right text-slate-500 border-l border-slate-50">
-                                                        {formatBillion(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue / (1 + (proj.internal_vat_percentage ?? 8) / 100) : proj.totalValuePreVat)}
+                                                        {fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue / (1 + (proj.internal_vat_percentage ?? 8) / 100) : proj.totalValuePreVat)}
                                                     </td>
                                                     <td className="px-1.5 py-1.5 text-right">
                                                         {activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? (
@@ -721,23 +719,23 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                             )
                                                         )}
                                                     </td>
-                                                    <td className="px-1.5 py-1.5 text-right font-medium text-blue-700 bg-blue-50/10" title={proj.total_approved_variations ? `Gốc: ${formatBillion(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.totalValuePostVat * (proj.sateco_contract_ratio||98)/100 - ((proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100))*(proj.sateco_contract_ratio||98)/100) : proj.totalValuePostVat - (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)))} + PS: ${formatBillion(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)) * (proj.sateco_contract_ratio||98)/100 : (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)))}` : ''}>
-                                                        {formatBillion(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue : proj.totalValuePostVat)}
+                                                    <td className="px-1.5 py-1.5 text-right font-medium text-blue-700 bg-blue-50/10" title={proj.total_approved_variations ? `Gốc: ${fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.totalValuePostVat * (proj.sateco_contract_ratio||98)/100 - ((proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100))*(proj.sateco_contract_ratio||98)/100) : proj.totalValuePostVat - (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)))} + PS: ${fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)) * (proj.sateco_contract_ratio||98)/100 : (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)))}` : ''}>
+                                                        {fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue : proj.totalValuePostVat)}
                                                     </td>
                                                     <td className="px-1.5 py-1.5 text-right text-slate-600 border-l border-slate-50">
-                                                        {formatBillion(proj.totalInvoice)}
+                                                        {fmt(proj.totalInvoice)}
                                                     </td>
                                                     <td className="px-1.5 py-1.5 text-right text-slate-600">
-                                                        {formatBillion(proj.totalRequested)}
+                                                        {fmt(proj.totalRequested)}
                                                     </td>
                                                     <td className="px-1.5 py-1.5 text-right font-medium text-emerald-600">
-                                                        {formatBillion(proj.totalIncome)}
+                                                        {fmt(proj.totalIncome)}
                                                     </td>
                                                     <td className={`px-1.5 py-1.5 text-right font-medium border-l border-rose-50/50 ${proj.debtInvoice > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                                        {formatBillion(proj.debtInvoice)}
+                                                        {fmt(proj.debtInvoice)}
                                                     </td>
                                                     <td className={`px-1.5 py-1.5 text-right font-medium ${(proj.totalRequested - proj.totalIncome) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-                                                        {formatBillion(proj.totalRequested - proj.totalIncome)}
+                                                        {fmt(proj.totalRequested - proj.totalIncome)}
                                                     </td>
                                                     <td className="px-1.5 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                                                         <select
@@ -804,22 +802,22 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                     TỔNG HỢP TOÀN BỘ ({filteredProjects.length} DA)
                                                 </td>
                                                 <td className="px-1.5 py-3 text-right text-blue-700 text-[14px] font-black bg-blue-50/30">
-                                                    {formatBillion(totalValueAll)}
+                                                    {fmt(totalValueAll)}
                                                 </td>
                                                 <td className="px-1.5 py-3 text-right text-slate-600 text-[14px] font-black border-l border-slate-100">
-                                                    {formatBillion(totalInvoiceAll)}
+                                                    {fmt(totalInvoiceAll)}
                                                 </td>
                                                 <td className="px-1.5 py-3 text-right text-slate-600 text-[14px] font-black">
-                                                    {formatBillion(totalRequestedAll)}
+                                                    {fmt(totalRequestedAll)}
                                                 </td>
                                                 <td className="px-1.5 py-3 text-right text-emerald-600 text-[14px] font-black">
-                                                    {formatBillion(totalIncomeAll)}
+                                                    {fmt(totalIncomeAll)}
                                                 </td>
                                                 <td className={`px-1.5 py-3 text-right text-[14px] font-black border-l border-rose-50 ${totalDebtInvoiceAll > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                                    {formatBillion(totalDebtInvoiceAll)}
+                                                    {fmt(totalDebtInvoiceAll)}
                                                 </td>
                                                 <td className={`px-1.5 py-3 text-right text-[14px] font-black bg-amber-50/20 ${(totalRequestedAll - totalIncomeAll) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-                                                    {formatBillion(totalRequestedAll - totalIncomeAll)}
+                                                    {fmt(totalRequestedAll - totalIncomeAll)}
                                                 </td>
                                                 <td colSpan={4} className="bg-slate-50"></td>
                                             </tr>

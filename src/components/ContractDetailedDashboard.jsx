@@ -10,14 +10,10 @@ import { fmt, fmtB, fmtDate } from '../utils/formatters';
 import ContractExpenseTab from './contract/ContractExpenseTab';
 import ContractAddendaTab from './contract/ContractAddendaTab';
 import ContractDriveTab from './contract/ContractDriveTab';
+import PaymentHistoryRow from './documentTracking/PaymentHistoryRow';
 
 const TABS = [
     { id: 'overview', label: 'Tổng quan Dự án', icon: 'dashboard', color: 'text-blue-600', bg: 'bg-blue-50' },
-    { id: 'payment', label: 'Thanh toán & Thu hồi', icon: 'payments', color: 'text-green-600', bg: 'bg-green-50' },
-    { id: 'material', label: 'Chi phí Vật tư', icon: 'inventory_2', color: 'text-orange-600', bg: 'bg-orange-50' },
-    { id: 'labor', label: 'Chi phí Thầu phụ', icon: 'engineering', color: 'text-purple-600', bg: 'bg-purple-50' },
-    { id: 'expense', label: 'Chi Phí Khác (Sateco)', icon: 'receipt_long', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { id: 'addenda', label: 'Phụ lục Hợp đồng', icon: 'post_add', color: 'text-rose-600', bg: 'bg-rose-50' },
     { id: 'doc', label: 'Tài liệu & Drive', icon: 'folder_open', color: 'text-emerald-600', bg: 'bg-emerald-50' },
 ];
 
@@ -31,8 +27,34 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
     const [subfolders, setSubfolders] = useState([]);
     const [selectedSubfolder, setSelectedSubfolder] = useState(null);
     const [loading, setLoading] = useState(true);
+    
+    // History expansion state
+    const [expandedId, setExpandedId] = useState(null);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [paymentHistoryCurrent, setPaymentHistoryCurrent] = useState([]);
 
-
+    const toggleExpansion = async (item) => {
+        if (expandedId === item.id) {
+            setExpandedId(null);
+            return;
+        }
+        setExpandedId(item.id);
+        setHistoryLoading(true);
+        setPaymentHistoryCurrent([]);
+        try {
+            const { data, error } = await supabase
+                .from('payment_history')
+                .select('*')
+                .eq('payment_id', item.id)
+                .order('payment_date', { ascending: false });
+            if (error) throw error;
+            setPaymentHistoryCurrent(data || []);
+        } catch (error) {
+            console.error('Error fetching payment history:', error);
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
 
     // === Dual Ratios Logic ===
     const SATECO_CONTRACT_RATIO = project && project.sateco_contract_ratio ? parseFloat(project.sateco_contract_ratio) / 100 : 0.98;
@@ -233,7 +255,7 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-5 divide-y lg:divide-y-0 lg:divide-x divide-slate-100 border-b border-slate-100">
                     {[
-                        { label: isInternalView ? 'Giá trị Khoán Nội bộ' : 'Tổng Giá trị Hợp đồng', value: fmtB(isInternalView ? contractValueSateco : totalContractValueThangLong), sub: isInternalView ? `Tỷ lệ khoán ${project.sateco_contract_ratio || 98}%` : `Gốc + ${approvedAddendas.length} phụ lục`, color: isInternalView ? 'text-emerald-700' : 'text-slate-800', dot: isInternalView ? 'bg-emerald-500' : 'bg-slate-400', icon: 'gavel' },
+                        { label: isInternalView ? 'Giá Khoán Nội bộ (Gồm VAT)' : 'Tổng Giá trị HĐ (Gồm VAT)', value: fmtB(isInternalView ? contractValueSateco : totalContractValueThangLong), sub: isInternalView ? `Tỷ lệ khoán ${project.sateco_contract_ratio || 98}%` : `Gốc + ${approvedAddendas.length} phụ lục`, color: isInternalView ? 'text-emerald-700' : 'text-slate-800', dot: isInternalView ? 'bg-emerald-500' : 'bg-slate-400', icon: 'gavel' },
                         { label: isInternalView ? 'Đã thu từ Group' : 'CĐT Đã thu', value: fmtB(cdtTotalIncome), sub: `${(isInternalView ? contractValueSateco : totalContractValueThangLong) > 0 ? ((cdtTotalIncome / (isInternalView ? contractValueSateco : totalContractValueThangLong)) * 100).toFixed(1) : 0}% của Hợp đồng`, color: 'text-green-600', dot: 'bg-green-500', icon: 'payments' },
                         { label: isInternalView ? 'Công nợ Nội bộ' : 'CĐT Nợ hóa đơn', value: fmtB(Math.max(0, cdtRemainingDebt)), sub: cdtRemainingDebt > 0 ? (isInternalView ? 'Thăng Long chưa chuyển đủ' : 'Chưa thanh toán đủ Hóa đơn') : 'Đã thu đủ', color: cdtRemainingDebt > 0 ? 'text-rose-600' : 'text-emerald-500', dot: cdtRemainingDebt > 0 ? 'bg-rose-500' : 'bg-emerald-500', icon: 'warning' },
                         { label: 'Tổng Chi phí Sateco', value: fmtB(totalExpensesSateco), sub: 'Vật tư + Nhân công + CPSXC', color: 'text-orange-600', dot: 'bg-orange-500', icon: 'shopping_cart' },
@@ -308,43 +330,44 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
                     {/* Performance Row */}
                     <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
                         {/* Rating Card */}
-                        <div className={`p-6 rounded-2xl border ${rating.border} ${rating.bg} flex flex-col items-center justify-center relative overflow-hidden group`}>
+                        <div className={`p-4 rounded-xl border ${rating.border} ${rating.bg} flex flex-col items-center justify-center relative overflow-hidden group h-full`}>
                              <div className={`absolute inset-0 ${rating.bg} opacity-30 -z-10 group-hover:scale-110 transition-transform duration-700`}></div>
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 z-10">Xếp hạng Dự án</h3>
-                            <div className={`w-24 h-24 rounded-full border-4 ${rating.border} bg-white flex flex-col items-center justify-center shadow-md z-10 relative`}>
-                                <span className={`text-3xl font-black ${rating.color}`}>{rating.label}</span>
-                                <div className="absolute -bottom-2 px-2 py-0.5 rounded-full bg-white border border-slate-100 shadow-sm">
-                                    <span className="text-[10px] font-black text-slate-500">{ratingScore}đ</span>
+                            <div className="flex flex-col sm:flex-row items-center gap-3 z-10 w-full justify-center">
+                                <div className={`w-14 h-14 shrink-0 rounded-full border-2 ${rating.border} bg-white flex flex-col items-center justify-center shadow-sm relative`}>
+                                    <span className={`text-xl font-black ${rating.color}`}>{rating.label}</span>
+                                    <div className="absolute -bottom-1.5 px-1 py-0 rounded-full bg-white border border-slate-100 shadow-sm">
+                                        <span className="text-[8px] font-black text-slate-500">{ratingScore}đ</span>
+                                    </div>
+                                </div>
+                                <div className="text-center sm:text-left">
+                                    <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Xếp hạng Dự án</h3>
+                                    <p className={`px-2 py-0.5 rounded-full text-[9px] inline-block font-black uppercase ${rating.bg} ${rating.color} border ${rating.border}`}>{rating.desc}</p>
                                 </div>
                             </div>
-                            <p className={`mt-5 px-3 py-1 rounded-full text-[10px] font-black uppercase ${rating.bg} ${rating.color} border ${rating.border} z-10`}>{rating.desc}</p>
                         </div>
                         
                         {/* KPI Grid */}
-                        <div className="xl:col-span-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <div className="xl:col-span-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                             {[
-                                { label: 'Tỷ suất LNG/DT', value: kpi_lng_dt, suffix: '%', icon: 'trending_up', color: 'emerald', desc: 'Mali / Doanh thu' },
-                                { label: 'Tỷ suất SL & CP', value: kpi_sl_cp, suffix: '%', icon: 'balance', color: 'blue', desc: '(SL - CP) / SL' },
-                                { label: 'Chỉ số SPI', value: kpi_spi, suffix: '', icon: 'speed', color: kpi_spi >= 1 ? 'green' : 'rose', desc: 'Tiến độ thi công' },
-                                { label: 'Chuyển đổi ĐT-SL', value: kpi_dt_sl, suffix: '%', icon: 'account_balance_wallet', color: 'amber', desc: 'Thu / Sản lượng' },
-                                { label: 'Chuyển đổi Thu-DT', value: kpi_thu_dt, suffix: '%', icon: 'currency_exchange', color: 'indigo', desc: 'Thu / Tổng HĐ' },
-                                { label: 'Cân đối Thu - Chi', value: kpi_thu_chi, suffix: 'x', icon: 'compare_arrows', color: kpi_thu_chi >= 1 ? 'emerald' : 'orange', desc: 'Thu / Chi thực' },
+                                { label: 'Tỷ suất LNG/DT', value: kpi_lng_dt, suffix: '%', icon: 'trending_up', color: 'emerald', desc: 'Mali/Doanh thu' },
+                                { label: 'Tỷ suất SL & CP', value: kpi_sl_cp, suffix: '%', icon: 'balance', color: 'blue', desc: '(SL-CP)/SL' },
+                                { label: 'Chỉ số SPI', value: kpi_spi, suffix: '', icon: 'speed', color: kpi_spi >= 1 ? 'green' : 'rose', desc: 'Tiến độ C.việc' },
+                                { label: 'C.đổi ĐT-SL', value: kpi_dt_sl, suffix: '%', icon: 'account_balance_wallet', color: 'amber', desc: 'Thu/Sản lượng' },
+                                { label: 'C.đổi Thu-DT', value: kpi_thu_dt, suffix: '%', icon: 'currency_exchange', color: 'indigo', desc: 'Thu/Tổng HĐ' },
+                                { label: 'Cân đối Thu-Chi', value: kpi_thu_chi, suffix: 'x', icon: 'compare_arrows', color: kpi_thu_chi >= 1 ? 'emerald' : 'orange', desc: 'Thu/Chi thực' },
                             ].map((k, i) => (
-                                <div key={i} className="glass-panel p-4 shadow-sm border border-slate-200/60 hover:shadow-md transition-all group bg-white">
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div className={`w-8 h-8 rounded-lg bg-${k.color}-50 text-${k.color}-600 flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                                            <span className="material-symbols-outlined notranslate text-[18px]" translate="no">{k.icon}</span>
+                                <div key={i} className="glass-panel p-3 shadow-sm border border-slate-200/60 hover:shadow-md transition-all group bg-white flex flex-col justify-center min-h-[85px]">
+                                    <div className="flex items-center gap-1.5 mb-1.5">
+                                        <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 bg-${k.color}-50 text-${k.color}-600 group-hover:scale-110 transition-transform`}>
+                                            <span className="material-symbols-outlined notranslate text-[13px]" translate="no">{k.icon}</span>
                                         </div>
-                                        <span className="text-[12px] font-black text-slate-200">#0{i+1}</span>
+                                        <h4 className="text-[8px] font-black text-slate-500 uppercase tracking-tighter truncate">{k.label}</h4>
                                     </div>
-                                    <div>
-                                        <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-tighter mb-1 h-6">{k.label}</h4>
-                                        <div className="flex items-baseline gap-0.5">
-                                            <span className={`text-base font-black text-${k.color}-600 tracking-tighter`}>{k.value.toFixed(k.suffix === 'x' ? 2 : 1)}</span>
-                                            <span className="text-[9px] font-bold text-slate-400">{k.suffix}</span>
-                                        </div>
-                                        <p className="text-[8px] text-slate-400 mt-2 italic truncate">{k.desc}</p>
+                                    <div className="flex items-baseline gap-0.5 mt-0.5">
+                                        <span className={`text-sm font-black text-${k.color}-600 tracking-tighter`}>{k.value.toFixed(k.suffix === 'x' ? 2 : 1)}</span>
+                                        <span className="text-[8px] font-bold text-slate-400">{k.suffix}</span>
                                     </div>
+                                    <p className="text-[7.5px] text-slate-400 mt-1 truncate w-full italic leading-tight">{k.desc}</p>
                                 </div>
                             ))}
                         </div>
@@ -450,34 +473,90 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
                                     </span>
                                 </div>
                                 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {payments.slice(0, 4).map((p, i) => {
-                                        const isPaid = Number(p.external_income) >= Number(p.payment_request_amount) && Number(p.payment_request_amount) > 0;
-                                        return (
-                                            <div key={p.id} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:border-green-200 transition-all cursor-pointer group" onClick={() => setActiveTab('payment')}>
-                                                <div className="flex justify-between items-start mb-3">
-                                                    <span className="text-[10px] font-black text-slate-300 uppercase">Đợt {i+1}</span>
-                                                    <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
-                                                        {isPaid ? 'Đã thu' : 'Chờ thu'}
-                                                    </span>
-                                                </div>
-                                                <div className="font-bold text-xs text-slate-800 mb-2 truncate">{p.stage_name}</div>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <div className="p-2 bg-slate-50 rounded-lg">
-                                                        <p className="text-[8px] font-bold text-slate-400 uppercase">Nghiệm thu</p>
-                                                        <p className="font-black text-slate-700 text-[11px]">{fmtB(p.payment_request_amount)}</p>
-                                                    </div>
-                                                    <div className="p-2 bg-green-50/50 rounded-lg">
-                                                        <p className="text-[8px] font-bold text-green-500 uppercase">Thực thu</p>
-                                                        <p className="font-black text-green-700 text-[11px]">{fmtB(p.external_income)}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                    {payments.length === 0 && (
-                                        <div className="col-span-2 text-center py-10 opacity-50">Chưa có dữ liệu thanh toán</div>
-                                    )}
+                                <div className="overflow-x-auto mt-2 pb-2">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-slate-100 text-[9px] text-slate-400 uppercase font-black bg-slate-50/50">
+                                                <th className="py-2.5 px-3">Hóa đơn / Đợt</th>
+                                                <th className="py-2.5 px-3">Ngày xuất HĐ</th>
+                                                <th className="py-2.5 px-3 text-right">Giá trị xuất HĐ</th>
+                                                <th className="py-2.5 px-3 text-right">Giá trị Đề nghị</th>
+                                                <th className="py-2.5 px-3 text-right">Thực thu</th>
+                                                <th className="py-2.5 px-3 text-right">Còn lại</th>
+                                                <th className="py-2.5 px-3 text-right">Trạng thái</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50 text-[11px] font-medium text-slate-600">
+                                            {payments.map((p, i) => {
+                                                const invoiceAmt = Number(p.invoice_amount || 0);
+                                                const requestAmt = Number(p.payment_request_amount || 0);
+                                                const actualAmt = Number(p.external_income || 0);
+                                                const debt = Math.max(0, requestAmt - actualAmt);
+                                                const isPaid = actualAmt >= requestAmt && requestAmt > 0;
+                                                
+                                                return (
+                                                    <React.Fragment key={p.id}>
+                                                        <tr 
+                                                            className={`hover:bg-blue-50/30 transition-colors cursor-pointer border-l-4 ${expandedId === p.id ? 'border-blue-500 bg-blue-50/20' : 'border-transparent'}`}
+                                                            onClick={() => toggleExpansion(p)}
+                                                        >
+                                                            <td className="py-3 px-3">
+                                                                <div className="font-bold text-slate-700">{p.stage_name}</div>
+                                                            </td>
+                                                            <td className="py-3 px-3">
+                                                                <div className="text-[10px] font-bold text-slate-600 flex items-center gap-1.5 whitespace-nowrap">
+                                                                    <span className="material-symbols-outlined notranslate text-[14px] text-slate-400" translate="no">calendar_month</span>
+                                                                    {p.invoice_date ? new Date(p.invoice_date).toLocaleDateString('vi-VN') : '---'}
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-3 px-3 text-right text-slate-500 font-bold tabular-nums">{fmt(invoiceAmt)}</td>
+                                                            <td className="py-3 px-3 text-right text-slate-700 font-bold tabular-nums">{fmt(requestAmt)}</td>
+                                                            <td className="py-3 px-3 text-right text-green-600 font-bold tabular-nums">{fmt(actualAmt)}</td>
+                                                            <td className="py-3 px-3 text-right tabular-nums">
+                                                                <span className={debt > 0 ? 'text-rose-600 font-black' : 'text-slate-400'}>{fmt(debt)}</span>
+                                                            </td>
+                                                            <td className="py-3 px-3 text-right">
+                                                                <div className="flex items-center justify-end gap-2">
+                                                                    <span className={`inline-flex px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
+                                                                        {isPaid ? 'Đã thu' : 'Chờ thu'}
+                                                                    </span>
+                                                                    <span className={`material-symbols-outlined notranslate text-[16px] transition-transform duration-300 ${expandedId === p.id ? 'rotate-180 text-blue-600' : 'text-slate-300'}`} translate="no">
+                                                                        expand_more
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                        <PaymentHistoryRow 
+                                                            expandedId={expandedId} 
+                                                            item={{ ...p, projects: project }} 
+                                                            historyLoading={historyLoading} 
+                                                            paymentHistory={paymentHistoryCurrent} 
+                                                            generateHistory={() => {}} 
+                                                        />
+                                                    </React.Fragment>
+                                                );
+                                            })}
+                                            {payments.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="7" className="py-10 text-center opacity-50 italic">Chưa xuất hóa đơn / Chưa tạo đợt thu</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                        {payments.length > 0 && (
+                                            <tfoot>
+                                                <tr className="border-t border-slate-200 bg-slate-50/50 text-[11px] font-black text-slate-700">
+                                                    <td className="py-3 px-3 uppercase text-[10px]" colSpan="2">Tổng cộng</td>
+                                                    <td className="py-3 px-3 text-right tabular-nums text-slate-500">{fmt(payments.reduce((s, p) => s + Number(p.invoice_amount || 0), 0))}</td>
+                                                    <td className="py-3 px-3 text-right tabular-nums">{fmt(payments.reduce((s, p) => s + Number(p.payment_request_amount || 0), 0))}</td>
+                                                    <td className="py-3 px-3 text-right text-green-600 tabular-nums">{fmt(payments.reduce((s, p) => s + Number(p.external_income || 0), 0))}</td>
+                                                    <td className="py-3 px-3 text-right tabular-nums text-rose-600">
+                                                        {fmt(payments.reduce((s, p) => s + Math.max(0, Number(p.payment_request_amount || 0) - Number(p.external_income || 0)), 0))}
+                                                    </td>
+                                                    <td></td>
+                                                </tr>
+                                            </tfoot>
+                                        )}
+                                    </table>
                                 </div>
                             </div>
 
@@ -525,35 +604,6 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
             )}
 
             {/* ── Tab: Thanh toán ── */}
-            {activeTab === 'payment' && (
-                <div className="glass-panel p-2 shadow-sm border border-slate-200/60 bg-white/50">
-                     <PaymentTracking project={project} embedded={true} />
-                </div>
-            )}
-
-            {/* ── Tab: Vật tư ── */}
-            {activeTab === 'material' && (
-                <div className="glass-panel p-2 shadow-sm border border-slate-200/60 bg-white/50">
-                    <MaterialTracking project={project} embedded={true} />
-                </div>
-            )}
-
-            {/* ── Tab: Thầu phụ ── */}
-            {activeTab === 'labor' && (
-                <div className="glass-panel p-2 shadow-sm border border-slate-200/60 bg-white/50">
-                    <LaborTracking project={project} embedded={true} />
-                </div>
-            )}
-
-            {/* ── Tab: Chi phí khác ── */}
-            {activeTab === 'expense' && (
-                <ContractExpenseTab project={project} expenses={expenses} totalGenericExpenses={totalGenericExpenses} onRefresh={fetchDashboardData} />
-            )}
-
-            {/* ── Tab: Phụ lục ── */}
-            {activeTab === 'addenda' && (
-                <ContractAddendaTab project={project} addendas={addendas} approvedAddendas={approvedAddendas} totalAddendasValue={totalAddendasValue} satecoContractRatio={SATECO_CONTRACT_RATIO} onOpenFullscreen={onOpenFullscreen} />
-            )}
             {/* ── Tab: Tài liệu ── */}
             {activeTab === 'doc' && (
                 <ContractDriveTab project={project} subfolders={subfolders} selectedSubfolder={selectedSubfolder} onSelectSubfolder={setSelectedSubfolder} onOpenFullscreen={onOpenFullscreen} />
