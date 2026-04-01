@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
 import { smartToast } from '../utils/globalToast';
+import InlineSearchDropdown from './common/InlineSearchDropdown';
 
 export default function MaterialTracking({ project, onBack, embedded }) {
     const [materials, setMaterials] = useState([]);
@@ -18,25 +19,13 @@ export default function MaterialTracking({ project, onBack, embedded }) {
     const [suppliersList, setSuppliersList] = useState([]);
     const [materialsCatalog, setMaterialsCatalog] = useState([]);
     const [categories, setCategories] = useState([]);
-    const [supplierSearch, setSupplierSearch] = useState('');
-    const [materialSearch, setMaterialSearch] = useState('');
-    const [categorySearch, setCategorySearch] = useState('');
-    const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
-    const [showMaterialDropdown, setShowMaterialDropdown] = useState(false);
-    const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-    const supplierDropdownRef = useRef(null);
-    const materialDropdownRef = useRef(null);
-    const categoryDropdownRef = useRef(null);
     const projectDropdownRef = useRef(null);
     const [projectSearch, setProjectSearch] = useState('');
     const [showProjectDropdown, setShowProjectDropdown] = useState(false);
 
-    // Close dropdowns on outside click
+    // Close project dropdown on outside click
     useEffect(() => {
         const handleClickOutside = (e) => {
-            if (supplierDropdownRef.current && !supplierDropdownRef.current.contains(e.target)) setShowSupplierDropdown(false);
-            if (materialDropdownRef.current && !materialDropdownRef.current.contains(e.target)) setShowMaterialDropdown(false);
-            if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target)) setShowCategoryDropdown(false);
             if (projectDropdownRef.current && !projectDropdownRef.current.contains(e.target)) setShowProjectDropdown(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -265,6 +254,41 @@ export default function MaterialTracking({ project, onBack, embedded }) {
     const formatCurrency = (val) => new Intl.NumberFormat('vi-VN').format(Math.round(val || 0));
     const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('vi-VN') : '-';
 
+    // ── Price Alert: so sánh giá nhập vs niêm yết ──
+    const [recentPrices, setRecentPrices] = useState({}); // { materialId: [{ price, date, supplier }] }
+
+    const getPriceDeviation = () => {
+        if (!editForm.material_id || !editForm.unit_price) return null;
+        const catalogMat = materialsCatalog.find(m => m.id === editForm.material_id);
+        if (!catalogMat) return null;
+        const catalogPrice = Number(catalogMat.actual_price || catalogMat.base_price) || 0;
+        if (catalogPrice <= 0) return null;
+        const inputPrice = Number(editForm.unit_price);
+        if (inputPrice <= 0) return null;
+        const pct = ((inputPrice - catalogPrice) / catalogPrice * 100);
+        return { pct, catalogPrice, inputPrice };
+    };
+
+    // Fetch recent prices when material is selected for editing
+    useEffect(() => {
+        if (!editForm.material_id) return;
+        const matId = editForm.material_id;
+        if (recentPrices[matId]) return; // already cached
+        (async () => {
+            const { data } = await supabase
+                .from('expense_materials')
+                .select('unit_price, expense_date, supplier_name')
+                .eq('material_id', matId)
+                .gt('unit_price', 0)
+                .order('expense_date', { ascending: false })
+                .limit(3);
+            if (data) {
+                setRecentPrices(prev => ({ ...prev, [matId]: data }));
+            }
+        })();
+    }, [editForm.material_id]);
+
+
     // Summary Calculations
     const totalMaterialsValue = materials.filter(m => !m.isNew).reduce((sum, m) => sum + Number(m.total_amount), 0);
     const totalPaidValue = materials.filter(m => !m.isNew).reduce((sum, m) => sum + Number(m.paid_amount), 0);
@@ -357,9 +381,21 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                         Import Excel
                     </button>
                     <div className="flex-1"></div>
-                    <div className="text-right">
-                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tổng (gồm VAT)</div>
-                        <div className="font-black text-slate-800 text-base tabular-nums">{formatCurrency(totalMaterialsValue)}</div>
+                    <div className="flex items-center gap-4">
+                        <div className="text-right">
+                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tổng (gồm VAT)</div>
+                            <div className="font-black text-slate-800 text-base tabular-nums">{formatCurrency(totalMaterialsValue)}</div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">Đã TT</div>
+                            <div className="font-black text-emerald-600 text-base tabular-nums">{formatCurrency(totalPaidValue)}</div>
+                        </div>
+                        {totalDebtValue > 0 && (
+                            <div className="text-right">
+                                <div className="text-[10px] text-red-500 font-bold uppercase tracking-wider">Còn Nợ</div>
+                                <div className="font-black text-red-600 text-base tabular-nums">{formatCurrency(totalDebtValue)}</div>
+                            </div>
+                        )}
                     </div>
                     <button onClick={handleAddRow} className="btn bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-md shadow-orange-500/20 px-4 flex items-center gap-1.5 h-10 text-sm rounded-lg">
                         <span className="material-symbols-outlined notranslate text-[18px]" translate="no">add_box</span> Thêm VT
@@ -485,7 +521,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-3 mb-3 border-t border-slate-50 pt-3">
+                                        <div className="grid grid-cols-3 gap-3 mb-3 border-t border-slate-50 pt-3">
                                             <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
                                                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Số lượng</div>
                                                 <div className="text-sm font-black text-slate-700">{mat.quantity} <span className="text-[10px] font-medium text-slate-400">{mat.unit}</span></div>
@@ -493,6 +529,15 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                             <div className="p-2 rounded-xl bg-orange-50/50 border border-orange-100">
                                                 <div className="text-[9px] font-black text-orange-600 uppercase tracking-widest mb-0.5 text-right">Thành tiền</div>
                                                 <div className="text-sm font-black text-orange-700 text-right tabular-nums">{formatCurrency(mat.total_amount)}</div>
+                                            </div>
+                                            <div className="p-2 rounded-xl bg-emerald-50/50 border border-emerald-100">
+                                                <div className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5 text-right">Đã TT / Nợ</div>
+                                                <div className="text-sm font-black text-right tabular-nums">
+                                                    <span className="text-emerald-700">{formatCurrency(mat.paid_amount || 0)}</span>
+                                                    {Number(mat.total_amount) - Number(mat.paid_amount || 0) > 0 && (
+                                                        <span className="text-red-500 text-[10px] ml-1">(-{formatCurrency(Number(mat.total_amount) - Number(mat.paid_amount || 0))})</span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
 
@@ -520,6 +565,8 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                         <th className="px-3 py-2.5 w-28 text-right border-r border-slate-200">Đơn Giá</th>
                                         <th className="px-3 py-2.5 w-16 text-center border-r border-slate-200 bg-yellow-50 text-yellow-700">VAT (%)</th>
                                         <th className="px-3 py-2.5 w-32 text-right border-r border-slate-200 bg-orange-50 text-orange-700">Thành Tiền (VAT)</th>
+                                        <th className="px-3 py-2.5 w-24 text-right border-r border-slate-200 bg-emerald-50 text-emerald-700">Đã TT</th>
+                                        <th className="px-3 py-2.5 w-24 text-right border-r border-slate-200 bg-red-50 text-red-700">Còn Nợ</th>
                                         <th className="px-3 py-2.5 w-48 border-r border-slate-200">Diễn giải</th>
                                         <th className="px-3 py-2.5 w-20 text-center bg-slate-100">Action</th>
                                     </tr>
@@ -533,104 +580,43 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                                 <tr key={mat.id} className="bg-orange-50/40 relative z-20 shadow-[0_0_10px_rgba(249,115,22,0.1)] outline outline-1 outline-orange-300">
                                                     <td className="px-2 py-1 text-center border-r border-slate-200 font-bold text-orange-500">{mat.isNew ? '*' : index + 1}</td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
-                                                        <div className="relative" ref={categoryDropdownRef}>
-                                                            <input
-                                                                type="text"
-                                                                value={showCategoryDropdown ? categorySearch : (categories.find(c => c.code === editForm.item_group)?.name || editForm.item_group || '')}
-                                                                onChange={(e) => { setCategorySearch(e.target.value); setShowCategoryDropdown(true); }}
-                                                                onFocus={() => { setCategorySearch(''); setShowCategoryDropdown(true); }}
-                                                                placeholder="Tìm nhóm..."
-                                                                className="w-full bg-white border border-orange-300 rounded px-2 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all text-xs font-semibold"
-                                                                autoFocus
-                                                            />
-                                                            {showCategoryDropdown && (() => {
-                                                                const filtered = categories.filter(c => !categorySearch || c.name.toLowerCase().includes(categorySearch.toLowerCase()) || c.code.toLowerCase().includes(categorySearch.toLowerCase()));
-                                                                const hasExact = categories.some(c => c.name.toLowerCase() === categorySearch.toLowerCase() || c.code.toLowerCase() === categorySearch.toLowerCase());
-                                                                return (
-                                                                    <div className="absolute z-50 left-0 right-0 top-full mt-0.5 bg-white border border-orange-300 rounded shadow-lg max-h-48 overflow-y-auto min-w-[200px]">
-                                                                        {filtered.map(c => (
-                                                                            <div key={c.id} onClick={() => { handleEditChange('item_group', c.code); setShowCategoryDropdown(false); setCategorySearch(''); }} className="px-2 py-1.5 text-xs cursor-pointer hover:bg-orange-50 transition-colors border-b border-slate-100 last:border-0 font-medium">
-                                                                                {c.name}
-                                                                            </div>
-                                                                        ))}
-                                                                        {categorySearch && !hasExact && (
-                                                                            <div
-                                                                                onClick={async () => {
-                                                                                    const code = categorySearch.toUpperCase().replace(/\s+/g, '_');
-                                                                                    const { data, error } = await supabase.from('material_categories').insert([{ code, name: categorySearch }]).select().single();
-                                                                                    if (!error && data) {
-                                                                                        setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
-                                                                                        handleEditChange('item_group', data.code);
-                                                                                    }
-                                                                                    setShowCategoryDropdown(false);
-                                                                                    setCategorySearch('');
-                                                                                }}
-                                                                                className="px-2 py-1.5 text-xs cursor-pointer hover:bg-emerald-50 transition-colors border-t border-emerald-200 text-emerald-700 font-bold flex items-center gap-1"
-                                                                            >
-                                                                                <span className="material-symbols-outlined text-[14px]">add_circle</span>  Thêm "{categorySearch}"
-                                                                            </div>
-                                                                        )}
-                                                                        {filtered.length === 0 && !categorySearch && (
-                                                                            <div className="px-2 py-2 text-xs text-slate-400 text-center">Không có nhóm nào</div>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })()}
-                                                        </div>
+                                                        <InlineSearchDropdown
+                                                            items={categories.map(c => ({ id: c.code, label: c.name, subLabel: c.code }))}
+                                                            value={categories.find(c => c.code === editForm.item_group)?.name || editForm.item_group || ''}
+                                                            onSelect={(item) => handleEditChange('item_group', item.id)}
+                                                            placeholder="Tìm nhóm..."
+                                                            allowCreate={{
+                                                                enabled: true,
+                                                                onCreateNew: async (search) => {
+                                                                    const code = search.toUpperCase().replace(/\s+/g, '_');
+                                                                    const { data, error } = await supabase.from('material_categories').insert([{ code, name: search }]).select().single();
+                                                                    if (!error && data) {
+                                                                        setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+                                                                        handleEditChange('item_group', data.code);
+                                                                    }
+                                                                }
+                                                            }}
+                                                        />
                                                     </td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
                                                         <input type="date" value={editForm.expense_date || ''} onChange={(e) => handleEditChange('expense_date', e.target.value)} className="w-full bg-white border border-slate-300 rounded px-1.5 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-xs" />
                                                     </td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
-                                                        <div className="relative" ref={supplierDropdownRef}>
-                                                            <input
-                                                                type="text"
-                                                                value={showSupplierDropdown ? supplierSearch : (editForm.supplier_name || '')}
-                                                                onChange={(e) => { setSupplierSearch(e.target.value); setShowSupplierDropdown(true); }}
-                                                                onFocus={() => { setSupplierSearch(''); setShowSupplierDropdown(true); }}
-                                                                placeholder="Tìm NCC..."
-                                                                className="w-full bg-white border border-slate-300 rounded px-2 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-xs"
-                                                            />
-                                                            {showSupplierDropdown && (
-                                                                <div className="absolute z-50 left-0 right-0 top-full mt-0.5 bg-white border border-slate-300 rounded shadow-lg max-h-48 overflow-y-auto">
-                                                                    {suppliersList.filter(s => !supplierSearch || s.name.toLowerCase().includes(supplierSearch.toLowerCase()) || (s.code && s.code.toLowerCase().includes(supplierSearch.toLowerCase()))).map(s => (
-                                                                        <div key={s.id} onClick={() => { handleSelectSupplier(s.id); setShowSupplierDropdown(false); setSupplierSearch(''); }} className="px-2 py-1.5 text-xs cursor-pointer hover:bg-orange-50 transition-colors border-b border-slate-100 last:border-0">
-                                                                            <span className="font-bold text-slate-500">[{s.code}]</span> {s.name}
-                                                                        </div>
-                                                                    ))}
-                                                                    {suppliersList.filter(s => !supplierSearch || s.name.toLowerCase().includes(supplierSearch.toLowerCase()) || (s.code && s.code.toLowerCase().includes(supplierSearch.toLowerCase()))).length === 0 && (
-                                                                        <div className="px-2 py-2 text-xs text-slate-400 text-center">Không tìm thấy NCC</div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </div>
+                                                        <InlineSearchDropdown
+                                                            items={suppliersList.map(s => ({ id: s.id, label: s.name, subLabel: s.code }))}
+                                                            value={editForm.supplier_name || ''}
+                                                            onSelect={(item) => handleSelectSupplier(item.id)}
+                                                            placeholder="Tìm NCC..."
+                                                        />
                                                     </td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
-                                                        <div className="relative" ref={materialDropdownRef}>
-                                                            <input
-                                                                type="text"
-                                                                value={showMaterialDropdown ? materialSearch : (editForm.product_name || '')}
-                                                                onChange={(e) => { setMaterialSearch(e.target.value); setShowMaterialDropdown(true); }}
-                                                                onFocus={() => { setMaterialSearch(''); setShowMaterialDropdown(true); }}
-                                                                placeholder="Tìm vật tư..."
-                                                                className="w-full bg-white border border-orange-400 rounded px-2 py-1.5 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none font-bold text-orange-700 text-xs"
-                                                            />
-                                                            {showMaterialDropdown && (() => {
-                                                                const filtered = (editForm.item_group ? materialsCatalog.filter(m => m.category_code === editForm.item_group) : materialsCatalog).filter(m => !materialSearch || m.name.toLowerCase().includes(materialSearch.toLowerCase()) || (m.code && m.code.toLowerCase().includes(materialSearch.toLowerCase())));
-                                                                return (
-                                                                    <div className="absolute z-50 left-0 right-0 top-full mt-0.5 bg-white border border-orange-300 rounded shadow-lg max-h-48 overflow-y-auto">
-                                                                        {filtered.map(m => (
-                                                                            <div key={m.id} onClick={() => { handleSelectMaterial(m.id); setShowMaterialDropdown(false); setMaterialSearch(''); }} className="px-2 py-1.5 text-xs cursor-pointer hover:bg-orange-50 transition-colors border-b border-slate-100 last:border-0">
-                                                                                <span className="font-bold text-orange-500">[{m.code}]</span> {m.name}
-                                                                            </div>
-                                                                        ))}
-                                                                        {filtered.length === 0 && (
-                                                                            <div className="px-2 py-2 text-xs text-slate-400 text-center">Không tìm thấy vật tư</div>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })()}
-                                                        </div>
+                                                        <InlineSearchDropdown
+                                                            items={(editForm.item_group ? materialsCatalog.filter(m => m.category_code === editForm.item_group) : materialsCatalog).map(m => ({ id: m.id, label: m.name, subLabel: m.code }))}
+                                                            value={editForm.product_name || ''}
+                                                            onSelect={(item) => handleSelectMaterial(item.id)}
+                                                            placeholder="Tìm vật tư..."
+                                                            highlight
+                                                        />
                                                     </td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
                                                         <input type="text" value={editForm.unit || ''} onChange={(e) => handleEditChange('unit', e.target.value)} className="w-full bg-white border border-slate-300 rounded px-2 py-1.5 text-center focus:border-orange-500 outline-none text-xs" placeholder="Cái" />
@@ -639,13 +625,63 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                                         <input type="number" value={editForm.quantity === 0 ? '' : editForm.quantity} onChange={(e) => handleEditChange('quantity', e.target.value)} className="w-full bg-white border border-slate-300 rounded px-2 py-1.5 text-right font-bold focus:border-orange-500 outline-none text-xs" placeholder="0" />
                                                     </td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
-                                                        <input type="number" value={editForm.unit_price === 0 ? '' : editForm.unit_price} onChange={(e) => handleEditChange('unit_price', e.target.value)} className="w-full bg-white border border-slate-300 rounded px-2 py-1.5 text-right font-bold focus:border-orange-500 outline-none text-xs" placeholder="0" />
+                                                        <div className="relative group/price">
+                                                            <input type="number" value={editForm.unit_price === 0 ? '' : editForm.unit_price} onChange={(e) => handleEditChange('unit_price', e.target.value)} className="w-full bg-white border border-slate-300 rounded px-2 py-1.5 text-right font-bold focus:border-orange-500 outline-none text-xs pr-8" placeholder="0" />
+                                                            {(() => {
+                                                                const dev = getPriceDeviation();
+                                                                if (!dev || Math.abs(dev.pct) < 0.5) return null;
+                                                                const isUp = dev.pct > 0;
+                                                                return (
+                                                                    <span className={`absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-black px-1 py-0.5 rounded ${isUp ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'} cursor-help`}>
+                                                                        {isUp ? '↑' : '↓'}{Math.abs(dev.pct).toFixed(0)}%
+                                                                    </span>
+                                                                );
+                                                            })()}
+                                                            {/* Tooltip: catalog price + 3 recent prices */}
+                                                            {editForm.material_id && Number(editForm.unit_price) > 0 && (
+                                                                <div className="absolute z-50 left-0 top-full mt-1 w-56 bg-slate-800 text-white rounded-xl shadow-xl p-3 text-[10px] opacity-0 pointer-events-none group-hover/price:opacity-100 group-hover/price:pointer-events-auto transition-opacity">
+                                                                    {(() => {
+                                                                        const dev = getPriceDeviation();
+                                                                        const recent = recentPrices[editForm.material_id] || [];
+                                                                        return (
+                                                                            <>
+                                                                                {dev && (
+                                                                                    <div className="flex justify-between mb-1.5 pb-1.5 border-b border-slate-600">
+                                                                                        <span className="text-slate-400">Giá niêm yết:</span>
+                                                                                        <span className="font-bold">{formatCurrency(dev.catalogPrice)}đ</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {recent.length > 0 ? (
+                                                                                    <>
+                                                                                        <div className="text-slate-400 font-bold mb-1">3 lần mua gần nhất:</div>
+                                                                                        {recent.map((r, i) => (
+                                                                                            <div key={i} className="flex justify-between py-0.5">
+                                                                                                <span className="text-slate-300 truncate max-w-[100px]">{formatDate(r.expense_date)} · {r.supplier_name || '-'}</span>
+                                                                                                <span className="font-bold tabular-nums">{formatCurrency(r.unit_price)}đ</span>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </>
+                                                                                ) : (
+                                                                                    <div className="text-slate-400 italic">Chưa có lịch sử mua</div>
+                                                                                )}
+                                                                            </>
+                                                                        );
+                                                                    })()}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-2 py-1 border-r border-slate-200 bg-yellow-50/50">
                                                         <input type="number" value={editForm.vat_rate === 0 ? '' : editForm.vat_rate} onChange={(e) => handleEditChange('vat_rate', e.target.value)} className="w-full bg-white border border-yellow-400 rounded px-2 py-1.5 text-center focus:border-yellow-500 outline-none text-xs" placeholder="0" />
                                                     </td>
                                                     <td className="px-2 py-1 border-r border-slate-200 bg-orange-50">
                                                         <input type="number" value={editForm.total_amount === 0 ? '' : editForm.total_amount} onChange={(e) => handleEditChange('total_amount', e.target.value)} className="w-full bg-white border border-orange-500 rounded px-2 py-1.5 text-right font-black text-orange-700 shadow-inner outline-none text-xs" placeholder="0" />
+                                                    </td>
+                                                    <td className="px-2 py-1 border-r border-slate-200 bg-emerald-50/50 text-center text-xs text-slate-400" title="Tự động tính khi thanh toán NCC">
+                                                        —
+                                                    </td>
+                                                    <td className="px-2 py-1 border-r border-slate-200 bg-red-50/50 text-center text-xs text-slate-400">
+                                                        —
                                                     </td>
                                                     <td className="px-2 py-1 border-r border-slate-200">
                                                         <input type="text" value={editForm.notes || ''} onChange={(e) => handleEditChange('notes', e.target.value)} className="w-full bg-white border border-slate-300 rounded px-2 py-1.5 focus:border-orange-500 outline-none text-xs" placeholder="Ghi chú..." />
@@ -677,6 +713,8 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                                                 <td className="px-3 py-2.5 border-r border-slate-200 text-right font-medium text-slate-700 tabular-nums">{formatCurrency(mat.unit_price)}</td>
                                                 <td className="px-3 py-2.5 border-r border-slate-200 text-center bg-yellow-50/30 text-yellow-700 font-bold">{mat.vat_rate}%</td>
                                                 <td className="px-3 py-2.5 border-r border-slate-200 text-right font-black text-orange-600 tabular-nums bg-orange-50/20">{formatCurrency(mat.total_amount)}</td>
+                                                <td className="px-3 py-2.5 border-r border-slate-200 text-right font-bold text-emerald-600 tabular-nums bg-emerald-50/20">{Number(mat.paid_amount) > 0 ? formatCurrency(mat.paid_amount) : <span className="text-slate-300">—</span>}</td>
+                                                <td className={`px-3 py-2.5 border-r border-slate-200 text-right font-black tabular-nums ${(Number(mat.total_amount) - Number(mat.paid_amount || 0)) > 0 ? 'text-red-600 bg-red-50/20' : 'text-emerald-600 bg-emerald-50/10'}`}>{(Number(mat.total_amount) - Number(mat.paid_amount || 0)) > 0 ? formatCurrency(Number(mat.total_amount) - Number(mat.paid_amount || 0)) : '0'}</td>
                                                 <td className="px-3 py-2.5 border-r border-slate-200 text-slate-500 truncate max-w-[200px] text-[11px]" title={mat.notes}>{mat.notes}</td>
                                                 <td className="px-1.5 py-2.5 text-center border-l bg-slate-50/50">
                                                     <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -694,6 +732,134 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                 )}
             </div>
         </div>
+
+        {/* Mobile Edit Bottom Sheet */}
+        {editingId && (
+            <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/60 backdrop-blur-sm xl:hidden animate-fade-in sm:items-center sm:p-4">
+                <div className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-slide-up sm:animate-zoom-in max-h-[90vh] flex flex-col">
+                    <div className="px-5 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 relative shrink-0">
+                        <div className="w-12 h-1.5 bg-slate-200 rounded-full absolute top-2 left-1/2 -translate-x-1/2 sm:hidden"></div>
+                        <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2 mt-2 sm:mt-0">
+                            <span className="material-symbols-outlined text-orange-500">edit_square</span>
+                            {editForm.isNew ? 'Thêm VT Mới' : 'Cập nhật Vật tư'}
+                        </h3>
+                        <button onClick={() => handleCancelEdit(editingId)} className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center hover:bg-slate-300 transition-colors">
+                            <span className="material-symbols-outlined text-[18px]">close</span>
+                        </button>
+                    </div>
+                    
+                    <div className="p-5 overflow-y-auto space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">Chứng từ (Ngày)</label>
+                                <input type="date" value={editForm.expense_date || ''} onChange={(e) => handleEditChange('expense_date', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">Phân Nhóm</label>
+                                <InlineSearchDropdown
+                                    items={categories.map(c => ({ id: c.code, label: c.name, subLabel: c.code }))}
+                                    value={categories.find(c => c.code === editForm.item_group)?.name || editForm.item_group || ''}
+                                    onSelect={(item) => handleEditChange('item_group', item.id)}
+                                    placeholder="Tìm nhóm..."
+                                    className="[&>input]:rounded-xl [&>input]:px-3 [&>input]:py-2 [&>input]:text-sm [&>input]:bg-slate-50 [&>input]:border-slate-200"
+                                    allowCreate={{
+                                        enabled: true,
+                                        onCreateNew: async (search) => {
+                                            const code = search.toUpperCase().replace(/\s+/g, '_');
+                                            const { data } = await supabase.from('material_categories').insert([{ code, name: search }]).select().single();
+                                            if (data) {
+                                                setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+                                                handleEditChange('item_group', data.code);
+                                            }
+                                        }
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">Nhà Cung Cấp</label>
+                            <InlineSearchDropdown
+                                items={suppliersList.map(s => ({ id: s.id, label: s.name, subLabel: s.code }))}
+                                value={editForm.supplier_name || ''}
+                                onSelect={(item) => handleSelectSupplier(item.id)}
+                                placeholder="Tìm NCC..."
+                                className="[&>input]:rounded-xl [&>input]:px-3 [&>input]:py-2 [&>input]:text-sm [&>input]:bg-slate-50 [&>input]:border-slate-200"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">Tên SP / Vật Tư</label>
+                            <InlineSearchDropdown
+                                items={(editForm.item_group ? materialsCatalog.filter(m => m.category_code === editForm.item_group) : materialsCatalog).map(m => ({ id: m.id, label: m.name, subLabel: m.code }))}
+                                value={editForm.product_name || ''}
+                                onSelect={(item) => handleSelectMaterial(item.id)}
+                                placeholder="Tìm vật tư..."
+                                highlight
+                                className="[&>input]:rounded-xl [&>input]:px-3 [&>input]:py-2 [&>input]:text-sm"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-3">
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">Số lượng</label>
+                                <input type="number" value={editForm.quantity === 0 ? '' : editForm.quantity} onChange={(e) => handleEditChange('quantity', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-center font-bold focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none" placeholder="0" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">ĐVT</label>
+                                <input type="text" value={editForm.unit || ''} onChange={(e) => handleEditChange('unit', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-center focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none" placeholder="Cái" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-yellow-600 mb-1">VAT (%)</label>
+                                <input type="number" value={editForm.vat_rate === 0 ? '' : editForm.vat_rate} onChange={(e) => handleEditChange('vat_rate', e.target.value)} className="w-full bg-yellow-50/50 border border-yellow-200 rounded-xl px-3 py-2 text-sm text-center focus:ring-2 focus:ring-yellow-500/20 focus:border-yellow-500 outline-none" placeholder="0" />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">Đơn Giá</label>
+                                <div className="relative">
+                                    <input type="number" value={editForm.unit_price === 0 ? '' : editForm.unit_price} onChange={(e) => handleEditChange('unit_price', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-right font-bold pr-12 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none" placeholder="0" />
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-xs">đ</div>
+                                </div>
+                                {(() => {
+                                    const dev = getPriceDeviation();
+                                    if (dev && Math.abs(dev.pct) > 0.5) {
+                                        return (
+                                            <div className={`mt-1.5 inline-flex px-1.5 py-0.5 rounded text-[10px] font-black ${dev.pct > 0 ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                                {dev.pct > 0 ? '↑ Cao hơn NY' : '↓ Rẻ hơn NY'} {Math.abs(dev.pct).toFixed(1)}%
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-orange-600 mb-1">Thành Tiền (VAT)</label>
+                                <div className="w-full bg-orange-50 border border-orange-200 rounded-xl px-3 py-2 text-sm text-right font-black text-orange-700">
+                                    {formatCurrency(editForm.total_amount)}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">Diễn giải / Ghi chú</label>
+                            <input type="text" value={editForm.notes || ''} onChange={(e) => handleEditChange('notes', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none" placeholder="Nhập diễn giải..." />
+                        </div>
+                    </div>
+
+                    <div className="p-4 border-t border-slate-200 bg-white grid grid-cols-2 gap-3 shrink-0">
+                        <button onClick={() => handleCancelEdit(editingId)} className="w-full py-3 rounded-xl font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 active:scale-95 transition-all">
+                            Hủy bỏ
+                        </button>
+                        <button onClick={handleSaveEdit} className="w-full py-3 rounded-xl font-bold text-white bg-orange-500 hover:bg-orange-600 shadow-lg shadow-orange-500/20 active:scale-95 transition-all flex justify-center items-center gap-2">
+                            <span className="material-symbols-outlined text-[20px]">save</span>
+                            Lưu Vật tư
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {/* Excel Import Modal */}
         <ExcelImportModal

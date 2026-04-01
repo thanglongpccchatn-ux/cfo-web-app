@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { useInventory } from '../../context/InventoryContext';
 import { useAuth } from '../../context/AuthContext';
 import InventoryDashboard from './InventoryDashboard';
@@ -9,6 +9,7 @@ import InventoryRequestForm from './InventoryRequestForm';
 import InventoryRequestList from './InventoryRequestList';
 import PurchaseOrderList from './PurchaseOrderList';
 import PurchaseOrderCreate from './PurchaseOrderCreate';
+const MaterialPriceHistory = lazy(() => import('./MaterialPriceHistory'));
 
 class InventoryErrorBoundary extends React.Component {
   constructor(props) {
@@ -54,6 +55,7 @@ export default function InventoryManager() {
         { id: 'requests', label: 'Đề nghị VT', icon: 'assignment', perm: 'view_inventory' },
         { id: 'po', label: 'Đơn đặt hàng', icon: 'shopping_cart', perm: 'view_inventory' },
         { id: 'stock', label: 'Kho vật tư', icon: 'inventory_2', perm: 'view_inventory' },
+        { id: 'price_history', label: 'Giá VT', icon: 'trending_up', perm: 'view_inventory' },
         { id: 'inbound', label: 'Nhập kho', icon: 'login', perm: 'import_inventory' },
         { id: 'outbound', label: 'Xuất kho', icon: 'logout', perm: 'export_inventory' },
     ].filter(t => !t.perm || hasPermission(t.perm) || profile?.role_code === 'ROLE01');
@@ -78,10 +80,11 @@ export default function InventoryManager() {
             case 'stock': return <InventoryList onAction={(tab) => setSubTab(tab)} />;
             case 'inbound': return <InventoryInbound onBack={() => setSubTab('stock')} />;
             case 'outbound': return <InventoryOutbound onBack={() => setSubTab('stock')} />;
-            case 'requests': return <InventoryRequestList onCreateNew={() => setSubTab('request_form')} />;
+            case 'requests': return <InventoryRequestList onCreateNew={() => setSubTab('request_form')} onCreatePO={(reqId) => { setPORequestId(reqId); setSubTab('po_create'); }} />;
             case 'request_form': return <InventoryRequestForm onBack={() => setSubTab('requests')} />;
             case 'po': return <PurchaseOrderList onCreateNew={(reqId) => { setPORequestId(reqId); setSubTab('po_create'); }} onViewTab={(tab) => setSubTab(tab)} />;
             case 'po_create': return <PurchaseOrderCreate requestId={poRequestId} onBack={() => { setPORequestId(null); setSubTab('po'); }} />;
+            case 'price_history': return <Suspense fallback={<div className="text-center py-10 text-slate-400 animate-pulse">Đang tải...</div>}><MaterialPriceHistory /></Suspense>;
             default: return <InventoryDashboard onAction={(tab) => setSubTab(tab)} />;
         }
     };

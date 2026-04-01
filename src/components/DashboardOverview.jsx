@@ -263,7 +263,7 @@ const DashboardOverview = () => {
             if (!projectDetails || projectDetails.length === 0) return;
             data = projectDetails.filter(p => {
                 const debt = type === 'invoice' ? p.debtInvoice : p.debtRequested;
-                return debt > 0;
+                return Math.abs(debt) > 1; // Include both positive (owed) and negative (overpaid) debts, ignore tiny float errors
             }).sort((a,b) => (type === 'invoice' ? b.debtInvoice - a.debtInvoice : b.debtRequested - a.debtRequested));
         } else if (type === 'unsigned') {
             data = unsignedProjects || [];

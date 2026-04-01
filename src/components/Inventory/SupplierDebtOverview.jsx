@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { fmt, formatBillion } from '../../utils/formatters';
 import SkeletonTable from '../ui/SkeletonTable';
+import SupplierPaymentModal from '../supplier/SupplierPaymentModal';
 
 export default function SupplierDebtOverview() {
     const [expandedId, setExpandedId] = useState(null);
     const [search, setSearch] = useState('');
+    const [paymentPO, setPaymentPO] = useState(null);
+    const [paymentSupplier, setPaymentSupplier] = useState(null);
+    const queryClient = useQueryClient();
 
     // ── React Query: Supplier debt data ──
     const { data: suppliers = [], isLoading: loading } = useQuery({
@@ -140,6 +144,7 @@ export default function SupplierDebtOverview() {
                                                         <th className="px-3 py-2 text-right">Đã TT</th>
                                                         <th className="px-3 py-2 text-right">Còn nợ</th>
                                                         <th className="px-3 py-2 text-center">Trạng thái</th>
+                                                        <th className="px-3 py-2 text-center">Thao tác</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
@@ -160,6 +165,16 @@ export default function SupplierDebtOverview() {
                                                                         'bg-amber-100 text-amber-700 border-amber-200'
                                                                     }`}>{po.status === 'COMPLETED' ? 'Xong' : po.status === 'PARTIAL' ? '1 phần' : 'Đã đặt'}</span>
                                                                 </td>
+                                                                <td className="px-3 py-2 text-center">
+                                                                    {poDebt > 0 && (
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); setPaymentPO(po); setPaymentSupplier({ id: s.id, name: s.name, code: s.code }); }}
+                                                                            className="px-2.5 py-1 bg-blue-500 text-white text-[9px] font-bold rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-1 mx-auto"
+                                                                        >
+                                                                            <span className="material-symbols-outlined text-[11px]">payments</span> TT
+                                                                        </button>
+                                                                    )}
+                                                                </td>
                                                             </tr>
                                                         );
                                                     })}
@@ -172,6 +187,16 @@ export default function SupplierDebtOverview() {
                         );
                     })}
                 </div>
+            )}
+
+            {paymentPO && (
+                <SupplierPaymentModal
+                    po={paymentPO}
+                    supplier={paymentSupplier}
+                    onClose={() => { setPaymentPO(null); setPaymentSupplier(null); }}
+                    onSuccess={() => queryClient.invalidateQueries({ queryKey: ['supplierDebtOverview'] })}
+                    existingPayments={paymentPO.po_payments || []}
+                />
             )}
         </div>
     );

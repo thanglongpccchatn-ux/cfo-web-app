@@ -46,7 +46,7 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                                 {detailModal.type === 'unsigned' ? 'DANH SÁCH CÁC HỢP ĐỒNG CHƯA HOÀN TẤT KÝ KẾT' :
                                  detailModal.type === 'unsettled' ? 'DỰ ÁN ĐÃ HOÀN THÀNH NHƯNG CHƯA QUYẾT TOÁN XONG' :
                                  detailModal.type === 'pending' ? 'DANH SÁCH HỒ SƠ THANH TOÁN ĐANG CHỜ XÉT DUYỆT' :
-                                 'CÁC DỰ ÁN ĐANG GHI NHẬN CÔNG NỢ > 0 ₫'}
+                                 'CÁC DỰ ÁN ĐANG GHI NHẬN CÔNG NỢ HOẶC THU DƯ TẠM ỨNG'}
                             </p>
                         </div>
                     </div>
@@ -58,8 +58,8 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                 <div className="p-0 overflow-auto flex-1 bg-slate-50/30">
                     <table className="w-full text-left border-collapse table-fixed">
                         <colgroup>
-                            <col style={{width:'14%'}} />
-                            <col style={{width:'26%'}} />
+                            <col style={{width:'22%'}} />
+                            <col style={{width:'18%'}} />
                             <col style={{width:'20%'}} />
                             <col style={{width:'20%'}} />
                             <col style={{width:'20%'}} />
@@ -67,7 +67,7 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                         <thead className="bg-white sticky top-0 z-10 shadow-sm border-b border-slate-200">
                             <tr className="text-[11px] font-black text-slate-500 uppercase tracking-widest">
                                 <th className="px-5 py-4">Mã {detailModal.type === 'pending' ? 'Hồ sơ' : 'Dự án'}</th>
-                                <th className="px-5 py-4">{detailModal.type === 'pending' ? 'Công việc / Dự án' : 'Tên Dự án'}</th>
+                                <th className="px-5 py-4">{detailModal.type === 'pending' ? 'Công việc / Dự án' : 'Đối Tác'}</th>
                                 <th className="px-5 py-4 text-right">
                                     {detailModal.type === 'pending' ? 'Giá trị ĐNTT' : 
                                      detailModal.type === 'unsigned' || detailModal.type === 'unsettled' ? 'Giá trị TVH' :
@@ -75,7 +75,7 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                                 </th>
                                 <th className="px-5 py-4 text-right">Thực Thu</th>
                                 <th className="px-5 py-4 text-right text-rose-600 bg-rose-50/30">
-                                    {detailModal.type === 'pending' || detailModal.type === 'invoice' || detailModal.type === 'requested' ? 'Công Nợ' : 'Giá trị gốc'}
+                                    {detailModal.type === 'pending' || detailModal.type === 'invoice' || detailModal.type === 'requested' ? 'Công Nợ' : 'Giá trị HĐ'}
                                 </th>
                             </tr>
                         </thead>
@@ -113,8 +113,21 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                                     (p.projPmts || []).filter(pm => {
                                         const phaseReq = detailModal.type === 'invoice' ? (parseFloat(pm.invoice_amount)||0) : (parseFloat(pm.payment_request_amount)||0);
                                         const phaseInc = parseFloat(pm.external_income)||0;
-                                        return phaseReq - phaseInc > 0;
+                                        // Show phases that have debt OR have income (advance payments)
+                                        return (phaseReq - phaseInc > 0) || (phaseInc > 0);
                                     }) : [];
+
+                                const totalPhaseDebt = pendingPhases.reduce((s, pm) => {
+                                    const req = detailModal.type === 'invoice' ? (parseFloat(pm.invoice_amount)||0) : (parseFloat(pm.payment_request_amount)||0);
+                                    const inc = parseFloat(pm.external_income)||0;
+                                    return s + Math.max(0, req - inc);
+                                }, 0);
+
+                                const totalAdvance = pendingPhases.reduce((s, pm) => {
+                                    const req = detailModal.type === 'invoice' ? (parseFloat(pm.invoice_amount)||0) : (parseFloat(pm.payment_request_amount)||0);
+                                    const inc = parseFloat(pm.external_income)||0;
+                                    return s + Math.max(0, inc - req);
+                                }, 0);
 
                                 return (
                                     <React.Fragment key={p.id}>
@@ -129,12 +142,12 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                                                             <span className="material-symbols-outlined text-[16px]">expand_more</span>
                                                         </div>
                                                     )}
-                                                    <span className="text-xs font-mono font-black text-slate-600 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 truncate">{code}</span>
+                                                    <span className="text-sm font-mono font-black text-slate-700 bg-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200">{code}</span>
                                                 </div>
                                             </td>
                                             <td className="px-5 py-4">
-                                                <p className="text-sm font-black text-slate-800 truncate" title={name}>{name}</p>
-                                                <p className="text-xs font-bold text-slate-400 mt-0.5 truncate" title={sub}>{sub}</p>
+                                                <p className="text-sm font-black text-slate-800 truncate" title={sub}>{sub}</p>
+                                                <p className="text-xs font-bold text-slate-400 mt-0.5 truncate" title={name}>{name}</p>
                                             </td>
                                             <td className="px-5 py-4 text-right text-sm font-black text-slate-700 tabular-nums whitespace-nowrap">
                                                 {formatVND(val1)}
@@ -142,8 +155,11 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                                             <td className="px-5 py-4 text-right text-sm font-black text-emerald-600 tabular-nums whitespace-nowrap">
                                                 {formatVND(valThu)}
                                             </td>
-                                            <td className={`px-5 py-4 text-right text-sm font-black tabular-nums whitespace-nowrap ${detailModal.type === 'unsigned' || detailModal.type === 'unsettled' ? 'text-slate-600' : 'text-rose-600 bg-rose-50/10'}`}>
-                                                {formatVND(valNo)}&nbsp;₫
+                                            <td className={`px-5 py-4 text-right text-sm font-black tabular-nums whitespace-nowrap ${
+                                                detailModal.type === 'unsigned' || detailModal.type === 'unsettled' ? 'text-slate-600' :
+                                                valNo < 0 ? 'text-emerald-600 bg-emerald-50/40' : 'text-rose-600 bg-rose-50/10'
+                                            }`}>
+                                                {valNo < 0 ? `+${formatVND(Math.abs(valNo))}` : formatVND(valNo)}&nbsp;{detailModal.type !== 'unsigned' && detailModal.type !== 'unsettled' ? '₫' : ''}
                                             </td>
                                         </tr>
                                         {isExpanded && (
@@ -152,40 +168,78 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                                                     <div className="px-14 py-4 animate-in slide-in-from-top-2 duration-200 border-l-[3px] border-blue-400 ml-6 my-2 bg-white rounded-r-xl shadow-sm">
                                                         <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                                                             <span className="material-symbols-outlined text-[16px]">format_list_bulleted</span>
-                                                            Chi tiết các đợt phát sinh công nợ
+                                                            Chi tiết các đợt thanh toán
                                                         </h4>
                                                         {pendingPhases.length > 0 ? (
-                                                            <div className="space-y-2">
-                                                                {pendingPhases.map(pm => {
-                                                                    const phaseReq = detailModal.type === 'invoice' ? (parseFloat(pm.invoice_amount)||0) : (parseFloat(pm.payment_request_amount)||0);
-                                                                    const phaseInc = parseFloat(pm.external_income)||0;
-                                                                    const phaseDebt = phaseReq - phaseInc;
-                                                                    return (
-                                                                        <div key={pm.id} className="flex justify-between items-center p-3 rounded-lg border border-slate-100 bg-slate-50/50 hover:bg-white transition-colors">
-                                                                            <div className="flex items-center gap-3">
-                                                                                <div className="w-2 h-2 rounded-full bg-rose-400"></div>
-                                                                                <div>
-                                                                                    <p className="text-sm font-bold text-slate-700">{pm.stage_name}</p>
-                                                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-white border border-slate-200 px-1.5 py-0.5 rounded mt-1 inline-block">{pm.stage_type || 'Đợt thanh toán'}</span>
-                                                                                </div>
+                                                            <div className="space-y-3">
+                                                                <div className="overflow-hidden border border-slate-200 rounded-lg">
+                                                                    <table className="w-full text-left bg-white text-[13px]">
+                                                                        <thead className="bg-slate-50 border-b border-slate-200">
+                                                                            <tr>
+                                                                                <th className="px-3 py-2 font-bold text-slate-500 text-[10px] uppercase tracking-widest w-[250px]">Tên Đợt / Hạng mục</th>
+                                                                                <th className="px-3 py-2 font-bold text-slate-500 text-[10px] uppercase tracking-widest w-[110px] text-center">{detailModal.type === 'invoice' ? 'Ngày Xuất HĐ' : 'Ngày Đề Nghị'}</th>
+                                                                                <th className="px-3 py-2 font-bold text-slate-500 text-[10px] uppercase tracking-widest text-right">{detailModal.type === 'invoice' ? 'Xuất Hóa Đơn' : 'Đề Nghị'}</th>
+                                                                                <th className="px-3 py-2 font-bold text-slate-500 text-[10px] uppercase tracking-widest text-right">Thực Thu</th>
+                                                                                <th className="px-3 py-2 font-bold text-slate-500 text-[10px] uppercase tracking-widest text-right w-[130px]">Công Nợ</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody className="divide-y divide-slate-100">
+                                                                            {pendingPhases.map(pm => {
+                                                                                const phaseReq = detailModal.type === 'invoice' ? (parseFloat(pm.invoice_amount)||0) : (parseFloat(pm.payment_request_amount)||0);
+                                                                                const phaseInc = parseFloat(pm.external_income)||0;
+                                                                                const phaseDebt = phaseReq - phaseInc;
+                                                                                const isAdvance = phaseDebt <= 0 && phaseInc > 0;
+                                                                                const invDateStr = detailModal.type === 'invoice' ? pm.invoice_date : pm.payment_request_date;
+                                                                                return (
+                                                                                    <tr key={pm.id} className={`transition-colors ${isAdvance ? 'bg-emerald-50/20 hover:bg-emerald-50/40' : 'hover:bg-slate-50/50'}`}>
+                                                                                        <td className="px-3 py-2">
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isAdvance ? 'bg-emerald-400' : 'bg-rose-400'}`}></div>
+                                                                                                <span className="font-medium text-slate-700 truncate" title={pm.stage_name}>{pm.stage_name}</span>
+                                                                                            </div>
+                                                                                        </td>
+                                                                                        <td className="px-3 py-2 text-center text-[12px] font-medium text-slate-500">
+                                                                                            {invDateStr ? new Date(invDateStr).toLocaleDateString('vi-VN') : '-'}
+                                                                                        </td>
+                                                                                        <td className="px-3 py-2 text-right font-medium text-slate-600 tabular-nums">
+                                                                                            {phaseReq > 0 ? formatVND(phaseReq) : '-'}
+                                                                                        </td>
+                                                                                        <td className="px-3 py-2 text-right font-medium text-emerald-600 tabular-nums">
+                                                                                            {phaseInc > 0 ? formatVND(phaseInc) : '-'}
+                                                                                        </td>
+                                                                                        <td className="px-3 py-2 text-right font-medium tabular-nums">
+                                                                                            {isAdvance ? (
+                                                                                                <span className="text-emerald-600">+{formatVND(phaseInc)}</span>
+                                                                                            ) : (
+                                                                                                <span className="text-rose-600">{formatVND(phaseDebt)}</span>
+                                                                                            )}
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                );
+                                                                            })}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                                
+                                                                {/* Summary Box */}
+                                                                <div className="mt-4 pt-3 flex justify-end items-center gap-3 text-[11px] font-bold uppercase tracking-wide">
+                                                                    <div className="text-slate-500">
+                                                                        Tổng nợ các đợt: <span className="text-rose-600">{formatVND(totalPhaseDebt)}</span>
+                                                                    </div>
+                                                                    {totalAdvance > 0 && (
+                                                                        <>
+                                                                            <span className="text-slate-300">-</span>
+                                                                            <div className="text-slate-500">
+                                                                                Tạm ứng: <span className="text-emerald-500">{formatVND(totalAdvance)}</span>
                                                                             </div>
-                                                                            <div className="flex items-center gap-8 text-right">
-                                                                                <div>
-                                                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Giá trị gốc</p>
-                                                                                    <p className="text-sm font-black text-slate-600">{formatVND(phaseReq)}</p>
-                                                                                </div>
-                                                                                <div>
-                                                                                    <p className="text-[10px] font-bold text-emerald-600/70 uppercase tracking-widest">Thực thu</p>
-                                                                                    <p className="text-sm font-black text-emerald-600">{formatVND(phaseInc)}</p>
-                                                                                </div>
-                                                                                <div className="min-w-[150px] bg-white p-2 rounded-md border border-rose-100 shadow-[0_2px_8px_-4px_rgba(244,63,94,0.3)]">
-                                                                                    <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest mb-0.5">Công nợ đợt này</p>
-                                                                                    <p className="text-[15px] font-black text-rose-600 leading-none whitespace-nowrap">{formatVND(phaseDebt)}&nbsp;₫</p>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                })}
+                                                                        </>
+                                                                    )}
+                                                                    <span className="text-slate-300">=</span>
+                                                                    <div className="text-slate-600 tracking-normal px-2 py-1 bg-rose-50/50 rounded-md border border-rose-100/50">
+                                                                        <span className="uppercase tracking-widest text-[9px] mr-1">Công nợ thực tế:</span>
+                                                                        <span className="text-rose-600 text-[13px]">{formatVND(detailModal.type === 'invoice' ? p.debtInvoice : p.debtRequested)} ₫</span>
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         ) : (
                                                             <div className="text-slate-500 text-sm font-medium italic p-4 bg-slate-50 rounded-lg">Không xác định được đợt thanh toán nào gây ra công nợ (có thể do sai lệch số liệu lịch sử thu tiền).</div>
@@ -220,8 +274,11 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                                 <td className="px-5 py-5 text-right text-base font-black text-emerald-600 tabular-nums whitespace-nowrap">
                                     {formatVND(detailModal.data.reduce((s, p) => s + p.totalIncome, 0))}
                                 </td>
-                                <td className="px-5 py-5 text-right text-lg font-black text-rose-600 bg-rose-50/30 tabular-nums whitespace-nowrap">
-                                    {formatVND(detailModal.data.reduce((s, p) => s + (detailModal.type === 'invoice' ? p.debtInvoice : p.debtRequested), 0))}&nbsp;₫
+                                <td className="px-5 py-5 text-right text-lg font-black tabular-nums whitespace-nowrap bg-slate-50 border-l border-slate-200">
+                                    {(() => {
+                                        const totNet = detailModal.data.reduce((s, p) => s + (detailModal.type === 'invoice' ? p.debtInvoice : p.debtRequested), 0);
+                                        return totNet < 0 ? <span className="text-emerald-600">+{formatVND(Math.abs(totNet))} ₫</span> : <span className="text-rose-600">{formatVND(totNet)} ₫</span>;
+                                    })()}
                                 </td>
                             </tr>
                         </tfoot>

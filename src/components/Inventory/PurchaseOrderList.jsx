@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { fmt } from '../../utils/formatters';
 import SkeletonTable from '../ui/SkeletonTable';
+import SupplierPaymentModal from '../supplier/SupplierPaymentModal';
 
 const STATUS_MAP = {
     'ORDERED':   { label: 'Đã đặt', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: 'local_shipping' },
@@ -26,6 +27,7 @@ export default function PurchaseOrderList({ onCreateNew, onViewTab }) {
     const { error: toastError } = useToast();
     const [filter, setFilter] = useState('all');
     const [expandedId, setExpandedId] = useState(null);
+    const [paymentPO, setPaymentPO] = useState(null);
 
     const canCreatePO = profile?.role_code === 'ROLE03' || profile?.role_code === 'ROLE01';
 
@@ -215,12 +217,40 @@ export default function PurchaseOrderList({ onCreateNew, onViewTab }) {
                                                 {po.notes}
                                             </div>
                                         )}
+
+                                        {/* Actions Row */}
+                                        <div className="flex items-center justify-end gap-2 pt-2">
+                                            {po.payment_status !== 'PAID' && Number(po.total_amount) > totalPaid && (
+                                                <button
+                                                    onClick={() => setPaymentPO(po)}
+                                                    className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1 transition-all shadow-sm"
+                                                >
+                                                    <span className="material-symbols-outlined text-[14px]">payments</span>Thanh toán NCC
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>
                         );
                     })}
                 </div>
+            )}
+
+            {paymentPO && (
+                <SupplierPaymentModal
+                    po={{
+                        id: paymentPO.id,
+                        code: paymentPO.code,
+                        total_amount: paymentPO.total_amount,
+                        paid_amount: (paymentPO.po_payments || []).reduce((s, p) => s + Number(p.amount || 0), 0),
+                        project_id: paymentPO.project_id,
+                    }}
+                    supplier={{ id: paymentPO.supplier_id, name: paymentPO.partners?.name || '', code: paymentPO.partners?.code || '' }}
+                    onClose={() => setPaymentPO(null)}
+                    onSuccess={() => { invalidatePOs(); setPaymentPO(null); }}
+                    existingPayments={paymentPO.po_payments || []}
+                />
             )}
         </div>
     );

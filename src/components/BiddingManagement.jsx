@@ -25,11 +25,15 @@ export default function BiddingManagement() {
         total_cost_before_vat: '', total_cost_after_vat: '',
         rejection_reason: '', submission_deadline: '', result_date: '', notes: ''
     });
+    const [vatRate, setVatRate] = useState(8);
 
     // History modal
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [historyLogs, setHistoryLogs] = useState([]);
     const [selectedBidName, setSelectedBidName] = useState('');
+
+    const [isAddingPartner, setIsAddingPartner] = useState(false);
+    const [newPartnerName, setNewPartnerName] = useState('');
 
     const queryClient = useQueryClient();
     const invalidateBids = () => queryClient.invalidateQueries({ queryKey: ['biddingData'] });
@@ -49,7 +53,7 @@ export default function BiddingManagement() {
         queryFn: async () => {
             const [bidRes, partnerRes, profilesRes] = await Promise.all([
                 supabase.from('bids').select('*, partners(name, code, short_name)').order('created_at', { ascending: false }),
-                supabase.from('partners').select('id, name, code, short_name, type').or('type.eq.Client,type.eq.Subcontractor').order('name'),
+                supabase.from('partners').select('id, name, code, short_name, type').eq('type', 'Client').order('name'),
                 supabase.from('profiles').select('id, full_name, role_code, roles:role_code(name)').eq('status', 'Hoạt động').order('full_name')
             ]);
             const allProfiles = profilesRes.data || [];
@@ -71,6 +75,29 @@ export default function BiddingManagement() {
     const handleOpenForm = (bid = null) => {
         if (bid) {
             setEditingBid(bid);
+            let derivedVat = 8;
+            if (parseFloat(bid.price_before_vat) > 0 && parseFloat(bid.price_after_vat) > 0) {
+                derivedVat = Math.round(((parseFloat(bid.price_after_vat) / parseFloat(bid.price_before_vat)) - 1) * 100);
+            } else if (parseFloat(bid.total_cost_before_vat) > 0 && parseFloat(bid.total_cost_after_vat) > 0) {
+                derivedVat = Math.round(((parseFloat(bid.total_cost_after_vat) / parseFloat(bid.total_cost_before_vat)) - 1) * 100);
+            }
+            setVatRate(derivedVat);
+
+            // Pre-calculate missing VATs if applicable
+            const prePB = parseFloat(bid.price_before_vat) || 0;
+            const prePA = parseFloat(bid.price_after_vat) || 0;
+            const preCB = parseFloat(bid.total_cost_before_vat) || 0;
+            const preCA = parseFloat(bid.total_cost_after_vat) || 0;
+
+            let loadedPA = bid.price_after_vat || '';
+            if (prePB > 0 && prePA === 0) {
+                 loadedPA = (prePB * (1 + derivedVat / 100)).toFixed(0);
+            }
+            let loadedCA = bid.total_cost_after_vat || '';
+            if (preCB > 0 && preCA === 0) {
+                 loadedCA = (preCB * (1 + derivedVat / 100)).toFixed(0);
+            }
+
             setFormData({
                 bid_code: bid.bid_code || '',
                 requester: bid.requester || '',
@@ -82,9 +109,9 @@ export default function BiddingManagement() {
                 assigned_to: bid.assigned_to || '',
                 change_description: '',
                 price_before_vat: bid.price_before_vat || '',
-                price_after_vat: bid.price_after_vat || '',
+                price_after_vat: loadedPA,
                 total_cost_before_vat: bid.total_cost_before_vat || '',
-                total_cost_after_vat: bid.total_cost_after_vat || '',
+                total_cost_after_vat: loadedCA,
                 rejection_reason: bid.rejection_reason || '',
                 submission_deadline: bid.submission_deadline ? bid.submission_deadline.split('T')[0] : '',
                 result_date: bid.result_date ? bid.result_date.split('T')[0] : '',
@@ -92,6 +119,7 @@ export default function BiddingManagement() {
             });
         } else {
             setEditingBid(null);
+            setVatRate(8);
             const nextCode = `BG-${new Date().getFullYear()}-${String(bids.length + 1).padStart(3, '0')}`;
             setFormData({
                 bid_code: nextCode, requester: profile?.full_name || '', partner_id: '', du_an_id: '',
@@ -103,6 +131,69 @@ export default function BiddingManagement() {
             });
         }
         setIsFormOpen(true);
+    };
+
+    // Auto-generate bid code logic
+    useEffect(() => {
+        if (!editingBid && isFormOpen) {
+            let targetDate = new Date();
+            if (formData.submission_deadline) {
+                targetDate = new Date(formData.submission_deadline);
+            }
+            const dateStr = `${String(targetDate.getDate()).padStart(2, '0')}${String(targetDate.getMonth() + 1).padStart(2, '0')}${targetDate.getFullYear()}`;
+            
+            const duAnId = formData.du_an_id || '';
+            const partner = partners.find(p => String(p.id) === String(formData.partner_id));
+            const partnerCode = partner ? (partner.short_name || partner.code || partner.name || '').replace(/\s+/g, '') : '';
+            
+            const parts = ['BG'];
+            if (duAnId) parts.push(duAnId.toUpperCase().replace(/\s+/g, ''));
+            if (partnerCode) parts.push(partnerCode.toUpperCase().replace(/\s+/g, ''));
+            parts.push(dateStr);
+            
+            const autoCode = parts.join('-');
+            
+            setFormData(prev => {
+                if (prev.bid_code !== autoCode) {
+                    return { ...prev, bid_code: autoCode };
+                }
+                return prev;
+            });
+        }
+    }, [formData.du_an_id, formData.partner_id, formData.submission_deadline, editingBid, isFormOpen, partners]);
+
+    const handleQuickAddPartner = async () => {
+        const trimmed = newPartnerName.trim();
+        if (!trimmed) return;
+        
+        const existing = partners.find(p => p.name.toLowerCase() === trimmed.toLowerCase() || (p.short_name || '').toLowerCase() === trimmed.toLowerCase());
+        if (existing) {
+            setFormData(prev => ({ ...prev, partner_id: existing.id }));
+            setIsAddingPartner(false);
+            setNewPartnerName('');
+            smartToast('Đối tác đã tồn tại trong danh mục!');
+            return;
+        }
+        
+        try {
+            const { data, error } = await supabase.from('partners').insert([{
+                name: trimmed,
+                short_name: trimmed,
+                type: 'Client',
+                code: trimmed.substring(0, 8).toUpperCase().replace(/\s+/g, '') + Math.floor(Math.random() * 100)
+            }]).select().single();
+            
+            if (error) throw error;
+            
+            smartToast('Đã thêm nhanh CĐT / Tổng thầu!');
+            invalidateBids(); 
+            setFormData(prev => ({ ...prev, partner_id: String(data.id) }));
+            setIsAddingPartner(false);
+            setNewPartnerName('');
+        } catch (err) {
+            console.error('Lỗi khi thêm CĐT:', err);
+            smartToast('Lỗi khi thêm: ' + err.message);
+        }
     };
 
     const handleSave = async (e) => {
@@ -174,7 +265,7 @@ export default function BiddingManagement() {
                     price_after_vat: parseFloat(formData.price_after_vat) || 0,
                     total_cost_before_vat: parseFloat(formData.total_cost_before_vat) || 0,
                     total_cost_after_vat: parseFloat(formData.total_cost_after_vat) || 0,
-                    change_description: 'Khởi tạo báo giá',
+                    change_description: formData.change_description || 'Khởi tạo báo giá',
                     old_status: null,
                     new_status: formData.status,
                     changed_by: profile?.full_name || 'System'
@@ -241,7 +332,7 @@ export default function BiddingManagement() {
     const totalBids = filtered.length;
     const tracking = filtered.filter(b => b.status === 'Theo dõi').length;
     const quoting = filtered.filter(b => b.status === 'Đang báo giá').length;
-    const submitted = filtered.filter(b => b.status === 'Đã nộp').length;
+    const submitted = filtered.filter(b => ['Đã nộp', 'Trúng thầu', 'Trượt thầu'].includes(b.status)).length;
     const won = filtered.filter(b => b.status === 'Trúng thầu');
     const lost = filtered.filter(b => b.status === 'Trượt thầu').length;
     const winRate = (won.length + lost) > 0 ? ((won.length / (won.length + lost)) * 100).toFixed(1) : '-';
@@ -371,10 +462,10 @@ export default function BiddingManagement() {
                                              </div>
                                              <div className="text-right">
                                                  <div className="text-slate-500 text-[11px] font-bold"><span className="material-symbols-outlined text-[14px] align-text-bottom mr-1">event</span>{fmtDate(b.submission_deadline)}</div>
-                                                 {daysLeft !== null && daysLeft >= 0 && daysLeft <= 7 && (
+                                                 {daysLeft !== null && daysLeft >= 0 && daysLeft <= 7 && ['Theo dõi', 'Đang báo giá'].includes(b.status) && (
                                                      <span className="text-[10px] font-black text-rose-500 animate-pulse mt-0.5 block">Còn {daysLeft} ngày</span>
                                                  )}
-                                                 {daysLeft !== null && daysLeft < 0 && (
+                                                 {daysLeft !== null && daysLeft < 0 && ['Theo dõi', 'Đang báo giá'].includes(b.status) && (
                                                      <span className="text-[10px] font-black text-rose-600 mt-0.5 block">Quá hạn</span>
                                                  )}
                                              </div>
@@ -450,10 +541,10 @@ export default function BiddingManagement() {
                                                 </td>
                                                 <td className="px-3 py-3 text-xs text-slate-500 whitespace-nowrap">
                                                     {fmtDate(b.submission_deadline)}
-                                                    {daysLeft !== null && daysLeft >= 0 && daysLeft <= 7 && (
+                                                    {daysLeft !== null && daysLeft >= 0 && daysLeft <= 7 && ['Theo dõi', 'Đang báo giá'].includes(b.status) && (
                                                         <span className="block text-[9px] font-black text-rose-500 animate-pulse mt-0.5">Còn {daysLeft} ngày</span>
                                                     )}
-                                                    {daysLeft !== null && daysLeft < 0 && (
+                                                    {daysLeft !== null && daysLeft < 0 && ['Theo dõi', 'Đang báo giá'].includes(b.status) && (
                                                         <span className="block text-[9px] font-black text-rose-600 mt-0.5">Quá hạn</span>
                                                     )}
                                                 </td>
@@ -494,6 +585,10 @@ export default function BiddingManagement() {
                         </div>
                         <div className="p-6 overflow-y-auto w-full">
                             <form id="bidForm" onSubmit={handleSave} className="space-y-5">
+                                {/* Handlers for dynamic VAT computation */}
+                                {(() => {
+                                    // defined inside to not mess up component structure, though using local vars is safer
+                                })()}
                                 {/* Row 1 */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
@@ -510,12 +605,41 @@ export default function BiddingManagement() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-bold text-slate-700 mb-1 uppercase tracking-wide">CĐT / Tổng thầu <span className="text-rose-500">*</span></label>
-                                        <select required value={formData.partner_id} onChange={(e) => setFormData({...formData, partner_id: e.target.value})}
-                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500/20 outline-none">
-                                            <option value="">-- Chọn CĐT / Tổng thầu --</option>
-                                            {partners.map(p => <option key={p.id} value={p.id}>{p.short_name || p.name} ({p.code})</option>)}
-                                        </select>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wide">CĐT / Tổng thầu {(!isAddingPartner) && <span className="text-rose-500">*</span>}</label>
+                                            {!isAddingPartner && (
+                                                <button type="button" onClick={() => setIsAddingPartner(true)} className="text-[10px] font-bold text-cyan-600 hover:text-cyan-700 flex items-center gap-0.5 px-1 py-0.5 hover:bg-cyan-50 rounded transition-colors">
+                                                    <span className="material-symbols-outlined text-[13px]">add_circle</span> Thêm nhanh
+                                                </button>
+                                            )}
+                                        </div>
+                                        {isAddingPartner ? (
+                                            <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
+                                                <input 
+                                                    type="text" 
+                                                    autoFocus
+                                                    placeholder="Nhập tên CĐT / Tổng thầu..."
+                                                    value={newPartnerName}
+                                                    onChange={(e) => setNewPartnerName(e.target.value)}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleQuickAddPartner(); } else if (e.key === 'Escape') { setIsAddingPartner(false); } }}
+                                                    className="w-full px-3 py-2 rounded-xl border border-cyan-300 ring-4 ring-cyan-50 text-sm focus:outline-none font-bold text-slate-700"
+                                                />
+                                                <div className="flex gap-1 shrink-0">
+                                                   <button type="button" onClick={handleQuickAddPartner} className="w-8 h-8 flex items-center justify-center bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg shadow-sm transition-colors" title="Lưu">
+                                                       <span className="material-symbols-outlined text-[18px]">check</span>
+                                                   </button>
+                                                   <button type="button" onClick={() => setIsAddingPartner(false)} className="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg shadow-sm transition-colors" title="Hủy (Esc)">
+                                                       <span className="material-symbols-outlined text-[18px]">close</span>
+                                                   </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <select required value={formData.partner_id} onChange={(e) => setFormData({...formData, partner_id: e.target.value})}
+                                                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500/20 outline-none">
+                                                <option value="">-- Chọn CĐT / Tổng thầu --</option>
+                                                {partners.map(p => <option key={p.id} value={p.id}>{p.short_name || p.name} {p.code && `(${p.code})`}</option>)}
+                                            </select>
+                                        )}
                                     </div>
                                 </div>
                                 {/* Row 2 */}
@@ -540,14 +664,38 @@ export default function BiddingManagement() {
 
                                 {/* Price Section */}
                                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/60">
-                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[14px]">payments</span> Giá trị báo giá
-                                    </p>
+                                    <div className="flex justify-between items-center mb-4">
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5 m-0">
+                                            <span className="material-symbols-outlined text-[14px]">payments</span> Giá trị báo giá
+                                        </p>
+                                        <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-slate-200/60 shadow-sm">
+                                            <span className="text-[10px] font-black text-slate-500 tracking-wider">THUẾ VAT (%)</span>
+                                            <input type="number" value={vatRate} onChange={(e) => {
+                                                const v = parseFloat(e.target.value) || 0;
+                                                setVatRate(v);
+                                                const pB = parseFloat(formData.price_before_vat) || 0;
+                                                const cB = parseFloat(formData.total_cost_before_vat) || 0;
+                                                setFormData({
+                                                    ...formData,
+                                                    price_after_vat: pB ? (pB * (1 + v / 100)).toFixed(0) : formData.price_after_vat,
+                                                    total_cost_after_vat: cB ? (cB * (1 + v / 100)).toFixed(0) : formData.total_cost_after_vat
+                                                });
+                                            }} className="w-12 text-center text-xs font-bold text-indigo-700 bg-indigo-50 border-none px-1 py-0.5 rounded outline-none" min="0" max="100"/>
+                                        </div>
+                                    </div>
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                         <div>
                                             <label className="block text-[10px] font-bold text-slate-600 mb-1">Giá chào (tr.VAT)</label>
                                             <div className="relative">
-                                                <input type="number" value={formData.price_before_vat} onChange={(e) => setFormData({...formData, price_before_vat: e.target.value})}
+                                                <input type="number" value={formData.price_before_vat} onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    const num = parseFloat(val) || 0;
+                                                    setFormData({
+                                                        ...formData, 
+                                                        price_before_vat: val, 
+                                                        price_after_vat: num > 0 ? (num * (1 + vatRate/100)).toFixed(0) : formData.price_after_vat
+                                                    });
+                                                }}
                                                     className="w-full px-3 py-2 pr-8 rounded-xl border border-slate-200 text-sm font-mono text-right focus:ring-2 focus:ring-cyan-500/20 outline-none" />
                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">₫</span>
                                             </div>
@@ -563,7 +711,15 @@ export default function BiddingManagement() {
                                         <div>
                                             <label className="block text-[10px] font-bold text-indigo-600 mb-1">Giá vốn (tr.VAT)</label>
                                             <div className="relative">
-                                                <input type="number" value={formData.total_cost_before_vat} onChange={(e) => setFormData({...formData, total_cost_before_vat: e.target.value})}
+                                                <input type="number" value={formData.total_cost_before_vat} onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    const num = parseFloat(val) || 0;
+                                                    setFormData({
+                                                        ...formData, 
+                                                        total_cost_before_vat: val, 
+                                                        total_cost_after_vat: num > 0 ? (num * (1 + vatRate/100)).toFixed(0) : formData.total_cost_after_vat
+                                                    });
+                                                }}
                                                     className="w-full px-3 py-2 pr-8 rounded-xl border border-indigo-200 text-sm font-mono text-right text-indigo-600 focus:ring-2 focus:ring-indigo-500/20 outline-none" />
                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">₫</span>
                                             </div>
@@ -625,17 +781,27 @@ export default function BiddingManagement() {
                                         className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500/20 outline-none" />
                                 </div>
 
-                                {/* Change description (required when editing and values changed) */}
-                                {editingBid && (formData.status !== editingBid.status || parseFloat(formData.price_before_vat) !== (parseFloat(editingBid.price_before_vat) || 0) || parseFloat(formData.price_after_vat) !== (parseFloat(editingBid.price_after_vat) || 0)) && (
-                                    <div className="p-4 rounded-xl border-l-[3px] border-amber-500 bg-amber-50/50">
-                                        <label className="block text-xs font-bold text-amber-800 mb-1 uppercase tracking-wide flex items-center gap-1">
-                                            <span className="material-symbols-outlined text-[16px]">info</span> Nội dung thay đổi (bắt buộc — sẽ ghi vào lịch sử v{(editingBid.current_version || 0) + 1}) <span className="text-rose-500">*</span>
+                                {/* Change version description */}
+                                <div className={`p-4 rounded-xl border-l-[3px] ${(!editingBid || (editingBid && formData.status === editingBid.status && parseFloat(formData.price_before_vat) === (parseFloat(editingBid.price_before_vat) || 0) && parseFloat(formData.price_after_vat) === (parseFloat(editingBid.price_after_vat) || 0))) ? 'border-indigo-500 bg-indigo-50/50' : 'border-amber-500 bg-amber-50/50'}`}>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className={`block text-xs font-bold uppercase tracking-wide flex items-center gap-1 ${(!editingBid || (editingBid && formData.status === editingBid.status && parseFloat(formData.price_before_vat) === (parseFloat(editingBid.price_before_vat) || 0) && parseFloat(formData.price_after_vat) === (parseFloat(editingBid.price_after_vat) || 0))) ? 'text-indigo-800' : 'text-amber-800'}`}>
+                                            <span className="material-symbols-outlined text-[16px]">history_edu</span> 
+                                            {!editingBid ? 'Nội dung khởi tạo (Lịch sử v1)' : `Nội dung thay đổi (Lịch sử v${(editingBid.current_version || 0) + 1})`}
+                                            {editingBid && (formData.status !== editingBid.status || parseFloat(formData.price_before_vat) !== (parseFloat(editingBid.price_before_vat) || 0) || parseFloat(formData.price_after_vat) !== (parseFloat(editingBid.price_after_vat) || 0)) && <span className="text-rose-500">*</span>}
                                         </label>
-                                        <textarea required value={formData.change_description} onChange={(e) => setFormData({...formData, change_description: e.target.value})}
-                                            rows={2} placeholder="VD: Điều chỉnh giá chào giảm 5% theo yêu cầu CĐT..."
-                                            className="w-full px-3 py-2 mt-1 rounded-lg border border-amber-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-sm bg-white outline-none" />
                                     </div>
-                                )}
+                                    <textarea 
+                                        required={!!editingBid && (formData.status !== editingBid.status || parseFloat(formData.price_before_vat) !== (parseFloat(editingBid.price_before_vat) || 0) || parseFloat(formData.price_after_vat) !== (parseFloat(editingBid.price_after_vat) || 0))}
+                                        value={formData.change_description} 
+                                        onChange={(e) => setFormData({...formData, change_description: e.target.value})}
+                                        rows={2} 
+                                        placeholder={!editingBid ? "VD: Báo giá lần đầu..." : "VD: Điều chỉnh giá chào giảm 5% theo yêu cầu CĐT..."}
+                                        className={`w-full px-3 py-2 mt-1 rounded-lg border text-sm bg-white outline-none focus:ring-2 ${(!editingBid || (editingBid && formData.status === editingBid.status && parseFloat(formData.price_before_vat) === (parseFloat(editingBid.price_before_vat) || 0) && parseFloat(formData.price_after_vat) === (parseFloat(editingBid.price_after_vat) || 0))) ? 'border-indigo-200 focus:border-indigo-500 focus:ring-indigo-500/20' : 'border-amber-200 focus:border-amber-500 focus:ring-amber-500/20'}`} 
+                                    />
+                                    {editingBid && (formData.status !== editingBid.status || parseFloat(formData.price_before_vat) !== (parseFloat(editingBid.price_before_vat) || 0) || parseFloat(formData.price_after_vat) !== (parseFloat(editingBid.price_after_vat) || 0)) && (
+                                         <p className="text-[10px] text-amber-700 mt-1 italic">* Bắt buộc nhập vì bạn vừa thay đổi Giá hoặc Trạng thái thầu.</p>
+                                    )}
+                                </div>
                             </form>
                         </div>
                         <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">

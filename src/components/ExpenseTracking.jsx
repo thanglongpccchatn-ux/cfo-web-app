@@ -27,7 +27,7 @@ export default function ExpenseTracking() {
         expenseType: 'BCH công trường',
         amount: '',
         paidAmount: '',
-        requestedDate: '',
+        requestedDate: new Date().toISOString().split('T')[0],
         expenseDate: new Date().toISOString().split('T')[0],
         paidDate: new Date().toISOString().split('T')[0],
         recipientId: '',
@@ -77,7 +77,15 @@ export default function ExpenseTracking() {
 
     const updateDraftNum = (key, field, value) => {
         const clean = value.replace(/[^0-9]/g, '');
-        setDraftRows(prev => prev.map(r => r._key === key ? { ...r, [field]: clean } : r));
+        setDraftRows(prev => prev.map(r => {
+            if (r._key === key) {
+                if (field === 'amount' && (r.paidAmount === r.amount || !r.paidAmount)) {
+                    return { ...r, amount: clean, paidAmount: clean };
+                }
+                return { ...r, [field]: clean };
+            }
+            return r;
+        }));
     };
 
     const removeDraft = (key) => {

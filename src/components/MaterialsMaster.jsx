@@ -36,6 +36,28 @@ export default function MaterialsMaster() {
     const [quickAddType, setQuickAddType] = useState('BRAND');
     const [quickAddValue, setQuickAddValue] = useState({ name: '', code: '' });
     const [bulkUpdateForm, setBulkUpdateForm] = useState({ type: 'PERCENT_DISCOUNT', value: '' });
+    const [expandedMaterialId, setExpandedMaterialId] = useState(null);
+    const [priceHistoryData, setPriceHistoryData] = useState([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+
+    const togglePriceHistory = async (materialId) => {
+        if (expandedMaterialId === materialId) {
+            setExpandedMaterialId(null);
+            return;
+        }
+        setExpandedMaterialId(materialId);
+        setLoadingHistory(true);
+        setPriceHistoryData([]);
+        const { data } = await supabase
+            .from('expense_materials')
+            .select('unit_price, expense_date, supplier_name, quantity, unit, project_id, projects(name, code)')
+            .eq('material_id', materialId)
+            .gt('unit_price', 0)
+            .order('expense_date', { ascending: false })
+            .limit(10);
+        setPriceHistoryData(data || []);
+        setLoadingHistory(false);
+    };
 
     const materialMapping = {
         code: "Mã VT", name: "Tên vật tư", category_code: "Danh mục", brand: "Hãng", model: "Model",
@@ -334,9 +356,12 @@ export default function MaterialsMaster() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                {filteredList.map((m) => (
-                                    <tr key={m.id} className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/80 group transition-colors ${selectedIds.has(m.id) ? 'bg-primary/5 dark:bg-primary/10' : ''}`}>
-                                        <td className="px-4 py-4 text-center">
+                                {filteredList.map((m) => {
+                                    const isExpanded = expandedMaterialId === m.id;
+                                    return (
+                                    <React.Fragment key={m.id}>
+                                    <tr className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/80 group transition-colors cursor-pointer ${selectedIds.has(m.id) ? 'bg-primary/5 dark:bg-primary/10' : ''} ${isExpanded ? 'bg-amber-50/50' : ''}`} onClick={() => togglePriceHistory(m.id)}>
+                                        <td className="px-4 py-4 text-center" onClick={e => e.stopPropagation()}>
                                             <input 
                                                 type="checkbox" 
                                                 className="rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary"
@@ -350,7 +375,10 @@ export default function MaterialsMaster() {
                                             </span>
                                         </td>
                                         <td className="px-4 py-4">
-                                            <div className="font-bold text-slate-900 dark:text-white mb-0.5">{m.name}</div>
+                                            <div className="font-bold text-slate-900 dark:text-white mb-0.5 flex items-center gap-1.5">
+                                                {m.name}
+                                                <span className={`material-symbols-outlined text-[14px] transition-transform ${isExpanded ? 'rotate-180 text-amber-500' : 'text-slate-300'}`}>expand_more</span>
+                                            </div>
                                             <div className="flex flex-wrap gap-x-3 gap-y-1">
                                                 {m.brand && <span className="text-[10px] text-slate-500 font-medium tracking-wide">Hãng: {m.brand}</span>}
                                                 {m.model && <span className="text-[10px] text-slate-500 font-medium tracking-wide">Model: {m.model}</span>}
@@ -378,7 +406,7 @@ export default function MaterialsMaster() {
                                         <td className="px-4 py-4 text-right font-black text-primary text-base">
                                             {fmt(m.actual_price)}
                                         </td>
-                                        <td className="px-4 py-4 text-right whitespace-nowrap">
+                                        <td className="px-4 py-4 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                             <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                               <button onClick={() => handleEditManual(m)} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors">
                                                   <span className="material-symbols-outlined notranslate text-[18px]" translate="no">edit</span>
@@ -389,7 +417,97 @@ export default function MaterialsMaster() {
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
+                                    {/* Expanded Price History Row */}
+                                    {isExpanded && (
+                                        <tr>
+                                            <td colSpan="9" className="bg-amber-50/30 dark:bg-amber-950/10 border-b-2 border-amber-200/50 p-0">
+                                                <div className="px-6 py-4 animate-slide-down">
+                                                    <h5 className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-3 flex items-center gap-1.5">
+                                                        <span className="material-symbols-outlined text-[14px]">trending_up</span>
+                                                        Lịch sử giá mua — {m.name}
+                                                    </h5>
+                                                    {loadingHistory ? (
+                                                        <div className="text-xs text-slate-400 animate-pulse py-4 text-center">Đang tải...</div>
+                                                    ) : priceHistoryData.length === 0 ? (
+                                                        <div className="text-xs text-slate-400 italic py-4 text-center">Chưa có lịch sử mua cho vật tư này</div>
+                                                    ) : (
+                                                        <div className="space-y-3">
+                                                            {/* Mini price stats */}
+                                                            {(() => {
+                                                                const prices = priceHistoryData.map(p => Number(p.unit_price));
+                                                                const minP = Math.min(...prices);
+                                                                const maxP = Math.max(...prices);
+                                                                const avgP = prices.reduce((s, v) => s + v, 0) / prices.length;
+                                                                const catalogP = Number(m.actual_price || m.base_price) || 0;
+                                                                return (
+                                                                    <div className="grid grid-cols-4 gap-2">
+                                                                        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-2.5">
+                                                                            <div className="text-[8px] font-black uppercase text-slate-400 tracking-wider">Niêm yết</div>
+                                                                            <div className="text-sm font-black text-slate-700 tabular-nums">{fmt(catalogP)}đ</div>
+                                                                        </div>
+                                                                        <div className="bg-white dark:bg-slate-800 rounded-xl border border-emerald-200 p-2.5">
+                                                                            <div className="text-[8px] font-black uppercase text-emerald-600 tracking-wider">Thấp nhất</div>
+                                                                            <div className="text-sm font-black text-emerald-700 tabular-nums">{fmt(minP)}đ</div>
+                                                                        </div>
+                                                                        <div className="bg-white dark:bg-slate-800 rounded-xl border border-blue-200 p-2.5">
+                                                                            <div className="text-[8px] font-black uppercase text-blue-600 tracking-wider">Trung bình</div>
+                                                                            <div className="text-sm font-black text-blue-700 tabular-nums">{fmt(Math.round(avgP))}đ</div>
+                                                                        </div>
+                                                                        <div className="bg-white dark:bg-slate-800 rounded-xl border border-red-200 p-2.5">
+                                                                            <div className="text-[8px] font-black uppercase text-red-600 tracking-wider">Cao nhất</div>
+                                                                            <div className="text-sm font-black text-red-700 tabular-nums">{fmt(maxP)}đ</div>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                            {/* Purchase list */}
+                                                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                                                                <table className="w-full text-left">
+                                                                    <thead className="text-[8px] font-black uppercase text-slate-400 tracking-widest bg-slate-50 dark:bg-slate-900">
+                                                                        <tr>
+                                                                            <th className="px-3 py-1.5">Ngày</th>
+                                                                            <th className="px-3 py-1.5">NCC</th>
+                                                                            <th className="px-3 py-1.5">Dự án</th>
+                                                                            <th className="px-3 py-1.5 text-center">SL</th>
+                                                                            <th className="px-3 py-1.5 text-right">Đơn giá</th>
+                                                                            <th className="px-3 py-1.5 text-center">vs Niêm yết</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                                                        {priceHistoryData.map((p, i) => {
+                                                                            const catalogP = Number(m.actual_price || m.base_price) || 0;
+                                                                            const priceDev = catalogP > 0 ? ((Number(p.unit_price) - catalogP) / catalogP * 100) : 0;
+                                                                            return (
+                                                                                <tr key={i} className="text-[11px] hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                                                                    <td className="px-3 py-1.5 font-medium text-slate-600">{p.expense_date ? new Date(p.expense_date).toLocaleDateString('vi-VN') : '-'}</td>
+                                                                                    <td className="px-3 py-1.5 text-slate-500 truncate max-w-[120px]">{p.supplier_name || '-'}</td>
+                                                                                    <td className="px-3 py-1.5 text-slate-400 truncate max-w-[100px]">{p.projects?.code || p.projects?.name || '-'}</td>
+                                                                                    <td className="px-3 py-1.5 text-center font-bold text-slate-500">{p.quantity} {p.unit}</td>
+                                                                                    <td className="px-3 py-1.5 text-right font-black text-slate-800 tabular-nums">{fmt(p.unit_price)}đ</td>
+                                                                                    <td className="px-3 py-1.5 text-center">
+                                                                                        {Math.abs(priceDev) > 0.5 ? (
+                                                                                            <span className={`text-[10px] font-black ${priceDev > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                                                                                {priceDev > 0 ? '↑' : '↓'}{Math.abs(priceDev).toFixed(1)}%
+                                                                                            </span>
+                                                                                        ) : (
+                                                                                            <span className="text-[10px] text-slate-300">≈</span>
+                                                                                        )}
+                                                                                    </td>
+                                                                                </tr>
+                                                                            );
+                                                                        })}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    </React.Fragment>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     )}

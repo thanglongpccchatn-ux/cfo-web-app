@@ -7,6 +7,7 @@ import MaterialTracking from './MaterialTracking';
 import { smartToast } from '../utils/globalToast';
 import { fmt, formatBillion } from '../utils/formatters';
 import ReceiveGoodsModal from './supplier/ReceiveGoodsModal';
+import SupplierPaymentModal from './supplier/SupplierPaymentModal';
 import SkeletonTable from './ui/SkeletonTable';
 
 const EMPTY_LINE = () => ({ _key: Date.now() + Math.random(), materialId: '', productName: '', unit: 'Cái', quantity: '', unitPrice: '', vatRate: '8', notes: '', _showSuggestions: false });
@@ -30,6 +31,8 @@ export default function SuppliersMaster() {
     const [receivePO, setReceivePO] = useState(null);
     const [receiveLines, setReceiveLines] = useState([]);
     const [submitting, setSubmitting] = useState(false);
+    const [paymentPO, setPaymentPO] = useState(null);
+    const [paymentSupplier, setPaymentSupplier] = useState(null);
 
     const [purchaseHeader, setPurchaseHeader] = useState({
         supplierId: '', projectId: '', expenseDate: new Date().toISOString().split('T')[0]
@@ -62,7 +65,7 @@ export default function SuppliersMaster() {
         queryFn: async () => {
             const [supRes, poRes, matRes] = await Promise.all([
                 supabase.from('suppliers').select('*').order('name', { ascending: true }),
-                supabase.from('purchase_orders').select('supplier_id, total_amount, project_id'),
+                supabase.from('purchase_orders').select('supplier_id, total_amount, project_id, po_payments(amount)'),
                 supabase.from('expense_materials').select('supplier_id, total_amount, paid_amount, project_id'),
             ]);
             if (supRes.error) { console.error('Lỗi tải NCC:', supRes.error); return []; }
@@ -73,17 +76,20 @@ export default function SuppliersMaster() {
             (poRes.data || []).forEach(po => {
                 if (po.supplier_id && supplierAgg[po.supplier_id]) {
                     supplierAgg[po.supplier_id].totalOrdered += Number(po.total_amount || 0);
+                    // Sum actual payments from po_payments
+                    const poPaid = (po.po_payments || []).reduce((s, p) => s + Number(p.amount || 0), 0);
+                    supplierAgg[po.supplier_id].totalPaid += poPaid;
                     if (po.project_id) supplierAgg[po.supplier_id].projectIds.add(po.project_id);
                 }
             });
             (matRes.data || []).forEach(mat => {
                 if (mat.supplier_id && supplierAgg[mat.supplier_id]) {
                     supplierAgg[mat.supplier_id].totalValue += Number(mat.total_amount || 0);
-                    supplierAgg[mat.supplier_id].totalPaid += Number(mat.paid_amount || 0);
+                    // Don't add mat.paid_amount here — totalPaid comes from po_payments above
                     if (mat.project_id) supplierAgg[mat.supplier_id].projectIds.add(mat.project_id);
                 }
             });
-            return Object.values(supplierAgg).map(s => ({ ...s, totalDebt: s.totalValue - s.totalPaid, projectCount: s.projectIds ? s.projectIds.size : 0 }));
+            return Object.values(supplierAgg).map(s => ({ ...s, totalDebt: s.totalOrdered - s.totalPaid, projectCount: s.projectIds ? s.projectIds.size : 0 }));
         },
         staleTime: 5 * 60 * 1000,
     });
@@ -202,7 +208,7 @@ export default function SuppliersMaster() {
         setLoadingPOs(true);
         const { data } = await supabase
             .from('purchase_orders')
-            .select('*, purchase_order_lines(*)')
+            .select('*, purchase_order_lines(*), po_payments(id, amount, payment_date, payment_method, reference_number, notes)')
             .eq('supplier_id', supplierId)
             .order('created_at', { ascending: false });
         setSupplierPOs(data || []);
@@ -276,7 +282,7 @@ export default function SuppliersMaster() {
     const globalTotalOrdered = suppliersData.reduce((acc, s) => acc + (s.totalOrdered || 0), 0);
     const globalTotalValue = suppliersData.reduce((acc, s) => acc + (s.totalValue || 0), 0);
     const globalTotalPaid = suppliersData.reduce((acc, s) => acc + (s.totalPaid || 0), 0);
-    const globalTotalDebt = globalTotalValue - globalTotalPaid;
+    const globalTotalDebt = globalTotalOrdered - globalTotalPaid;
 
     if (loading) {
         return <SkeletonTable rows={5} cols={7} />;
@@ -478,6 +484,8 @@ export default function SuppliersMaster() {
                                                                             <th className="px-4 py-2.5">Ngày đặt</th>
                                                                             <th className="px-4 py-2.5">Dự án</th>
                                                                             <th className="px-4 py-2.5 text-right">Tổng PO</th>
+                                                                            <th className="px-4 py-2.5 text-right text-emerald-600">Đã TT</th>
+                                                                            <th className="px-4 py-2.5 text-right text-red-600">Còn nợ</th>
                                                                             <th className="px-4 py-2.5 text-center">Vật tư</th>
                                                                             <th className="px-4 py-2.5 text-center">Trạng thái</th>
                                                                             <th className="px-4 py-2.5 text-center">Thao tác</th>
@@ -489,6 +497,8 @@ export default function SuppliersMaster() {
                                                                             const lines = po.purchase_order_lines || [];
                                                                             const totalOrdered = lines.reduce((s, l) => s + Number(l.ordered_qty), 0);
                                                                             const totalReceived = lines.reduce((s, l) => s + Number(l.received_qty), 0);
+                                                                            const poPaid = (po.po_payments || []).reduce((s, p) => s + Number(p.amount || 0), 0);
+                                                                            const poDebt = Number(po.total_amount || 0) - poPaid;
                                                                             return (
                                                                                 <React.Fragment key={po.id}>
                                                                                 <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
@@ -496,6 +506,8 @@ export default function SuppliersMaster() {
                                                                                     <td className="px-4 py-2.5 text-slate-500">{po.order_date}</td>
                                                                                     <td className="px-4 py-2.5 text-slate-600 dark:text-slate-400">{proj?.name || proj?.code || '-'}</td>
                                                                                     <td className="px-4 py-2.5 text-right font-bold">{fmt(po.total_amount)} ₫</td>
+                                                                                    <td className="px-4 py-2.5 text-right font-bold text-emerald-600 tabular-nums">{poPaid > 0 ? fmt(poPaid) : '-'}</td>
+                                                                                    <td className={`px-4 py-2.5 text-right font-black tabular-nums ${poDebt > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{poDebt > 0 ? fmt(poDebt) : '0'}</td>
                                                                                     <td className="px-4 py-2.5 text-center">
                                                                                         <span className="text-[10px] font-bold">{totalReceived}/{totalOrdered}</span>
                                                                                     </td>
@@ -505,16 +517,23 @@ export default function SuppliersMaster() {
                                                                                         </span>
                                                                                     </td>
                                                                                     <td className="px-4 py-2.5 text-center">
-                                                                                        {po.status !== 'completed' && po.status !== 'cancelled' && (
-                                                                                            <button onClick={(e) => { e.stopPropagation(); openReceiveModal(po); }} className="px-3 py-1 bg-emerald-500 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-600 transition-colors">
-                                                                                                Nhận hàng
-                                                                                            </button>
-                                                                                        )}
+                                                                                        <div className="flex justify-center gap-1.5">
+                                                                                            {po.status !== 'completed' && po.status !== 'cancelled' && (
+                                                                                                <button onClick={(e) => { e.stopPropagation(); openReceiveModal(po); }} className="px-3 py-1 bg-emerald-500 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-600 transition-colors">
+                                                                                                    Nhận hàng
+                                                                                                </button>
+                                                                                            )}
+                                                                                            {poDebt > 0 && (
+                                                                                                <button onClick={(e) => { e.stopPropagation(); setPaymentPO(po); setPaymentSupplier(supplier); }} className="px-3 py-1 bg-blue-500 text-white text-[10px] font-bold rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-1">
+                                                                                                    <span className="material-symbols-outlined text-[12px]">payments</span> Thanh toán
+                                                                                                </button>
+                                                                                            )}
+                                                                                        </div>
                                                                                     </td>
                                                                                 </tr>
                                                                                 {/* PO Line details */}
                                                                                 <tr>
-                                                                                    <td colSpan="7" className="px-4 pb-2 pt-0">
+                                                                                    <td colSpan="9" className="px-4 pb-2 pt-0">
                                                                                         <div className="flex flex-wrap gap-x-6 gap-y-1 pl-4 border-l-2 border-orange-200 dark:border-orange-500/30">
                                                                                             {lines.map(l => (
                                                                                                 <div key={l.id} className="text-[10px] text-slate-500 flex items-center gap-1.5">
@@ -751,6 +770,18 @@ export default function SuppliersMaster() {
                 onSubmit={handleReceiveSubmit}
                 onClose={() => setShowReceiveModal(false)}
             />
+
+            {paymentPO && (
+                <SupplierPaymentModal
+                    po={paymentPO}
+                    supplier={paymentSupplier}
+                    onClose={() => { setPaymentPO(null); setPaymentSupplier(null); }}
+                    onSuccess={() => {
+                        invalidateSuppliers();
+                        if (paymentPO?.supplier_id) toggleSupplierPOs(paymentPO.supplier_id);
+                    }}
+                />
+            )}
         </div>
     );
 }

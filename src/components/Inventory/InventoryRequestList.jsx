@@ -41,7 +41,7 @@ const timeAgo = (dateStr) => {
     return days + ' ngày trước';
 };
 
-export default function InventoryRequestList({ onCreateNew }) {
+export default function InventoryRequestList({ onCreateNew, onCreatePO }) {
     const { approveRequestL1, approveRequestL2, rejectRequest } = useInventory();
     const { profile } = useAuth();
     const { success, error: toastError } = useToast();
@@ -219,6 +219,11 @@ export default function InventoryRequestList({ onCreateNew }) {
                                                         <span className="material-symbols-outlined text-[14px]">close</span>Từ chối
                                                     </button>
                                                 </>
+                                            )}
+                                            {req.status === 'APPROVED' && onCreatePO && (
+                                                <button onClick={(e) => { e.stopPropagation(); onCreatePO(req.id); }} className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1 transition-all shadow-sm">
+                                                    <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>Tạo PO
+                                                </button>
                                             )}
                                             <span className={`material-symbols-outlined text-[20px] text-slate-300 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>expand_more</span>
                                         </div>
