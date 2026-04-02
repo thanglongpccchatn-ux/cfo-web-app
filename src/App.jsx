@@ -27,6 +27,7 @@ const ContractMasterDetail = lazy(() => import('./components/ContractMasterDetai
 const PaymentsMaster = lazy(() => import('./components/PaymentsMaster'));
 const SuppliersMaster = lazy(() => import('./components/SuppliersMaster'));
 const SubcontractorsMaster = lazy(() => import('./components/SubcontractorsMaster'));
+const LaborSubcontractorHub = lazy(() => import('./components/LaborSubcontractorHub'));
 const MaterialsMaster = lazy(() => import('./components/MaterialsMaster'));
 const PartnerManagement = lazy(() => import('./components/PartnerManagement'));
 const UserManagement = lazy(() => import('./components/UserManagement'));
@@ -45,6 +46,7 @@ const SettlementManagement = lazy(() => import('./components/SettlementManagemen
 const VariationsManagement = lazy(() => import('./components/VariationsManagement'));
 const BiddingManagement = lazy(() => import('./components/BiddingManagement'));
 const ExpenseTracking = lazy(() => import('./components/ExpenseTracking'));
+const WeeklyExpensePlan = lazy(() => import('./components/WeeklyExpensePlan'));
 const ConstructionModule = lazy(() => import('./components/ConstructionModule'));
 const UserGuide = lazy(() => import('./components/UserGuide'));
 const LoanManagement = lazy(() => import('./components/LoanManagement'));
@@ -203,14 +205,16 @@ function MainLayout() {
             <Route path="/site_diary" element={<ProtectedRoute><SiteDiary /></ProtectedRoute>} />
             <Route path="/warranty_tracking" element={<ProtectedRoute requiredPerms={['view_contracts']}><WarrantyTracking /></ProtectedRoute>} />
             <Route path="/settlement" element={<ProtectedRoute requiredPerms={['view_contracts']}><SettlementManagement /></ProtectedRoute>} />
-            <Route path="/labor_tracking" element={<ProtectedRoute requiredPerms={['view_labor', 'manage_labor']}><LaborTracking /></ProtectedRoute>} />
+            <Route path="/labor_subcontractors" element={<ProtectedRoute requiredPerms={['view_labor', 'manage_labor', 'view_subcontractors']}><LaborSubcontractorHub /></ProtectedRoute>} />
+            <Route path="/labor_tracking" element={<Navigate to="/labor_subcontractors?tab=labor" replace />} />
             <Route path="/material_tracking" element={<ProtectedRoute requiredPerms={['view_materials', 'manage_materials_tracking', 'manage_materials']}><MaterialTracking /></ProtectedRoute>} />
             <Route path="/expense_tracking" element={<ProtectedRoute requiredPerms={['view_expenses', 'manage_expenses']}><ExpenseTracking /></ProtectedRoute>} />
+            <Route path="/weekly_expense_plan" element={<ProtectedRoute requiredPerms={['view_planning', 'manage_planning']}><WeeklyExpensePlan /></ProtectedRoute>} />
             
             {/* Financial & Inventory Modules */}
             <Route path="/payments" element={<ProtectedRoute requiredPerms={['view_payments']}><PaymentsMaster /></ProtectedRoute>} />
             <Route path="/suppliers" element={<ProtectedRoute requiredPerms={['view_suppliers', 'view_payments']}><SuppliersMaster /></ProtectedRoute>} />
-            <Route path="/subcontractors" element={<ProtectedRoute requiredPerms={['view_suppliers', 'view_payments']}><SubcontractorsMaster /></ProtectedRoute>} />
+            <Route path="/subcontractors" element={<Navigate to="/labor_subcontractors?tab=master" replace />} />
             <Route path="/materials" element={<ProtectedRoute requiredPerms={['view_materials', 'view_payments']}><MaterialsMaster /></ProtectedRoute>} />
             <Route path="/inventory" element={<ProtectedRoute requiredPerms={['view_materials']}><InventoryManager /></ProtectedRoute>} />
             

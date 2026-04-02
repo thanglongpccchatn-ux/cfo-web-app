@@ -23,6 +23,7 @@ export default function BiddingManagement() {
         assigned_to: '', change_description: '',
         price_before_vat: '', price_after_vat: '',
         total_cost_before_vat: '', total_cost_after_vat: '',
+        final_price_before_vat: '', final_price_after_vat: '',
         rejection_reason: '', submission_deadline: '', result_date: '', notes: ''
     });
     const [vatRate, setVatRate] = useState(8);
@@ -98,6 +99,14 @@ export default function BiddingManagement() {
                  loadedCA = (preCB * (1 + derivedVat / 100)).toFixed(0);
             }
 
+            // Pre-calculate missing final price VAT
+            const preFB = parseFloat(bid.final_price_before_vat) || 0;
+            const preFA = parseFloat(bid.final_price_after_vat) || 0;
+            let loadedFA = bid.final_price_after_vat || '';
+            if (preFB > 0 && preFA === 0) {
+                 loadedFA = (preFB * (1 + derivedVat / 100)).toFixed(0);
+            }
+
             setFormData({
                 bid_code: bid.bid_code || '',
                 requester: bid.requester || '',
@@ -112,6 +121,8 @@ export default function BiddingManagement() {
                 price_after_vat: loadedPA,
                 total_cost_before_vat: bid.total_cost_before_vat || '',
                 total_cost_after_vat: loadedCA,
+                final_price_before_vat: bid.final_price_before_vat || '',
+                final_price_after_vat: loadedFA,
                 rejection_reason: bid.rejection_reason || '',
                 submission_deadline: bid.submission_deadline ? bid.submission_deadline.split('T')[0] : '',
                 result_date: bid.result_date ? bid.result_date.split('T')[0] : '',
@@ -127,6 +138,7 @@ export default function BiddingManagement() {
                 assigned_to: profile?.full_name || '', change_description: '',
                 price_before_vat: '', price_after_vat: '',
                 total_cost_before_vat: '', total_cost_after_vat: '',
+                final_price_before_vat: '', final_price_after_vat: '',
                 rejection_reason: '', submission_deadline: '', result_date: '', notes: ''
             });
         }
@@ -213,6 +225,8 @@ export default function BiddingManagement() {
                 price_after_vat: parseFloat(formData.price_after_vat) || 0,
                 total_cost_before_vat: parseFloat(formData.total_cost_before_vat) || 0,
                 total_cost_after_vat: parseFloat(formData.total_cost_after_vat) || 0,
+                final_price_before_vat: parseFloat(formData.final_price_before_vat) || 0,
+                final_price_after_vat: parseFloat(formData.final_price_after_vat) || 0,
                 rejection_reason: formData.rejection_reason || null,
                 submission_deadline: formData.submission_deadline || null,
                 result_date: formData.result_date || null,
@@ -247,6 +261,8 @@ export default function BiddingManagement() {
                         price_after_vat: newPriceAV,
                         total_cost_before_vat: parseFloat(formData.total_cost_before_vat) || 0,
                         total_cost_after_vat: parseFloat(formData.total_cost_after_vat) || 0,
+                        final_price_before_vat: parseFloat(formData.final_price_before_vat) || 0,
+                        final_price_after_vat: parseFloat(formData.final_price_after_vat) || 0,
                         change_description: formData.change_description,
                         old_status: oldStatus,
                         new_status: formData.status,
@@ -265,6 +281,8 @@ export default function BiddingManagement() {
                     price_after_vat: parseFloat(formData.price_after_vat) || 0,
                     total_cost_before_vat: parseFloat(formData.total_cost_before_vat) || 0,
                     total_cost_after_vat: parseFloat(formData.total_cost_after_vat) || 0,
+                    final_price_before_vat: parseFloat(formData.final_price_before_vat) || 0,
+                    final_price_after_vat: parseFloat(formData.final_price_after_vat) || 0,
                     change_description: formData.change_description || 'Khởi tạo báo giá',
                     old_status: null,
                     new_status: formData.status,
@@ -675,27 +693,32 @@ export default function BiddingManagement() {
                                                 setVatRate(v);
                                                 const pB = parseFloat(formData.price_before_vat) || 0;
                                                 const cB = parseFloat(formData.total_cost_before_vat) || 0;
+                                                const fB = parseFloat(formData.final_price_before_vat) || 0;
                                                 setFormData({
                                                     ...formData,
                                                     price_after_vat: pB ? (pB * (1 + v / 100)).toFixed(0) : formData.price_after_vat,
-                                                    total_cost_after_vat: cB ? (cB * (1 + v / 100)).toFixed(0) : formData.total_cost_after_vat
+                                                    total_cost_after_vat: cB ? (cB * (1 + v / 100)).toFixed(0) : formData.total_cost_after_vat,
+                                                    final_price_after_vat: fB ? (fB * (1 + v / 100)).toFixed(0) : formData.final_price_after_vat
                                                 });
                                             }} className="w-12 text-center text-xs font-bold text-indigo-700 bg-indigo-50 border-none px-1 py-0.5 rounded outline-none" min="0" max="100"/>
                                         </div>
                                     </div>
+                                    {(() => {
+                                        const toRaw = (v) => String(v).replace(/[^0-9\-]/g, '');
+                                        const fmtNum = (v) => { const n = toRaw(v); if (!n) return ''; return Number(n).toLocaleString('vi-VN'); };
+                                        const handlePriceChange = (field, pairedField, val) => {
+                                            const raw = toRaw(val);
+                                            const num = parseFloat(raw) || 0;
+                                            const updates = { ...formData, [field]: raw };
+                                            if (pairedField && num > 0) updates[pairedField] = String(Math.round(num * (1 + vatRate/100)));
+                                            setFormData(updates);
+                                        };
+                                        return (
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                         <div>
                                             <label className="block text-[10px] font-bold text-slate-600 mb-1">Giá chào (tr.VAT)</label>
                                             <div className="relative">
-                                                <input type="number" value={formData.price_before_vat} onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    const num = parseFloat(val) || 0;
-                                                    setFormData({
-                                                        ...formData, 
-                                                        price_before_vat: val, 
-                                                        price_after_vat: num > 0 ? (num * (1 + vatRate/100)).toFixed(0) : formData.price_after_vat
-                                                    });
-                                                }}
+                                                <input type="text" inputMode="numeric" value={fmtNum(formData.price_before_vat)} onChange={(e) => handlePriceChange('price_before_vat', 'price_after_vat', e.target.value)}
                                                     className="w-full px-3 py-2 pr-8 rounded-xl border border-slate-200 text-sm font-mono text-right focus:ring-2 focus:ring-cyan-500/20 outline-none" />
                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">₫</span>
                                             </div>
@@ -703,7 +726,7 @@ export default function BiddingManagement() {
                                         <div>
                                             <label className="block text-[10px] font-bold text-slate-600 mb-1">Giá chào (s.VAT)</label>
                                             <div className="relative">
-                                                <input type="number" value={formData.price_after_vat} onChange={(e) => setFormData({...formData, price_after_vat: e.target.value})}
+                                                <input type="text" inputMode="numeric" value={fmtNum(formData.price_after_vat)} onChange={(e) => setFormData({...formData, price_after_vat: toRaw(e.target.value)})}
                                                     className="w-full px-3 py-2 pr-8 rounded-xl border border-cyan-200 text-sm font-mono text-right font-bold text-cyan-700 focus:ring-2 focus:ring-cyan-500/20 outline-none" />
                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">₫</span>
                                             </div>
@@ -711,15 +734,7 @@ export default function BiddingManagement() {
                                         <div>
                                             <label className="block text-[10px] font-bold text-indigo-600 mb-1">Giá vốn (tr.VAT)</label>
                                             <div className="relative">
-                                                <input type="number" value={formData.total_cost_before_vat} onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    const num = parseFloat(val) || 0;
-                                                    setFormData({
-                                                        ...formData, 
-                                                        total_cost_before_vat: val, 
-                                                        total_cost_after_vat: num > 0 ? (num * (1 + vatRate/100)).toFixed(0) : formData.total_cost_after_vat
-                                                    });
-                                                }}
+                                                <input type="text" inputMode="numeric" value={fmtNum(formData.total_cost_before_vat)} onChange={(e) => handlePriceChange('total_cost_before_vat', 'total_cost_after_vat', e.target.value)}
                                                     className="w-full px-3 py-2 pr-8 rounded-xl border border-indigo-200 text-sm font-mono text-right text-indigo-600 focus:ring-2 focus:ring-indigo-500/20 outline-none" />
                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">₫</span>
                                             </div>
@@ -727,12 +742,47 @@ export default function BiddingManagement() {
                                         <div>
                                             <label className="block text-[10px] font-bold text-indigo-600 mb-1">Giá vốn (s.VAT)</label>
                                             <div className="relative">
-                                                <input type="number" value={formData.total_cost_after_vat} onChange={(e) => setFormData({...formData, total_cost_after_vat: e.target.value})}
+                                                <input type="text" inputMode="numeric" value={fmtNum(formData.total_cost_after_vat)} onChange={(e) => setFormData({...formData, total_cost_after_vat: toRaw(e.target.value)})}
                                                     className="w-full px-3 py-2 pr-8 rounded-xl border border-indigo-200 text-sm font-mono text-right font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500/20 outline-none" />
                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">₫</span>
                                             </div>
                                         </div>
                                     </div>
+                                    );
+                                    })()}
+                                    {(() => {
+                                        const toRaw = (v) => String(v).replace(/[^0-9\-]/g, '');
+                                        const fmtNum = (v) => { const n = toRaw(v); if (!n) return ''; return Number(n).toLocaleString('vi-VN'); };
+                                        return (
+                                    <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-dashed border-emerald-300">
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-emerald-600 mb-1">🏆 Giá trúng thầu (tr.VAT)</label>
+                                            <div className="relative">
+                                                <input type="text" inputMode="numeric" value={fmtNum(formData.final_price_before_vat)} onChange={(e) => {
+                                                    const raw = toRaw(e.target.value);
+                                                    const num = parseFloat(raw) || 0;
+                                                    setFormData({
+                                                        ...formData, 
+                                                        final_price_before_vat: raw, 
+                                                        final_price_after_vat: num > 0 ? String(Math.round(num * (1 + vatRate/100))) : formData.final_price_after_vat
+                                                    });
+                                                }}
+                                                    placeholder="Nhập khi có KQ"
+                                                    className="w-full px-3 py-2 pr-8 rounded-xl border border-emerald-200 text-sm font-mono text-right text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none bg-emerald-50/30" />
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-400 text-xs font-black">₫</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-emerald-600 mb-1">🏆 Giá trúng thầu (s.VAT)</label>
+                                            <div className="relative">
+                                                <input type="text" inputMode="numeric" value={fmtNum(formData.final_price_after_vat)} onChange={(e) => setFormData({...formData, final_price_after_vat: toRaw(e.target.value)})}
+                                                    className="w-full px-3 py-2 pr-8 rounded-xl border border-emerald-300 text-sm font-mono text-right font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none bg-emerald-50/30" />
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-400 text-xs font-black">₫</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    );
+                                    })()}
                                 </div>
 
                                 {/* Status & Dates */}

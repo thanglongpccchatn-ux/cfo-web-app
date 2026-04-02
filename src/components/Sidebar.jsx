@@ -69,6 +69,7 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
             label: 'Tài chính',
             icon: 'account_balance',
             items: [
+                { id: 'weekly_expense_plan', icon: 'view_week', label: 'Kế hoạch Chi Tuần', perms: ['view_expenses', 'view_planning'] },
                 { id: 'expense_tracking', icon: 'receipt_long', label: 'Chi phí Chung', perms: ['view_expenses', 'manage_expenses'] },
                 { id: 'loans', icon: 'account_balance_wallet', label: 'Vay vốn', perms: ['view_loans', 'manage_loans'] },
                 { id: 'treasury', icon: 'monetization_on', label: 'Sổ Quỹ Tổng', perms: ['manage_treasury'] },
@@ -79,9 +80,8 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
             label: 'Vận hành',
             icon: 'construction',
             items: [
-                { id: 'labor_tracking', icon: 'engineering', label: 'Nhân công', perms: ['view_labor', 'manage_labor'] },
+                { id: 'labor_subcontractors', icon: 'engineering', label: 'Tổ đội & Thầu phụ', perms: ['view_labor', 'manage_labor', 'view_subcontractors'] },
                 { id: 'suppliers', icon: 'local_shipping', label: 'Nhà cung cấp', perms: ['view_partners', 'manage_partners', 'view_materials', 'manage_materials_tracking'] },
-                { id: 'subcontractors', icon: 'groups', label: 'Thầu phụ / Tổ đội', perms: ['view_subcontractors', 'manage_subcontractors'] },
                 { id: 'inventory', icon: 'warehouse', label: 'Kho vật tư', perms: ['view_inventory', 'import_inventory', 'export_inventory', 'manage_materials'] },
                 { id: 'site_diary', icon: 'edit_calendar', label: 'Nhật ký', perms: ['view_construction', 'manage_construction'] },
                 { id: 'construction', icon: 'build', label: 'Thi công', perms: ['view_construction', 'manage_construction'] },

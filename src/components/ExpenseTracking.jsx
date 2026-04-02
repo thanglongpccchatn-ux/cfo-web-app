@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
@@ -12,6 +13,65 @@ const EXPENSE_TYPES = [
     { value: 'Máy thi công', label: 'Máy thi công', color: 'rose' },
     { value: 'Chi phí chung', label: 'Chi phí chung', color: 'slate' }
 ];
+
+function SearchSelect({ value, onChange, options, placeholder = 'Chọn...' }) {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const btnRef = useRef(null);
+    const dropRef = useRef(null);
+    const selected = options.find(o => String(o.value) === String(value));
+    const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+
+    React.useEffect(() => {
+        const handler = (e) => {
+            if (btnRef.current && !btnRef.current.contains(e.target) && dropRef.current && !dropRef.current.contains(e.target)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const handleOpen = () => {
+        if (!open && btnRef.current) {
+            const rect = btnRef.current.getBoundingClientRect();
+            setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+        }
+        setOpen(!open);
+        setSearch('');
+    };
+
+    const filtered = options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()));
+
+    return (
+        <div className="relative w-full">
+            <button ref={btnRef} type="button" onClick={handleOpen}
+                className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-left focus:ring-1 focus:ring-indigo-500 outline-none truncate flex items-center justify-between gap-1">
+                <span className={selected ? 'text-slate-800 font-medium' : 'text-slate-400'}>{selected ? selected.label : placeholder}</span>
+                <span className="material-symbols-outlined text-[14px] text-slate-300 shrink-0">expand_more</span>
+            </button>
+            {open && ReactDOM.createPortal(
+                <div ref={dropRef} style={{ position: 'fixed', top: pos.top, left: pos.left, width: Math.max(pos.width, 200), zIndex: 9999 }}
+                    className="bg-white border border-slate-200 rounded-xl shadow-2xl max-h-52 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+                    <div className="p-1.5 border-b border-slate-100">
+                        <input autoFocus type="text" value={search} onChange={e => setSearch(e.target.value)}
+                            placeholder="Gõ để tìm..."
+                            className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:ring-1 focus:ring-indigo-400" />
+                    </div>
+                    <div className="overflow-y-auto max-h-40">
+                        {filtered.length === 0 && <div className="px-3 py-2 text-xs text-slate-400">Không tìm thấy</div>}
+                        {filtered.map(o => (
+                            <button key={o.value} type="button"
+                                onClick={() => { onChange(o.value); setOpen(false); setSearch(''); }}
+                                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-indigo-50 transition-colors truncate ${String(o.value) === String(value) ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-700'}`}>
+                                {o.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>,
+                document.body
+            )}
+        </div>
+    );
+}
 
 export default function ExpenseTracking() {
     const [isEditing, setIsEditing] = useState(false);
@@ -90,6 +150,21 @@ export default function ExpenseTracking() {
 
     const removeDraft = (key) => {
         setDraftRows(prev => prev.filter(r => r._key !== key));
+    };
+
+    const handleApprove = async (id, amount) => {
+        const { error } = await supabase.from('expenses')
+            .update({ 
+                paid_amount: amount, 
+                paid_date: new Date().toISOString().split('T')[0] 
+            })
+            .eq('id', id);
+            
+        if (error) { toast.error('Lỗi khi duyệt chi: ' + error.message); }
+        else {
+            toast.success('Đã duyệt chi phí thành công!');
+            queryClient.invalidateQueries({ queryKey: ['expenses'] });
+        }
     };
 
     const handleSaveAll = async () => {
@@ -228,7 +303,7 @@ export default function ExpenseTracking() {
                             className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 px-3 py-1 rounded-full text-[12px] font-black focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer hover:bg-indigo-100 dark:hover:bg-indigo-900/30"
                         >
                             <option value="all">Tất cả dự án (Toàn cục)</option>
-                            {projects.map(p => <option key={p.id} value={p.id}>Dự án: {p.code}</option>)}
+                            {projects.map(p => <option key={p.id} value={p.id}>Dự án: {p.internal_code || p.code}</option>)}
                         </select>
                     </div>
                 </div>
@@ -348,7 +423,16 @@ export default function ExpenseTracking() {
                                     </td>
                                     <td className="px-4 py-3 text-xs text-slate-600 font-medium truncate">{item.recipient?.full_name || <span className="text-slate-200">—</span>}</td>
                                     <td className="px-4 py-3 text-xs text-slate-500 truncate" title={item.description}>{item.description || ''}</td>
-                                    <td className="px-4 py-3 text-right">
+                                    <td className="px-4 py-3 text-right flex items-center justify-end gap-1">
+                                        {(Number(item.amount) > 0 && Number(item.paid_amount) === 0) && (
+                                            <button 
+                                                onClick={() => handleApprove(item.id, item.amount)}
+                                                title="Duyệt chi số tiền này"
+                                                className="p-1 px-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg font-black text-[10px] uppercase tracking-wider flex items-center gap-1 border border-emerald-200/50 shadow-sm transition-all"
+                                            >
+                                                <span className="material-symbols-outlined text-[14px]">payments</span> Duyệt
+                                            </button>
+                                        )}
                                         <button 
                                             onClick={() => {
                                                 setEditingId(item.id);
@@ -383,10 +467,12 @@ export default function ExpenseTracking() {
                                 <tr key={row._key} className="bg-indigo-50/50 border-t border-indigo-100">
                                     <td className="px-2 py-1.5"><input type="date" value={row.requestedDate} onChange={e => updateDraft(row._key, 'requestedDate', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none" /></td>
                                     <td className="px-2 py-1.5">
-                                        <select value={row.projectId} onChange={e => updateDraft(row._key, 'projectId', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
-                                            <option value="">Chọn DA...</option>
-                                            {projects.map(p => <option key={p.id} value={p.id}>{p.internal_code || p.name}</option>)}
-                                        </select>
+                                        <SearchSelect
+                                            value={row.projectId}
+                                            onChange={(val) => updateDraft(row._key, 'projectId', val)}
+                                            options={projects.map(p => ({ value: p.id, label: p.internal_code || p.name }))}
+                                            placeholder="Chọn DA..."
+                                        />
                                     </td>
                                     <td className="px-2 py-1.5">
                                         <select value={row.expenseType} onChange={e => updateDraft(row._key, 'expenseType', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
@@ -394,13 +480,19 @@ export default function ExpenseTracking() {
                                         </select>
                                     </td>
                                     <td className="px-2 py-1.5"><input placeholder="0" value={fmt(row.amount)} onChange={e => updateDraftNum(row._key, 'amount', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right font-bold focus:ring-1 focus:ring-indigo-500 outline-none" /></td>
-                                    <td className="px-2 py-1.5"><input placeholder="0" value={fmt(row.paidAmount)} onChange={e => updateDraftNum(row._key, 'paidAmount', e.target.value)} className="w-full bg-rose-50 border border-rose-200 rounded-lg px-2 py-1.5 text-xs text-right font-black text-rose-600 focus:ring-1 focus:ring-rose-500 outline-none" /></td>
-                                    <td className="px-2 py-1.5"><input type="date" value={row.paidDate} onChange={e => updateDraft(row._key, 'paidDate', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none" /></td>
                                     <td className="px-2 py-1.5">
-                                        <select value={row.recipientId} onChange={e => updateDraft(row._key, 'recipientId', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
-                                            <option value="">Chọn...</option>
-                                            {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
-                                        </select>
+                                        <div className="w-full bg-slate-50 border border-slate-100 rounded-lg px-2 py-1.5 text-[10px] text-center italic text-slate-400 font-medium">Chờ duyệt chi</div>
+                                    </td>
+                                    <td className="px-2 py-1.5">
+                                        <div className="w-full bg-slate-50 border border-slate-100 rounded-lg px-2 py-1.5 text-[10px] text-center italic text-slate-400 font-medium">—</div>
+                                    </td>
+                                    <td className="px-2 py-1.5">
+                                        <SearchSelect
+                                            value={row.recipientId}
+                                            onChange={(val) => updateDraft(row._key, 'recipientId', val)}
+                                            options={employees.map(e => ({ value: e.id, label: e.full_name }))}
+                                            placeholder="Chọn..."
+                                        />
                                     </td>
                                     <td className="px-2 py-1.5"><input placeholder="Ghi chú..." value={row.description} onChange={e => updateDraft(row._key, 'description', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none" /></td>
                                     <td className="px-2 py-1.5 text-center">
