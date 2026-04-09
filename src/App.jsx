@@ -51,6 +51,14 @@ const ConstructionModule = lazy(() => import('./components/ConstructionModule'))
 const UserGuide = lazy(() => import('./components/UserGuide'));
 const LoanManagement = lazy(() => import('./components/LoanManagement'));
 const AuditTrailViewer = lazy(() => import('./components/AuditTrailViewer'));
+const ChartOfAccounts = lazy(() => import('./components/accounting/ChartOfAccounts'));
+const FiscalPeriodManager = lazy(() => import('./components/accounting/FiscalPeriodManager'));
+const JournalEntries = lazy(() => import('./components/accounting/JournalEntries'));
+const GeneralLedger = lazy(() => import('./components/accounting/GeneralLedger'));
+const FinancialReports = lazy(() => import('./components/accounting/FinancialReports'));
+const EInvoiceManagement = lazy(() => import('./components/accounting/EInvoiceManagement'));
+const BudgetManagement = lazy(() => import('./components/accounting/BudgetManagement'));
+const RecurringTemplates = lazy(() => import('./components/accounting/RecurringTemplates'));
 
 const queryClient = new QueryClient();
 
@@ -147,6 +155,11 @@ function MainLayout() {
       case 'guide': return { title: 'Hướng dẫn sử dụng', subtitle: 'Hướng dẫn chi tiết cho từng vai trò' };
       case 'loans': return { title: 'Quản lý Vay vốn', subtitle: 'Theo dõi khoản vay, lãi suất và trịch sử trả nợ' };
       case 'audit_trail': return { title: 'Nhật ký Hoạt động', subtitle: 'Lịch sử mọi thao tác trong hệ thống' };
+      case 'accounting/coa': return { title: 'Hệ thống Tài khoản', subtitle: 'Hệ thống tài khoản kế toán theo TT200' };
+      case 'accounting/periods': return { title: 'Kỳ Kế toán', subtitle: 'Quản lý năm tài chính và kỳ kế toán theo tháng' };
+      case 'accounting/journals': return { title: 'Bút toán', subtitle: 'Tạo và quản lý bút toán kế toán kép' };
+      case 'accounting/ledger': return { title: 'Sổ Cái', subtitle: 'Xem sổ cái theo tài khoản và kỳ kế toán' };
+      case 'accounting/reports': return { title: 'Báo cáo Tài chính', subtitle: 'Bảng CĐPS, CĐKT (B01-DN), KQKD (B02-DN) theo TT200' };
       default: return { title: 'Hệ thống Quản trị', subtitle: `${currentTheme.company_name}` };
     }
   };
@@ -233,6 +246,16 @@ function MainLayout() {
             <Route path="/guide" element={<ProtectedRoute><UserGuide /></ProtectedRoute>} />
             <Route path="/loans" element={<ProtectedRoute requiredPerms={['view_loans', 'manage_loans']}><LoanManagement /></ProtectedRoute>} />
             <Route path="/audit_trail" element={<ProtectedRoute requiredPerms={['manage_users']}><AuditTrailViewer /></ProtectedRoute>} />
+            
+            {/* Accounting Module (TT200) */}
+            <Route path="/accounting/coa" element={<ProtectedRoute requiredPerms={['view_accounting', 'manage_accounting']} moduleName="Hệ thống Tài khoản"><ChartOfAccounts /></ProtectedRoute>} />
+            <Route path="/accounting/periods" element={<ProtectedRoute requiredPerms={['view_accounting', 'manage_fiscal_periods']} moduleName="Kỳ Kế toán"><FiscalPeriodManager /></ProtectedRoute>} />
+            <Route path="/accounting/journals" element={<ProtectedRoute requiredPerms={['view_accounting', 'create_journal']} moduleName="Bút toán"><JournalEntries /></ProtectedRoute>} />
+            <Route path="/accounting/ledger" element={<ProtectedRoute requiredPerms={['view_accounting']} moduleName="Sổ Cái"><GeneralLedger /></ProtectedRoute>} />
+            <Route path="/accounting/reports" element={<ProtectedRoute requiredPerms={['view_accounting']} moduleName="Báo cáo Tài chính"><FinancialReports /></ProtectedRoute>} />
+            <Route path="/accounting/einvoices" element={<ProtectedRoute requiredPerms={['view_accounting']} moduleName="HĐĐT & Thuế"><EInvoiceManagement /></ProtectedRoute>} />
+            <Route path="/accounting/budgets" element={<ProtectedRoute requiredPerms={['view_accounting']} moduleName="Ngân sách"><BudgetManagement /></ProtectedRoute>} />
+            <Route path="/accounting/recurring" element={<ProtectedRoute requiredPerms={['view_accounting']} moduleName="Bút toán định kỳ"><RecurringTemplates /></ProtectedRoute>} />
             
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

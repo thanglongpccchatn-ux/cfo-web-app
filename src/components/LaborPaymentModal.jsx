@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { fmt, formatInputNumber } from '../utils/formatters';
+import { autoJournal } from '../lib/accountingService';
 
 export default function LaborPaymentModal({ isOpen, onClose, onSuccess, labor }) {
     const [paymentAmount, setPaymentAmount] = useState('');
@@ -55,6 +56,10 @@ export default function LaborPaymentModal({ isOpen, onClose, onSuccess, labor })
         if (error) {
             alert('Lỗi: ' + error.message);
         } else {
+            // Auto-create journal entry: Nợ 622 / Có 334
+            autoJournal.laborPayment(labor, paidAmt, paymentDate).catch(err =>
+                console.warn('[Accounting] Auto journal failed (non-critical):', err)
+            );
             onSuccess?.();
             onClose();
         }

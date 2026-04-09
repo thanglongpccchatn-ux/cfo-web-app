@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { smartToast } from '../utils/globalToast';
 import { fmt, formatInputNumber as fmtInput } from '../utils/formatters';
+import { autoJournal } from '../lib/accountingService';
 
 const LENDER_TYPES = [
     { value: 'company', label: 'Công ty', icon: 'domain', color: 'bg-blue-100 text-blue-700' },
@@ -189,6 +190,11 @@ export default function LoanManagement() {
             else if (totalPrincipalPaid === 0 && newTotalPaid === 0) newStatus = 'active';
 
             await supabase.from('loans').update({ total_paid: newTotalPaid, status: newStatus }).eq('id', selectedLoan.id);
+
+            // Auto-create journal entry: Nợ 341+635 / Có 112
+            autoJournal.loanPayment(selectedLoan, principal, interest, payForm.payment_date).catch(err =>
+                console.warn('[Accounting] Auto journal failed (non-critical):', err)
+            );
             
             setIsPaymentOpen(false);
             invalidateLoans();

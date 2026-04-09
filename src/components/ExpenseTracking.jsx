@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { fmt } from '../utils/formatters';
+import { autoJournal } from '../lib/accountingService';
 
 const EXPENSE_TYPES = [
     { value: 'BCH công trường', label: 'BCH Công trường (Kế toán nội bộ)', color: 'amber' },
@@ -162,6 +163,15 @@ export default function ExpenseTracking() {
             
         if (error) { toast.error('Lỗi khi duyệt chi: ' + error.message); }
         else {
+            // Auto-create journal entry: Nợ 627/642 / Có 112
+            const expense = expenses.find(e => e.id === id);
+            if (expense) {
+                const projectCode = expense.projects?.internal_code || expense.projects?.code || '';
+                autoJournal.generalExpense(
+                    { ...expense, paid_amount: amount, paid_date: new Date().toISOString().split('T')[0] },
+                    projectCode
+                ).catch(err => console.warn('[Accounting] Auto journal failed (non-critical):', err));
+            }
             toast.success('Đã duyệt chi phí thành công!');
             queryClient.invalidateQueries({ queryKey: ['expenses'] });
         }

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { logAudit } from '../lib/auditLog';
 import { smartToast } from '../utils/globalToast';
 import { fmt, fmtDate } from '../utils/formatters';
+import { autoJournal } from '../lib/accountingService';
 
 function getPaymentStatus(stage, lastExternalPaymentDate) {
     const income = Number(stage.external_income || 0);
@@ -205,6 +206,11 @@ export default function PaymentTracking({ project, onBack, embedded }) {
             changes: { amount: { old: null, new: amount } },
             metadata: { project_id: project.id }
         });
+
+        // Auto-create journal entry: Nợ 112 / Có 131
+        autoJournal.customerReceipt(cdtModal, amount, cdtForm.date, project?.code || project?.name).catch(err =>
+            console.warn('[Accounting] Auto journal failed (non-critical):', err)
+        );
 
         setCdtForm({ date: '', amount: '', notes: '' });
         invalidateStages();

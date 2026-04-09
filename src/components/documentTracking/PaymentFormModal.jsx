@@ -90,21 +90,21 @@ export default function PaymentFormModal({
                         <div className="space-y-6">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Giá trị ĐNTT (₫)</label>
-                                    <input 
-                                        type="text" 
-                                        value={formatInput(form.requestAmount)}
-                                        onChange={(e) => handleNumChange('requestAmount', e.target.value)}
-                                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all font-black text-slate-800 text-right pr-6"
-                                        placeholder="0"
-                                    />
-                                </div>
-                                <div className="space-y-2">
                                     <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Giá trị HĐ xuất (₫)</label>
                                     <input 
                                         type="text" 
                                         value={formatInput(form.invoiceAmount)}
                                         onChange={(e) => handleNumChange('invoiceAmount', e.target.value)}
+                                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all font-black text-slate-800 text-right pr-6"
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Giá trị ĐNTT (₫)</label>
+                                    <input 
+                                        type="text" 
+                                        value={formatInput(form.requestAmount)}
+                                        onChange={(e) => handleNumChange('requestAmount', e.target.value)}
                                         className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all font-black text-slate-800 text-right pr-6"
                                         placeholder="0"
                                     />

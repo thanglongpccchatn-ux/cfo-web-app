@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fmt, fmtDate } from '../../utils/formatters';
 import { smartToast } from '../../utils/globalToast';
+import { autoJournal } from '../../lib/accountingService';
 
 /**
  * SupplierPaymentModal — Ghi nhận thanh toán cho NCC theo PO
@@ -150,6 +151,12 @@ export default function SupplierPaymentModal({ po, supplier, onClose, onSuccess,
             }
 
             smartToast(`Đã ghi nhận thanh toán ${fmt(inputAmount)}đ cho PO ${po.code}`);
+
+            // Auto-create journal entry: Nợ 331 / Có 112 (or 111)
+            autoJournal.supplierPayment(po, supplier, inputAmount, form).catch(err =>
+                console.warn('[Accounting] Auto journal failed (non-critical):', err)
+            );
+
             onSuccess?.();
             onClose();
         } catch (err) {

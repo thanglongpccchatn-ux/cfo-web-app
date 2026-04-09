@@ -22,6 +22,8 @@ export default function BiddingManagement() {
         location: '', investor: '', status: 'Theo dõi',
         assigned_to: '', change_description: '',
         price_before_vat: '', price_after_vat: '',
+        cost_material: '', cost_labor: '',
+        cost_inspection_pct: '0', cost_management_pct: '3', cost_risk_pct: '1', cost_accounting_pct: '2',
         total_cost_before_vat: '', total_cost_after_vat: '',
         final_price_before_vat: '', final_price_after_vat: '',
         rejection_reason: '', submission_deadline: '', result_date: '', notes: ''
@@ -119,6 +121,12 @@ export default function BiddingManagement() {
                 change_description: '',
                 price_before_vat: bid.price_before_vat || '',
                 price_after_vat: loadedPA,
+                cost_material: bid.cost_material || '',
+                cost_labor: bid.cost_labor || '',
+                cost_inspection_pct: String(bid.cost_inspection_pct ?? 0),
+                cost_management_pct: String(bid.cost_management_pct ?? 3),
+                cost_risk_pct: String(bid.cost_risk_pct ?? 1),
+                cost_accounting_pct: String(bid.cost_accounting_pct ?? 2),
                 total_cost_before_vat: bid.total_cost_before_vat || '',
                 total_cost_after_vat: loadedCA,
                 final_price_before_vat: bid.final_price_before_vat || '',
@@ -137,6 +145,8 @@ export default function BiddingManagement() {
                 location: '', investor: '', status: 'Theo dõi',
                 assigned_to: profile?.full_name || '', change_description: '',
                 price_before_vat: '', price_after_vat: '',
+                cost_material: '', cost_labor: '',
+                cost_inspection_pct: '0', cost_management_pct: '3', cost_risk_pct: '1', cost_accounting_pct: '2',
                 total_cost_before_vat: '', total_cost_after_vat: '',
                 final_price_before_vat: '', final_price_after_vat: '',
                 rejection_reason: '', submission_deadline: '', result_date: '', notes: ''
@@ -223,6 +233,12 @@ export default function BiddingManagement() {
                 change_description: formData.change_description || null,
                 price_before_vat: parseFloat(formData.price_before_vat) || 0,
                 price_after_vat: parseFloat(formData.price_after_vat) || 0,
+                cost_material: parseFloat(formData.cost_material) || 0,
+                cost_labor: parseFloat(formData.cost_labor) || 0,
+                cost_inspection_pct: parseFloat(formData.cost_inspection_pct) || 0,
+                cost_management_pct: parseFloat(formData.cost_management_pct) || 0,
+                cost_risk_pct: parseFloat(formData.cost_risk_pct) || 0,
+                cost_accounting_pct: parseFloat(formData.cost_accounting_pct) || 0,
                 total_cost_before_vat: parseFloat(formData.total_cost_before_vat) || 0,
                 total_cost_after_vat: parseFloat(formData.total_cost_after_vat) || 0,
                 final_price_before_vat: parseFloat(formData.final_price_before_vat) || 0,
@@ -590,18 +606,18 @@ export default function BiddingManagement() {
             {/* ===== MODAL: Create / Edit Bid ===== */}
             {isFormOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden animate-fade-in flex flex-col max-h-[92vh]">
-                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                            <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-cyan-600">edit_document</span>
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden animate-fade-in flex flex-col max-h-[92vh]">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
+                                <span className="material-symbols-outlined text-cyan-600 text-[28px]">edit_document</span>
                                 {editingBid ? `Cập nhật BG: ${editingBid.bid_code}` : 'Tạo Báo giá mới'}
-                                {editingBid && <span className="text-xs font-bold text-slate-400 ml-2">v{editingBid.current_version || 1}</span>}
+                                {editingBid && <span className="text-sm font-bold text-slate-400 ml-2">v{editingBid.current_version || 1}</span>}
                             </h3>
                             <button onClick={() => setIsFormOpen(false)} className="text-slate-400 hover:text-red-500 transition-colors">
-                                <span className="material-symbols-outlined text-xl">close</span>
+                                <span className="material-symbols-outlined text-2xl">close</span>
                             </button>
                         </div>
-                        <div className="p-6 overflow-y-auto w-full">
+                        <div className="p-8 overflow-y-auto w-full">
                             <form id="bidForm" onSubmit={handleSave} className="space-y-5">
                                 {/* Handlers for dynamic VAT computation */}
                                 {(() => {
@@ -610,14 +626,14 @@ export default function BiddingManagement() {
                                 {/* Row 1 */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
-                                        <label className="block text-[10px] font-bold text-slate-700 mb-1 uppercase tracking-wide">Mã Báo giá</label>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Mã Báo giá</label>
                                         <input type="text" value={formData.bid_code} onChange={(e) => setFormData({...formData, bid_code: e.target.value})}
-                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono font-bold focus:ring-2 focus:ring-cyan-500/20 outline-none" />
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base font-mono font-bold focus:ring-2 focus:ring-cyan-500/20 outline-none" />
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-bold text-slate-700 mb-1 uppercase tracking-wide">Người yêu cầu <span className="text-[8px] text-slate-400 normal-case">(Giám đốc)</span></label>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Người yêu cầu <span className="text-[8px] text-slate-400 normal-case">(Giám đốc)</span></label>
                                         <select value={formData.requester} onChange={(e) => setFormData({...formData, requester: e.target.value})}
-                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500/20 outline-none">
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base focus:ring-2 focus:ring-cyan-500/20 outline-none">
                                             <option value="">-- Chọn --</option>
                                             {directors.map(d => <option key={d.id} value={d.full_name}>{d.full_name}</option>)}
                                         </select>
@@ -653,7 +669,7 @@ export default function BiddingManagement() {
                                             </div>
                                         ) : (
                                             <select required value={formData.partner_id} onChange={(e) => setFormData({...formData, partner_id: e.target.value})}
-                                                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500/20 outline-none">
+                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base focus:ring-2 focus:ring-cyan-500/20 outline-none">
                                                 <option value="">-- Chọn CĐT / Tổng thầu --</option>
                                                 {partners.map(p => <option key={p.id} value={p.id}>{p.short_name || p.name} {p.code && `(${p.code})`}</option>)}
                                             </select>
@@ -663,31 +679,31 @@ export default function BiddingManagement() {
                                 {/* Row 2 */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
-                                        <label className="block text-[10px] font-bold text-slate-700 mb-1 uppercase tracking-wide">Dự án ID</label>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Dự án ID</label>
                                         <input type="text" value={formData.du_an_id} onChange={(e) => setFormData({...formData, du_an_id: e.target.value})}
                                             placeholder="Mã dự án nội bộ (nếu có)"
-                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500/20 outline-none" />
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base focus:ring-2 focus:ring-cyan-500/20 outline-none" />
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-bold text-slate-700 mb-1 uppercase tracking-wide">Chủ đầu tư <span className="text-rose-500">*</span></label>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Chủ đầu tư <span className="text-rose-500">*</span></label>
                                         <input type="text" required value={formData.investor} onChange={(e) => setFormData({...formData, investor: e.target.value})}
-                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-medium focus:ring-2 focus:ring-cyan-500/20 outline-none" />
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base font-medium focus:ring-2 focus:ring-cyan-500/20 outline-none" />
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-bold text-slate-700 mb-1 uppercase tracking-wide">Địa điểm</label>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Địa điểm</label>
                                         <input type="text" value={formData.location} onChange={(e) => setFormData({...formData, location: e.target.value})}
-                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500/20 outline-none" />
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base focus:ring-2 focus:ring-cyan-500/20 outline-none" />
                                     </div>
                                 </div>
 
                                 {/* Price Section */}
-                                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/60">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5 m-0">
-                                            <span className="material-symbols-outlined text-[14px]">payments</span> Giá trị báo giá
+                                <div className="p-5 rounded-xl bg-slate-50 border border-slate-200/60">
+                                    <div className="flex justify-between items-center mb-5">
+                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 m-0">
+                                            <span className="material-symbols-outlined text-[18px]">payments</span> Giá trị báo giá
                                         </p>
-                                        <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-slate-200/60 shadow-sm">
-                                            <span className="text-[10px] font-black text-slate-500 tracking-wider">THUẾ VAT (%)</span>
+                                        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200/60 shadow-sm">
+                                            <span className="text-xs font-black text-slate-500 tracking-wider">THUẾ VAT (%)</span>
                                             <input type="number" value={vatRate} onChange={(e) => {
                                                 const v = parseFloat(e.target.value) || 0;
                                                 setVatRate(v);
@@ -700,7 +716,7 @@ export default function BiddingManagement() {
                                                     total_cost_after_vat: cB ? (cB * (1 + v / 100)).toFixed(0) : formData.total_cost_after_vat,
                                                     final_price_after_vat: fB ? (fB * (1 + v / 100)).toFixed(0) : formData.final_price_after_vat
                                                 });
-                                            }} className="w-12 text-center text-xs font-bold text-indigo-700 bg-indigo-50 border-none px-1 py-0.5 rounded outline-none" min="0" max="100"/>
+                                            }} className="w-14 text-center text-sm font-bold text-indigo-700 bg-indigo-50 border-none px-1 py-1 rounded outline-none" min="0" max="100"/>
                                         </div>
                                     </div>
                                     {(() => {
@@ -716,47 +732,145 @@ export default function BiddingManagement() {
                                         return (
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                         <div>
-                                            <label className="block text-[10px] font-bold text-slate-600 mb-1">Giá chào (tr.VAT)</label>
+                                            <label className="block text-xs font-bold text-slate-600 mb-1.5">Giá chào (tr.VAT)</label>
                                             <div className="relative">
                                                 <input type="text" inputMode="numeric" value={fmtNum(formData.price_before_vat)} onChange={(e) => handlePriceChange('price_before_vat', 'price_after_vat', e.target.value)}
-                                                    className="w-full px-3 py-2 pr-8 rounded-xl border border-slate-200 text-sm font-mono text-right focus:ring-2 focus:ring-cyan-500/20 outline-none" />
+                                                    className="w-full px-4 py-3 pr-8 rounded-xl border border-slate-200 text-base font-mono text-right focus:ring-2 focus:ring-cyan-500/20 outline-none" />
                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">₫</span>
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-bold text-slate-600 mb-1">Giá chào (s.VAT)</label>
+                                            <label className="block text-xs font-bold text-slate-600 mb-1.5">Giá chào (s.VAT)</label>
                                             <div className="relative">
                                                 <input type="text" inputMode="numeric" value={fmtNum(formData.price_after_vat)} onChange={(e) => setFormData({...formData, price_after_vat: toRaw(e.target.value)})}
-                                                    className="w-full px-3 py-2 pr-8 rounded-xl border border-cyan-200 text-sm font-mono text-right font-bold text-cyan-700 focus:ring-2 focus:ring-cyan-500/20 outline-none" />
+                                                    className="w-full px-4 py-3 pr-8 rounded-xl border border-cyan-200 text-base font-mono text-right font-bold text-cyan-700 focus:ring-2 focus:ring-cyan-500/20 outline-none" />
                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">₫</span>
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-bold text-indigo-600 mb-1">Giá vốn (tr.VAT)</label>
+                                            <label className="block text-xs font-bold text-indigo-600 mb-1.5">Giá vốn (tr.VAT) <span className="text-[8px] text-indigo-400 normal-case italic">= tự tính</span></label>
                                             <div className="relative">
                                                 <input type="text" inputMode="numeric" value={fmtNum(formData.total_cost_before_vat)} onChange={(e) => handlePriceChange('total_cost_before_vat', 'total_cost_after_vat', e.target.value)}
-                                                    className="w-full px-3 py-2 pr-8 rounded-xl border border-indigo-200 text-sm font-mono text-right text-indigo-600 focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+                                                    className="w-full px-4 py-3 pr-8 rounded-xl border border-indigo-200 text-base font-mono text-right text-indigo-600 focus:ring-2 focus:ring-indigo-500/20 outline-none bg-indigo-50/30" />
                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">₫</span>
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-bold text-indigo-600 mb-1">Giá vốn (s.VAT)</label>
+                                            <label className="block text-xs font-bold text-indigo-600 mb-1.5">Giá vốn (s.VAT)</label>
                                             <div className="relative">
                                                 <input type="text" inputMode="numeric" value={fmtNum(formData.total_cost_after_vat)} onChange={(e) => setFormData({...formData, total_cost_after_vat: toRaw(e.target.value)})}
-                                                    className="w-full px-3 py-2 pr-8 rounded-xl border border-indigo-200 text-sm font-mono text-right font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+                                                    className="w-full px-4 py-3 pr-8 rounded-xl border border-indigo-200 text-base font-mono text-right font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500/20 outline-none" />
                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">₫</span>
                                             </div>
                                         </div>
                                     </div>
                                     );
                                     })()}
+
+                                    {/* === COST BREAKDOWN === */}
+                                    {(() => {
+                                        const toRaw = (v) => String(v).replace(/[^0-9\-]/g, '');
+                                        const fmtNum = (v) => { const n = toRaw(v); if (!n) return ''; return Number(n).toLocaleString('vi-VN'); };
+                                        
+                                        const recalcTotal = (updates) => {
+                                            const mat = parseFloat(updates.cost_material ?? formData.cost_material) || 0;
+                                            const lab = parseFloat(updates.cost_labor ?? formData.cost_labor) || 0;
+                                            const base = mat + lab;
+                                            const inspPct = parseFloat(updates.cost_inspection_pct ?? formData.cost_inspection_pct) || 0;
+                                            const mgmtPct = parseFloat(updates.cost_management_pct ?? formData.cost_management_pct) || 0;
+                                            const riskPct = parseFloat(updates.cost_risk_pct ?? formData.cost_risk_pct) || 0;
+                                            const acctPct = parseFloat(updates.cost_accounting_pct ?? formData.cost_accounting_pct) || 0;
+                                            const totalPct = inspPct + mgmtPct + riskPct + acctPct;
+                                            const totalCost = Math.round(base * (1 + totalPct / 100));
+                                            updates.total_cost_before_vat = String(totalCost);
+                                            updates.total_cost_after_vat = String(Math.round(totalCost * (1 + vatRate / 100)));
+                                            return updates;
+                                        };
+
+                                        const handleCostChange = (field, val) => {
+                                            const raw = toRaw(val);
+                                            const updates = recalcTotal({ [field]: raw });
+                                            setFormData(prev => ({ ...prev, ...updates }));
+                                        };
+
+                                        const handlePctChange = (field, val) => {
+                                            const updates = recalcTotal({ [field]: val });
+                                            setFormData(prev => ({ ...prev, ...updates }));
+                                        };
+
+                                        const mat = parseFloat(formData.cost_material) || 0;
+                                        const lab = parseFloat(formData.cost_labor) || 0;
+                                        const base = mat + lab;
+                                        const inspPct = parseFloat(formData.cost_inspection_pct) || 0;
+                                        const mgmtPct = parseFloat(formData.cost_management_pct) || 0;
+                                        const riskPct = parseFloat(formData.cost_risk_pct) || 0;
+                                        const acctPct = parseFloat(formData.cost_accounting_pct) || 0;
+
+                                        return (
+                                    <div className="mt-4 pt-4 border-t border-dashed border-slate-300">
+                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-4">
+                                            <span className="material-symbols-outlined text-[18px]">calculate</span> Phân tích chi phí (cấu thành giá vốn)
+                                        </p>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                            {/* Chi phí Vật liệu */}
+                                            <div>
+                                                <label className="block text-xs font-bold text-orange-600 mb-1.5">Chi phí Vật liệu (VL)</label>
+                                                <div className="relative">
+                                                    <input type="text" inputMode="numeric" value={fmtNum(formData.cost_material)} onChange={(e) => handleCostChange('cost_material', e.target.value)}
+                                                        className="w-full px-4 py-3 pr-8 rounded-xl border border-orange-200 text-base font-mono text-right text-orange-700 focus:ring-2 focus:ring-orange-500/20 outline-none bg-orange-50/30" placeholder="0" />
+                                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-orange-300 text-xs font-black">₫</span>
+                                                </div>
+                                            </div>
+                                            {/* Chi phí Nhân công */}
+                                            <div>
+                                                <label className="block text-xs font-bold text-teal-600 mb-1.5">Chi phí Nhân công (NC)</label>
+                                                <div className="relative">
+                                                    <input type="text" inputMode="numeric" value={fmtNum(formData.cost_labor)} onChange={(e) => handleCostChange('cost_labor', e.target.value)}
+                                                        className="w-full px-4 py-3 pr-8 rounded-xl border border-teal-200 text-base font-mono text-right text-teal-700 focus:ring-2 focus:ring-teal-500/20 outline-none bg-teal-50/30" placeholder="0" />
+                                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-teal-300 text-xs font-black">₫</span>
+                                                </div>
+                                            </div>
+                                            {/* VL + NC Sum */}
+                                            <div className="md:col-span-2 flex items-end">
+                                                <div className="w-full bg-slate-100 px-4 py-3 rounded-xl border border-slate-200 text-right">
+                                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mr-2">VL + NC =</span>
+                                                    <span className="text-base font-black text-slate-700 tabular-nums">{base > 0 ? base.toLocaleString('vi-VN') : '0'} ₫</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Percentage-based costs */}
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                                            {[
+                                                { label: 'Nghiệm thu', field: 'cost_inspection_pct', color: 'violet', pct: inspPct },
+                                                { label: 'Quản lý', field: 'cost_management_pct', color: 'blue', pct: mgmtPct },
+                                                { label: 'Rủi ro', field: 'cost_risk_pct', color: 'rose', pct: riskPct },
+                                                { label: 'CAT (Kế toán)', field: 'cost_accounting_pct', color: 'amber', pct: acctPct },
+                                            ].map(item => (
+                                                <div key={item.field} className={`bg-${item.color}-50/40 p-3 rounded-xl border border-${item.color}-200/60`}>
+                                                    <label className={`block text-xs font-bold text-${item.color}-600 mb-2 uppercase tracking-wider`}>{item.label}</label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input type="number" step="0.5" min="0" max="100"
+                                                            value={formData[item.field]}
+                                                            onChange={(e) => handlePctChange(item.field, e.target.value)}
+                                                            className={`w-20 px-2 py-2 rounded-lg border border-${item.color}-200 text-sm font-black text-${item.color}-700 text-center outline-none focus:ring-2 focus:ring-${item.color}-500/20 bg-white`} />
+                                                        <span className="text-sm font-bold text-slate-400">%</span>
+                                                        <span className="text-sm font-mono text-slate-500 ml-auto tabular-nums">= {base > 0 ? Math.round(base * item.pct / 100).toLocaleString('vi-VN') : '0'}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                        );
+                                    })()}
+
                                     {(() => {
                                         const toRaw = (v) => String(v).replace(/[^0-9\-]/g, '');
                                         const fmtNum = (v) => { const n = toRaw(v); if (!n) return ''; return Number(n).toLocaleString('vi-VN'); };
                                         return (
                                     <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-dashed border-emerald-300">
                                         <div>
-                                            <label className="block text-[10px] font-bold text-emerald-600 mb-1">🏆 Giá trúng thầu (tr.VAT)</label>
+                                            <label className="block text-xs font-bold text-emerald-600 mb-1.5">🏆 Giá trúng thầu (tr.VAT)</label>
                                             <div className="relative">
                                                 <input type="text" inputMode="numeric" value={fmtNum(formData.final_price_before_vat)} onChange={(e) => {
                                                     const raw = toRaw(e.target.value);
@@ -768,15 +882,15 @@ export default function BiddingManagement() {
                                                     });
                                                 }}
                                                     placeholder="Nhập khi có KQ"
-                                                    className="w-full px-3 py-2 pr-8 rounded-xl border border-emerald-200 text-sm font-mono text-right text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none bg-emerald-50/30" />
+                                                    className="w-full px-4 py-3 pr-8 rounded-xl border border-emerald-200 text-base font-mono text-right text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none bg-emerald-50/30" />
                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-400 text-xs font-black">₫</span>
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-bold text-emerald-600 mb-1">🏆 Giá trúng thầu (s.VAT)</label>
+                                            <label className="block text-xs font-bold text-emerald-600 mb-1.5">🏆 Giá trúng thầu (s.VAT)</label>
                                             <div className="relative">
                                                 <input type="text" inputMode="numeric" value={fmtNum(formData.final_price_after_vat)} onChange={(e) => setFormData({...formData, final_price_after_vat: toRaw(e.target.value)})}
-                                                    className="w-full px-3 py-2 pr-8 rounded-xl border border-emerald-300 text-sm font-mono text-right font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none bg-emerald-50/30" />
+                                                    className="w-full px-4 py-3 pr-8 rounded-xl border border-emerald-300 text-base font-mono text-right font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none bg-emerald-50/30" />
                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-400 text-xs font-black">₫</span>
                                             </div>
                                         </div>
@@ -788,39 +902,39 @@ export default function BiddingManagement() {
                                 {/* Status & Dates */}
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                     <div>
-                                        <label className="block text-[10px] font-bold text-slate-700 mb-1 uppercase tracking-wide">Trạng thái</label>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Trạng thái</label>
                                         <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}
-                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold focus:ring-2 focus:ring-cyan-500/20 outline-none">
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base font-bold focus:ring-2 focus:ring-cyan-500/20 outline-none">
                                             {statusOptions.map(o => <option key={o} value={o}>{o}</option>)}
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-bold text-slate-700 mb-1 uppercase tracking-wide">Người phụ trách <span className="text-[8px] text-slate-400 normal-case">(Đấu thầu)</span></label>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Người phụ trách <span className="text-[8px] text-slate-400 normal-case">(Đấu thầu)</span></label>
                                         <select value={formData.assigned_to} onChange={(e) => setFormData({...formData, assigned_to: e.target.value})}
-                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500/20 outline-none">
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base focus:ring-2 focus:ring-cyan-500/20 outline-none">
                                             <option value="">-- Chọn --</option>
                                             {biddingStaff.map(s => <option key={s.id} value={s.full_name}>{s.full_name}</option>)}
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-bold text-slate-700 mb-1 uppercase tracking-wide">Hạn nộp HS</label>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Hạn nộp HS</label>
                                         <input type="date" value={formData.submission_deadline} onChange={(e) => setFormData({...formData, submission_deadline: e.target.value})}
-                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500/20 outline-none" />
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base focus:ring-2 focus:ring-cyan-500/20 outline-none" />
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-bold text-slate-700 mb-1 uppercase tracking-wide">Ngày công bố KQ</label>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Ngày công bố KQ</label>
                                         <input type="date" value={formData.result_date} onChange={(e) => setFormData({...formData, result_date: e.target.value})}
-                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500/20 outline-none" />
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base focus:ring-2 focus:ring-cyan-500/20 outline-none" />
                                     </div>
                                 </div>
 
                                 {/* Rejection reason (only if Trượt thầu) */}
                                 {formData.status === 'Trượt thầu' && (
                                     <div>
-                                        <label className="block text-[10px] font-bold text-rose-600 mb-1 uppercase tracking-wide">Lý do trượt thầu</label>
+                                        <label className="block text-xs font-bold text-rose-600 mb-1.5 uppercase tracking-wide">Lý do trượt thầu</label>
                                         <textarea rows={2} value={formData.rejection_reason} onChange={(e) => setFormData({...formData, rejection_reason: e.target.value})}
                                             placeholder="Giá cao hơn đối thủ, thiếu năng lực kinh nghiệm..."
-                                            className="w-full px-3 py-2 rounded-xl border border-rose-200 text-sm focus:ring-2 focus:ring-rose-500/20 outline-none" />
+                                            className="w-full px-4 py-3 rounded-xl border border-rose-200 text-base focus:ring-2 focus:ring-rose-500/20 outline-none" />
                                     </div>
                                 )}
 
@@ -828,7 +942,7 @@ export default function BiddingManagement() {
                                 <div>
                                     <label className="block text-[10px] font-bold text-slate-700 mb-1 uppercase tracking-wide">Ghi chú</label>
                                     <textarea rows={2} value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-cyan-500/20 outline-none" />
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base focus:ring-2 focus:ring-cyan-500/20 outline-none" />
                                 </div>
 
                                 {/* Change version description */}
@@ -854,10 +968,10 @@ export default function BiddingManagement() {
                                 </div>
                             </form>
                         </div>
-                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-                            <button onClick={() => setIsFormOpen(false)} className="btn bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 font-bold px-5 py-2 rounded-xl transition-all">Hủy</button>
-                            <button type="submit" form="bidForm" className="btn bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-5 py-2 rounded-xl transition-all flex items-center gap-2 shadow-md">
-                                <span className="material-symbols-outlined text-[18px]">save</span> Lưu
+                        <div className="p-5 border-t border-slate-100 bg-slate-50 flex justify-end gap-4">
+                            <button onClick={() => setIsFormOpen(false)} className="btn bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 font-bold px-6 py-3 rounded-xl transition-all text-base">Hủy</button>
+                            <button type="submit" form="bidForm" className="btn bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-8 py-3 rounded-xl transition-all flex items-center gap-2 shadow-md text-base">
+                                <span className="material-symbols-outlined text-[20px]">save</span> Lưu
                             </button>
                         </div>
                     </div>

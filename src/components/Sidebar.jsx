@@ -76,6 +76,21 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
             ]
         },
         {
+            key: 'accounting',
+            label: 'Kế Toán',
+            icon: 'calculate',
+            items: [
+                { id: 'accounting/coa', icon: 'account_tree', label: 'Hệ thống TK', perms: ['view_accounting', 'manage_accounting'] },
+                { id: 'accounting/journals', icon: 'receipt_long', label: 'Bút toán', perms: ['view_accounting', 'create_journal'] },
+                { id: 'accounting/ledger', icon: 'menu_book', label: 'Sổ Cái', perms: ['view_accounting'] },
+                { id: 'accounting/reports', icon: 'assessment', label: 'Báo cáo TC', perms: ['view_accounting'] },
+                { id: 'accounting/einvoices', icon: 'receipt', label: 'HĐĐT & Thuế', perms: ['view_accounting'] },
+                { id: 'accounting/budgets', icon: 'account_balance_wallet', label: 'Ngân sách', perms: ['view_accounting'] },
+                { id: 'accounting/recurring', icon: 'repeat', label: 'Định kỳ', perms: ['view_accounting'] },
+                { id: 'accounting/periods', icon: 'calendar_month', label: 'Kỳ kế toán', perms: ['view_accounting', 'manage_fiscal_periods'] },
+            ]
+        },
+        {
             key: 'operations',
             label: 'Vận hành',
             icon: 'construction',

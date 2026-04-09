@@ -202,6 +202,10 @@ export const EVENTS = {
   INVOICE_ISSUED:     'invoice:issued',
   EXPENSE_RECORDED:   'expense:recorded',
 
+  // Accounting
+  JOURNAL_AUTO_CREATED: 'journal:auto_created',
+  JOURNAL_POSTED:       'journal:posted',
+
   // System
   DASHBOARD_REFRESH:  'system:dashboard_refresh',
   DATA_EXPORTED:      'system:data_exported',

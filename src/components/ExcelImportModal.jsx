@@ -68,7 +68,8 @@ export default function ExcelImportModal({
   templateFilename,   // e.g. "mau_vat_tu.xlsx"
   templateSampleRows, // Array of arrays - sample data rows
   fixedData = {},
-  onSuccess 
+  onSuccess,
+  customImportHandler,  // Optional: async (rows, headers, columnMapping) => count — overrides default insert
 }) {
   const [file, setFile] = useState(null);
   const [previewData, setPreviewData] = useState([]);
@@ -187,6 +188,15 @@ export default function ExcelImportModal({
           
           const rawHeaders = data[0];
           const rows = data.slice(1).filter(row => row.some(cell => cell !== ''));
+
+          // ─── CUSTOM HANDLER PATH ─────────────────────────────────
+          if (customImportHandler) {
+            const count = await customImportHandler(rows, rawHeaders, columnMapping);
+            onSuccess(count);
+            onClose();
+            return;
+          }
+          // ─── DEFAULT PATH (below) ────────────────────────────────
 
           // Smart Foreign Key Resolution: Auto-create and Map missing Categories
           let finalCategoriesMap = new Map();

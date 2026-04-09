@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { fmt, formatInputNumber } from '../utils/formatters';
 import SearchableSelect from './SearchableSelect';
+import ExcelImportModal from './ExcelImportModal';
+import { smartToast } from '../utils/globalToast';
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUS_MAP = {
@@ -17,6 +19,14 @@ const TYPE_STYLES = {
     'Thầu phụ': { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200' },
 };
 
+// ─── SIGNING STATUS ────────────────────────────────────────────────────────
+const SIGNING_MAP = {
+    'Chưa ký': { bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400' },
+    'Đã ký': { bg: 'bg-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+    'Đang đàm phán': { bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500' },
+    'Hết hiệu lực': { bg: 'bg-red-100', text: 'text-red-600', dot: 'bg-red-400' },
+};
+
 const SYSTEM_CODES = [
     { value: 'CT', label: 'CT — Cải tạo' },
     { value: 'FA', label: 'FA — HT báo cháy, exit, âm thanh' },
@@ -27,6 +37,27 @@ const SYSTEM_CODES = [
     { value: 'E', label: 'E — HT điện' },
     { value: 'XD', label: 'XD — Xây dựng' },
 ];
+
+// ─── PAYMENT SCHEDULE DEFAULTS BY SYSTEM ────────────────────────────────────
+// Columns: Phần thô | Hoàn thành lắp đặt | Nghiệm thu | Quyết toán
+const PAYMENT_SCHEDULE_DEFAULTS = {
+    'FF':    { pct_rough: 70, pct_install: 85, pct_acceptance: 0,  pct_settlement: 95 },
+    'FA':    { pct_rough: 40, pct_install: 70, pct_acceptance: 85, pct_settlement: 95 },
+    'TAHK':  { pct_rough: 70, pct_install: 85, pct_acceptance: 0,  pct_settlement: 95 },
+    'PAINT': { pct_rough: 75, pct_install: 85, pct_acceptance: 0,  pct_settlement: 95 },
+    'PCCC':  { pct_rough: 70, pct_install: 85, pct_acceptance: 0,  pct_settlement: 95 },
+    'E':     { pct_rough: 70, pct_install: 85, pct_acceptance: 0,  pct_settlement: 95 },
+    'CT':    { pct_rough: 70, pct_install: 85, pct_acceptance: 0,  pct_settlement: 95 },
+    'XD':    { pct_rough: 60, pct_install: 75, pct_acceptance: 85, pct_settlement: 95 },
+};
+const DEFAULT_SCHEDULE = { pct_rough: 70, pct_install: 85, pct_acceptance: 0, pct_settlement: 95 };
+
+function getScheduleForSystem(systemCode) {
+    if (!systemCode) return DEFAULT_SCHEDULE;
+    // Handle multi-system like "FF.TAHK", "FA.FF" → use first code
+    const first = systemCode.split('.')[0].trim().toUpperCase();
+    return PAYMENT_SCHEDULE_DEFAULTS[first] || DEFAULT_SCHEDULE;
+}
 
 // ─── AUTO-DETECT: tên bắt đầu "Công ty" → Thầu phụ (VAT 8%), còn lại → Tổ đội (0%)
 function detectContractType(partnerName) {
@@ -53,38 +84,63 @@ function generateContractCode({ partner, project, systemCode, date }) {
 
 // ─── CREATE/EDIT MODAL ─────────────────────────────────────────────────────
 function ContractModal({ isOpen, onClose, onSuccess, editData, partners, projects }) {
-    const [form, setForm] = useState(() => editData ? {
-        partnerId: editData.partner_id,
-        projectId: editData.project_id,
-        contractCode: editData.contract_code || '',
-        contractName: editData.contract_name || '',
-        contractType: editData.contract_type || 'Tổ đội',
-        contractValue: String(editData.contract_value || ''),
-        vatRate: String(editData.vat_rate || 0),
-        invoicedAmount: String(editData.invoiced_amount || 0),
-        scopeOfWork: editData.scope_of_work || '',
-        systemCode: editData.system_code || '',
-        startDate: editData.start_date || '',
-        endDate: editData.end_date || '',
-        warrantyMonths: String(editData.warranty_months || 0),
-        status: editData.status || 'Đang thực hiện',
-        notes: editData.notes || '',
-    } : {
-        partnerId: '',
-        projectId: '',
-        contractCode: '',
-        contractName: '',
-        contractType: 'Tổ đội',
-        contractValue: '',
-        vatRate: '0',
-        invoicedAmount: '0',
-        scopeOfWork: '',
-        systemCode: '',
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: '',
-        warrantyMonths: '12',
-        status: 'Đang thực hiện',
-        notes: '',
+    const [form, setForm] = useState(() => {
+        const sched = editData ? {
+            pctRough: String(editData.pct_rough ?? 70),
+            pctInstall: String(editData.pct_install ?? 85),
+            pctAcceptance: String(editData.pct_acceptance ?? 0),
+            pctSettlement: String(editData.pct_settlement ?? 95),
+        } : getScheduleForSystem('');
+
+        return editData ? {
+            partnerId: editData.partner_id,
+            projectId: editData.project_id,
+            contractCode: editData.contract_code || '',
+            contractName: editData.contract_name || '',
+            contractType: editData.contract_type || 'Tổ đội',
+            contractValue: String(editData.contract_value || ''),
+            vatRate: String(editData.vat_rate || 0),
+            invoicedAmount: String(editData.invoiced_amount || 0),
+            scopeOfWork: editData.scope_of_work || '',
+            systemCode: editData.system_code || '',
+            startDate: editData.start_date || '',
+            endDate: editData.end_date || '',
+            warrantyMonths: String(editData.warranty_months || 0),
+            status: editData.status || 'Đang thực hiện',
+            signingStatus: editData.signing_status || 'Chưa ký',
+            notes: editData.notes || '',
+            advanceType: editData.advance_type || 'fixed',
+            advanceValue: String(editData.advance_value || '50000000'),
+            advanceNotes: editData.advance_notes || '',
+            pctRough: String(sched.pctRough),
+            pctInstall: String(sched.pctInstall),
+            pctAcceptance: String(sched.pctAcceptance),
+            pctSettlement: String(sched.pctSettlement),
+        } : {
+            partnerId: '',
+            projectId: '',
+            contractCode: '',
+            contractName: '',
+            contractType: 'Tổ đội',
+            contractValue: '',
+            vatRate: '0',
+            invoicedAmount: '0',
+            scopeOfWork: '',
+            systemCode: '',
+            startDate: new Date().toISOString().split('T')[0],
+            endDate: '',
+            warrantyMonths: '12',
+            status: 'Đang thực hiện',
+            signingStatus: 'Chưa ký',
+            notes: '',
+            advanceType: 'fixed',
+            advanceValue: '50000000',
+            advanceNotes: '',
+            pctRough: '70',
+            pctInstall: '85',
+            pctAcceptance: '0',
+            pctSettlement: '95',
+        };
     });
     const [submitting, setSubmitting] = useState(false);
 
@@ -112,7 +168,14 @@ function ContractModal({ isOpen, onClose, onSuccess, editData, partners, project
 
     const handleSystemChange = (systemCode) => {
         const code = rebuildCode({ systemCode });
-        setForm(prev => ({ ...prev, systemCode, contractCode: code }));
+        const sched = getScheduleForSystem(systemCode);
+        setForm(prev => ({
+            ...prev, systemCode, contractCode: code,
+            pctRough: String(sched.pct_rough),
+            pctInstall: String(sched.pct_install),
+            pctAcceptance: String(sched.pct_acceptance),
+            pctSettlement: String(sched.pct_settlement),
+        }));
     };
 
     const handleDateChange = (startDate) => {
@@ -133,6 +196,10 @@ function ContractModal({ isOpen, onClose, onSuccess, editData, partners, project
         }
         setSubmitting(true);
 
+        const advanceAmount = form.advanceType === 'percent'
+            ? Math.round((Number(form.contractValue) || 0) * (Number(form.advanceValue) || 0) / 100)
+            : Number(form.advanceValue) || 0;
+
         const payload = {
             partner_id: form.partnerId,
             project_id: form.projectId,
@@ -148,7 +215,16 @@ function ContractModal({ isOpen, onClose, onSuccess, editData, partners, project
             end_date: form.endDate || null,
             warranty_months: Number(form.warrantyMonths) || 0,
             status: form.status,
+            signing_status: form.signingStatus,
             notes: form.notes || null,
+            advance_type: form.advanceType,
+            advance_value: Number(form.advanceValue) || 0,
+            advance_amount: advanceAmount,
+            advance_notes: form.advanceNotes || null,
+            pct_rough: Number(form.pctRough) || 0,
+            pct_install: Number(form.pctInstall) || 0,
+            pct_acceptance: Number(form.pctAcceptance) || 0,
+            pct_settlement: Number(form.pctSettlement) || 0,
         };
 
         let error;
@@ -171,6 +247,11 @@ function ContractModal({ isOpen, onClose, onSuccess, editData, partners, project
 
     const vatAmount = (Number(form.contractValue) || 0) * (Number(form.vatRate) || 0) / 100;
     const totalWithVat = (Number(form.contractValue) || 0) + vatAmount;
+
+    // Advance calculation
+    const advanceCalc = form.advanceType === 'percent'
+        ? Math.round((Number(form.contractValue) || 0) * (Number(form.advanceValue) || 0) / 100)
+        : Number(form.advanceValue) || 0;
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
@@ -336,8 +417,186 @@ function ContractModal({ isOpen, onClose, onSuccess, editData, partners, project
                         </div>
                     </div>
 
-                    {/* Row 4: Ngày + Bảo hành + Trạng thái */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+                    {/* Row 3b: Tạm ứng — Premium UX */}
+                    <div className="rounded-2xl border border-teal-200/80 overflow-hidden shadow-sm">
+                        {/* Header */}
+                        <div className="px-5 py-3.5 bg-gradient-to-r from-teal-600 to-cyan-600 flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <span className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center backdrop-blur-sm border border-white/20">
+                                    <span className="material-symbols-outlined text-white text-[18px]">account_balance_wallet</span>
+                                </span>
+                                <div>
+                                    <h4 className="text-sm font-black text-white tracking-tight">Tạm ứng Hợp đồng</h4>
+                                    <p className="text-[10px] text-teal-100 font-medium">Thiết lập mức tạm ứng khi ký HĐ</p>
+                                </div>
+                            </div>
+                            {/* Toggle */}
+                            <div className="flex bg-white/15 rounded-xl p-0.5 border border-white/20 backdrop-blur-sm">
+                                <button type="button" onClick={() => setForm(prev => ({ ...prev, advanceType: 'fixed', advanceValue: '50000000' }))}
+                                    className={`px-4 py-1.5 rounded-[10px] text-[11px] font-bold transition-all ${form.advanceType === 'fixed' ? 'bg-white text-teal-700 shadow-md' : 'text-white/80 hover:text-white hover:bg-white/10'}`}>
+                                    💰 Số tiền
+                                </button>
+                                <button type="button" onClick={() => setForm(prev => ({ ...prev, advanceType: 'percent', advanceValue: '30' }))}
+                                    className={`px-4 py-1.5 rounded-[10px] text-[11px] font-bold transition-all ${form.advanceType === 'percent' ? 'bg-white text-teal-700 shadow-md' : 'text-white/80 hover:text-white hover:bg-white/10'}`}>
+                                    📊 Theo %
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Body */}
+                        <div className="px-5 py-5 bg-gradient-to-b from-teal-50/50 to-white">
+                            {form.advanceType === 'percent' ? (
+                                /* ═══ PERCENT MODE ═══ */
+                                <div className="space-y-4">
+                                    {/* Slider + Value */}
+                                    <div className="flex items-start gap-5">
+                                        <div className="flex-1 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[11px] font-extrabold text-teal-600 uppercase tracking-wider">Tỷ lệ tạm ứng</label>
+                                                <div className="flex items-baseline gap-1">
+                                                    <input
+                                                        type="number" min="0" max="100" step="1"
+                                                        value={form.advanceValue}
+                                                        onChange={(e) => {
+                                                            const v = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                                                            setForm(prev => ({ ...prev, advanceValue: String(v) }));
+                                                        }}
+                                                        className="w-16 bg-white border border-teal-300 rounded-lg px-2 py-1.5 text-sm font-black text-center text-teal-700 focus:ring-2 focus:ring-teal-500 outline-none"
+                                                    />
+                                                    <span className="text-teal-500 font-bold text-sm">%</span>
+                                                </div>
+                                            </div>
+                                            {/* Range slider */}
+                                            <div className="relative pt-1 pb-2">
+                                                <input
+                                                    type="range" min="0" max="100" step="5"
+                                                    value={form.advanceValue}
+                                                    onChange={(e) => setForm(prev => ({ ...prev, advanceValue: e.target.value }))}
+                                                    className="w-full h-2 bg-teal-100 rounded-full appearance-none cursor-pointer accent-teal-600 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-teal-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:cursor-pointer"
+                                                />
+                                                {/* Scale marks */}
+                                                <div className="flex justify-between mt-1 px-0.5">
+                                                    {[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(n => (
+                                                        <span key={n} className={`text-[8px] font-bold ${Number(form.advanceValue) === n ? 'text-teal-700' : 'text-slate-300'}`}>{n}</span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            {/* Quick % presets */}
+                                            <div className="flex gap-1.5">
+                                                {[10, 15, 20, 25, 30, 40, 50].map(pct => (
+                                                    <button key={pct} type="button"
+                                                        onClick={() => setForm(prev => ({ ...prev, advanceValue: String(pct) }))}
+                                                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
+                                                            Number(form.advanceValue) === pct
+                                                                ? 'bg-teal-600 text-white border-teal-700 shadow-sm scale-105'
+                                                                : 'bg-white text-teal-600 border-teal-200 hover:bg-teal-50 hover:border-teal-300'
+                                                        }`}>
+                                                        {pct}%
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {/* Result card */}
+                                        <div className="w-48 shrink-0">
+                                            <div className={`rounded-2xl p-4 text-center border-2 transition-all ${
+                                                advanceCalc > 0
+                                                    ? 'bg-gradient-to-br from-teal-500 to-cyan-600 border-teal-400 shadow-lg shadow-teal-200/50'
+                                                    : 'bg-slate-100 border-slate-200'
+                                            }`}>
+                                                <p className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${advanceCalc > 0 ? 'text-teal-100' : 'text-slate-400'}`}>Số tiền TƯ</p>
+                                                <p className={`text-lg font-black tracking-tight leading-tight ${advanceCalc > 0 ? 'text-white' : 'text-slate-400'}`}>
+                                                    {advanceCalc > 0 ? fmt(advanceCalc) : '—'}
+                                                </p>
+                                                {advanceCalc > 0 && Number(form.contractValue) > 0 && (
+                                                    <p className="text-[9px] text-teal-100/80 font-medium mt-1.5 border-t border-white/20 pt-1.5">
+                                                        {form.advanceValue}% × {fmt(form.contractValue)}
+                                                    </p>
+                                                )}
+                                                {!Number(form.contractValue) && (
+                                                    <p className="text-[9px] text-amber-200 font-medium mt-1.5">⚠ Nhập GT HĐ để tính</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {/* Notes */}
+                                    <div className="flex gap-4">
+                                        <div className="flex-1 space-y-1.5">
+                                            <label className="text-[10px] font-bold text-teal-500 uppercase tracking-wider">Ghi chú tạm ứng</label>
+                                            <input
+                                                placeholder="VD: TƯ đợt 1 theo điều khoản HĐ..."
+                                                value={form.advanceNotes}
+                                                onChange={(e) => setForm({ ...form, advanceNotes: e.target.value })}
+                                                className="w-full bg-white border border-teal-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-teal-500 outline-none transition-all placeholder:text-slate-300"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                /* ═══ FIXED MODE ═══ */
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        {/* Amount input */}
+                                        <div className="space-y-2">
+                                            <label className="block text-[11px] font-extrabold text-teal-600 uppercase tracking-wider">Số tiền tạm ứng</label>
+                                            <input
+                                                placeholder="50.000.000"
+                                                value={form.advanceValue ? formatInputNumber(form.advanceValue) : ''}
+                                                onChange={(e) => handleNumChange('advanceValue', e.target.value)}
+                                                className="w-full bg-white border border-teal-300 rounded-xl px-4 py-3 text-sm font-black text-right text-teal-700 focus:ring-2 focus:ring-teal-500 outline-none shadow-sm"
+                                            />
+                                            {/* Quick fixed presets */}
+                                            <div className="flex gap-1.5">
+                                                {[
+                                                    { label: '30 Tr', val: '30000000' },
+                                                    { label: '50 Tr', val: '50000000' },
+                                                    { label: '80 Tr', val: '80000000' },
+                                                    { label: '100 Tr', val: '100000000' },
+                                                    { label: '150 Tr', val: '150000000' },
+                                                ].map(preset => (
+                                                    <button key={preset.val} type="button"
+                                                        onClick={() => setForm(prev => ({ ...prev, advanceValue: preset.val }))}
+                                                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
+                                                            form.advanceValue === preset.val
+                                                                ? 'bg-teal-600 text-white border-teal-700 shadow-sm'
+                                                                : 'bg-white text-teal-600 border-teal-200 hover:bg-teal-50'
+                                                        }`}>
+                                                        {preset.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {/* Result */}
+                                        <div className="space-y-2">
+                                            <label className="block text-[11px] font-extrabold text-teal-600 uppercase tracking-wider">Xác nhận TƯ</label>
+                                            <div className={`rounded-xl px-4 py-3 text-sm font-black text-right border-2 ${
+                                                advanceCalc > 0 ? 'bg-teal-50 border-teal-400 text-teal-800' : 'bg-slate-50 border-slate-200 text-slate-400'
+                                            }`}>
+                                                {advanceCalc > 0 ? fmt(advanceCalc) + ' ₫' : '— ₫'}
+                                            </div>
+                                            {Number(form.contractValue) > 0 && advanceCalc > 0 && (
+                                                <p className="text-[10px] text-teal-500 font-medium text-right">
+                                                    ≈ {((advanceCalc / Number(form.contractValue)) * 100).toFixed(1)}% GT HĐ
+                                                </p>
+                                            )}
+                                        </div>
+                                        {/* Notes */}
+                                        <div className="space-y-2">
+                                            <label className="block text-[11px] font-extrabold text-teal-600 uppercase tracking-wider">Ghi chú TƯ</label>
+                                            <input
+                                                placeholder="VD: TƯ đợt 1 theo HĐ"
+                                                value={form.advanceNotes}
+                                                onChange={(e) => setForm({ ...form, advanceNotes: e.target.value })}
+                                                className="w-full bg-white border border-teal-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-teal-500 outline-none transition-all placeholder:text-slate-300"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Row 4: Ngày + Bảo hành + Tình trạng + Ký HĐ */}
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-5">
                         <div className="space-y-2">
                             <label className="block text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Ngày HĐ</label>
                             <input type="date" value={form.startDate} onChange={(e) => handleDateChange(e.target.value)}
@@ -370,6 +629,86 @@ function ContractModal({ isOpen, onClose, onSuccess, editData, partners, project
                                     { value: 'Thanh lý', label: '⚪ Thanh lý' },
                                 ]}
                             />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="block text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
+                                <span className="material-symbols-outlined text-[12px] align-middle mr-0.5 text-emerald-500">verified</span>
+                                Ký HĐ
+                            </label>
+                            <SearchableSelect
+                                value={form.signingStatus}
+                                onChange={(val) => setForm({ ...form, signingStatus: val })}
+                                direction="up"
+                                options={[
+                                    { value: 'Chưa ký', label: '⚪ Chưa ký' },
+                                    { value: 'Đã ký', label: '✅ Đã ký' },
+                                    { value: 'Đang đàm phán', label: '🟡 Đang đàm phán' },
+                                    { value: 'Hết hiệu lực', label: '🔴 Hết hiệu lực' },
+                                ]}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Row 4b: Payment Schedule */}
+                    <div className="rounded-2xl border border-orange-200/80 overflow-hidden shadow-sm">
+                        <div className="px-5 py-3 bg-gradient-to-r from-orange-500 to-amber-500 flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <span className="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center border border-white/20">
+                                    <span className="material-symbols-outlined text-white text-[16px]">receipt_long</span>
+                                </span>
+                                <div>
+                                    <h4 className="text-sm font-black text-white tracking-tight">Tỷ lệ Thanh toán theo giai đoạn</h4>
+                                    <p className="text-[9px] text-orange-100 font-medium">Tự động theo hệ thống • có thể tùy chỉnh</p>
+                                </div>
+                            </div>
+                            {form.systemCode && (
+                                <button type="button"
+                                    onClick={() => {
+                                        const sched = getScheduleForSystem(form.systemCode);
+                                        setForm(prev => ({
+                                            ...prev,
+                                            pctRough: String(sched.pct_rough),
+                                            pctInstall: String(sched.pct_install),
+                                            pctAcceptance: String(sched.pct_acceptance),
+                                            pctSettlement: String(sched.pct_settlement),
+                                        }));
+                                    }}
+                                    className="px-3 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold rounded-lg border border-white/20 transition-all"
+                                >
+                                    ↻ Reset mặc định
+                                </button>
+                            )}
+                        </div>
+                        <div className="px-5 py-4 bg-gradient-to-b from-orange-50/50 to-white">
+                            <div className="grid grid-cols-4 gap-3">
+                                {[
+                                    { key: 'pctRough', label: 'Phần thô', icon: 'foundation', color: 'orange' },
+                                    { key: 'pctInstall', label: 'HT Lắp đặt', icon: 'build', color: 'blue' },
+                                    { key: 'pctAcceptance', label: 'Nghiệm thu', icon: 'fact_check', color: 'purple' },
+                                    { key: 'pctSettlement', label: 'Quyết toán', icon: 'payments', color: 'emerald' },
+                                ].map(stage => (
+                                    <div key={stage.key} className="text-center space-y-2">
+                                        <div className="flex items-center justify-center gap-1">
+                                            <span className={`material-symbols-outlined text-[14px] text-${stage.color}-500`}>{stage.icon}</span>
+                                            <label className={`text-[10px] font-extrabold text-${stage.color}-600 uppercase tracking-wider`}>{stage.label}</label>
+                                        </div>
+                                        <div className="relative">
+                                            <input
+                                                type="number" min="0" max="100" step="5"
+                                                value={form[stage.key]}
+                                                onChange={(e) => setForm(prev => ({ ...prev, [stage.key]: e.target.value }))}
+                                                className={`w-full bg-white border border-${stage.color}-200 rounded-xl px-3 py-2.5 text-lg font-black text-center text-${stage.color}-700 focus:ring-2 focus:ring-${stage.color}-400 outline-none transition-all`}
+                                            />
+                                            <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-${stage.color}-400 font-bold text-sm`}>%</span>
+                                        </div>
+                                        {/* Visual bar */}
+                                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                            <div className={`h-full bg-${stage.color}-500 rounded-full transition-all`}
+                                                style={{ width: `${Math.min(Number(form[stage.key]) || 0, 100)}%` }} />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
 
@@ -444,6 +783,7 @@ export default function SubcontractorContracts() {
     const [expandedContract, setExpandedContract] = useState(null);
     const [variationForm, setVariationForm] = useState({ description: '', value: '', notes: '' });
     const [addingVariation, setAddingVariation] = useState(false);
+    const [importOpen, setImportOpen] = useState(false);
 
     // Fetch contracts with partner + project info
     const { data: contracts = [], isLoading } = useQuery({
@@ -633,11 +973,18 @@ export default function SubcontractorContracts() {
                         ))}
                     </div>
                 </div>
-                <button onClick={() => { setEditData(null); setModalOpen(true); }}
-                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-lg flex items-center gap-2 transition-all">
-                    <span className="material-symbols-outlined text-[18px]">add</span>
-                    Tạo HĐ mới
-                </button>
+                <div className="flex items-center gap-2">
+                    <button onClick={() => setImportOpen(true)}
+                        className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm rounded-xl shadow-lg flex items-center gap-2 transition-all">
+                        <span className="material-symbols-outlined text-[18px]">upload_file</span>
+                        Import Excel
+                    </button>
+                    <button onClick={() => { setEditData(null); setModalOpen(true); }}
+                        className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-lg flex items-center gap-2 transition-all">
+                        <span className="material-symbols-outlined text-[18px]">add</span>
+                        Tạo HĐ mới
+                    </button>
+                </div>
             </div>
 
             {/* Table */}
@@ -671,6 +1018,7 @@ export default function SubcontractorContracts() {
                                 <th className="px-3 py-2.5 text-right text-rose-200 bg-blue-800">Công nợ</th>
                                 <th className="px-2 py-2.5 text-center">BH (th)</th>
                                 <th className="px-3 py-2.5 text-center">Tình trạng</th>
+                                <th className="px-3 py-2.5 text-center">Ký HĐ</th>
                                 <th className="px-2 py-2.5 text-center w-16"></th>
                             </tr>
                         </thead>
@@ -678,6 +1026,7 @@ export default function SubcontractorContracts() {
                             {filtered.map((c, idx) => {
                                 const typeStyle = TYPE_STYLES[c.contract_type] || TYPE_STYLES['Tổ đội'];
                                 const statusStyle = STATUS_MAP[c.status] || STATUS_MAP['Đang thực hiện'];
+                                const signingStyle = SIGNING_MAP[c.signing_status] || SIGNING_MAP['Chưa ký'];
                                 const payments = getPayments(c);
                                 const totalContract = c.contract_value_with_vat || c.contract_value || 0;
                                 return (
@@ -693,9 +1042,22 @@ export default function SubcontractorContracts() {
                                         <td className="px-3 py-2.5 font-mono text-[10px] text-slate-400">HĐ-{String(idx + 1).padStart(3, '0')}</td>
                                         {/* Nhà thầu */}
                                         <td className="px-3 py-2.5">
-                                            <div className="font-bold text-slate-800 text-[11px]">{c.partners?.short_name || c.partners?.code || '—'}</div>
-                                            {c.partners?.name && c.partners?.name !== c.partners?.short_name && (
-                                                <div className="text-[9px] text-slate-400 truncate max-w-[140px]">{c.partners?.name}</div>
+                                            {c.partner_id ? (
+                                                <>
+                                                    <div className="font-bold text-slate-800 text-[11px]">{c.partners?.short_name || c.partners?.code || '—'}</div>
+                                                    {c.partners?.name && c.partners?.name !== c.partners?.short_name && (
+                                                        <div className="text-[9px] text-slate-400 truncate max-w-[140px]">{c.partners?.name}</div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <div className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200 inline-block mb-1">
+                                                    Thiếu NT: {c.unresolved_partner || '—'}
+                                                </div>
+                                            )}
+                                            {!c.project_id && c.unresolved_project && (
+                                                <div className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 inline-block mt-0.5">
+                                                    Thiếu DA: {c.unresolved_project}
+                                                </div>
                                             )}
                                         </td>
                                         {/* Phân loại */}
@@ -749,6 +1111,13 @@ export default function SubcontractorContracts() {
                                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${statusStyle.bg} ${statusStyle.text}`}>
                                                 <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`}></span>
                                                 {c.status}
+                                            </span>
+                                        </td>
+                                        {/* Ký HĐ */}
+                                        <td className="px-3 py-2.5 text-center">
+                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${signingStyle.bg} ${signingStyle.text}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${signingStyle.dot}`}></span>
+                                                {c.signing_status || 'Chưa ký'}
                                             </span>
                                         </td>
                                         {/* Actions */}
@@ -873,6 +1242,152 @@ export default function SubcontractorContracts() {
                     editData={editData}
                     partners={partners}
                     projects={projects}
+                />
+            )}
+
+            {/* Import Modal */}
+            {importOpen && (
+                <ExcelImportModal
+                    isOpen={importOpen}
+                    onClose={() => setImportOpen(false)}
+                    title="Import Hợp đồng Thầu phụ / Tổ đội"
+                    tableName="subcontractor_contracts"
+                    columnMapping={{
+                        _project_code: 'Mã dự án',
+                        _partner_name: 'Tên thầu phụ',
+                        contract_code: 'Số HĐ',
+                        contract_name: 'Nội dung HĐ',
+                        contract_type: 'Phân loại',
+                        contract_value: 'GT Trước thuế',
+                        vat_rate: '% VAT',
+                        system_code: 'Mã hệ thống',
+                        scope_of_work: 'Phạm vi công việc',
+                        start_date: 'Ngày HĐ',
+                        end_date: 'Ngày kết thúc',
+                        warranty_months: 'Bảo hành (tháng)',
+                        status: 'Tình trạng',
+                        signing_status: 'Ký HĐ',
+                        notes: 'Ghi chú',
+                        pct_rough: '% Phần thô',
+                        pct_install: '% HT Lắp đặt',
+                        pct_acceptance: '% Nghiệm thu',
+                        pct_settlement: '% Quyết toán',
+                        advance_type: 'Loại tạm ứng',
+                        advance_value: 'Giá trị tạm ứng',
+                    }}
+                    templateFilename="mau_hop_dong_thau_phu.xlsx"
+                    templateSampleRows={[
+                        ['YADEA', 'GHS BÌNH AN', 'HĐ-TP-001', 'TC hệ thống FF Block A', 'Thầu phụ', '500000000', '8', 'FF', 'Thi công PCCC', '2026-01-01', '2026-12-31', '12', 'Đang thực hiện', 'Đã ký', '', '70', '85', '0', '95', 'fixed', '50000000'],
+                        ['SUNREX', 'Huyền Nhân', 'HĐ-TĐ-002', 'TC hệ thống FA Block B', 'Tổ đội', '300000000', '0', 'FA', 'Báo cháy tầng 1-10', '2026-02-01', '', '12', 'Đang thực hiện', 'Chưa ký', '', '40', '70', '85', '95', 'percent', '30'],
+                    ]}
+                    customImportHandler={async (rows, rawHeaders, colMap) => {
+                        // 1. Build header index map
+                        const normalize = (s) => typeof s === 'string' ? s.toLowerCase().trim() : '';
+                        const headerIdx = {};
+                        Object.entries(colMap).forEach(([dbCol, label]) => {
+                            const idx = rawHeaders.findIndex(h => normalize(h) === normalize(label));
+                            if (idx !== -1) headerIdx[dbCol] = idx;
+                        });
+
+                        // 2. Load lookup tables
+                        const { data: allProjects } = await supabase.from('projects').select('id, code, internal_code, name');
+                        const { data: allPartners } = await supabase.from('partners').select('id, code, name, short_name').eq('type', 'Subcontractor');
+                        
+                        const projectMap = new Map();
+                        (allProjects || []).forEach(p => {
+                            if (p.internal_code) projectMap.set(p.internal_code.toLowerCase().trim(), p.id);
+                            if (p.code) projectMap.set(p.code.toLowerCase().trim(), p.id);
+                            if (p.name) projectMap.set(p.name.toLowerCase().trim(), p.id);
+                        });
+                        
+                        const partnerMap = new Map();
+                        (allPartners || []).forEach(p => {
+                            if (p.name) partnerMap.set(p.name.toLowerCase().trim(), p.id);
+                            if (p.short_name) partnerMap.set(p.short_name.toLowerCase().trim(), p.id);
+                            if (p.code) partnerMap.set(p.code.toLowerCase().trim(), p.id);
+                        });
+
+                        // 3. Parse rows
+                        const getVal = (row, key) => {
+                            const idx = headerIdx[key];
+                            if (idx === undefined) return null;
+                            const v = row[idx];
+                            return v === '' || v === undefined ? null : v;
+                        };
+
+                        let skipped = 0;
+                        const payload = [];
+                        
+                        rows.forEach((row, i) => {
+                            const projectCode = getVal(row, '_project_code');
+                            const partnerName = getVal(row, '_partner_name');
+                            const contractCode = getVal(row, 'contract_code');
+                            const contractName = getVal(row, 'contract_name');
+                            
+                            // Resolve FK
+                            const projectId = projectCode ? projectMap.get(String(projectCode).toLowerCase().trim()) : null;
+                            const partnerId = partnerName ? partnerMap.get(String(partnerName).toLowerCase().trim()) : null;
+                            
+                            if (!contractName && !contractCode) { skipped++; return; }
+                            
+                            const numVal = (key) => {
+                                const v = getVal(row, key);
+                                return v !== null ? (Number(String(v).replace(/[^0-9.-]/g, '')) || 0) : null;
+                            };
+                            const strVal = (key) => {
+                                const v = getVal(row, key);
+                                return v !== null ? String(v).trim() : null;
+                            };
+
+                            // Auto-fill payment schedule from system if not provided
+                            const sys = strVal('system_code');
+                            const sched = getScheduleForSystem(sys);
+
+                            payload.push({
+                                        project_id: projectId || null,
+                                        partner_id: partnerId || null,
+                                        unresolved_project: !projectId ? projectCode : null,
+                                        unresolved_partner: !partnerId ? partnerName : null,
+                                contract_code: contractCode ? String(contractCode).trim() : null,
+                                contract_name: contractName ? String(contractName).trim() : null,
+                                contract_type: strVal('contract_type') || 'Tổ đội',
+                                contract_value: numVal('contract_value') || 0,
+                                vat_rate: numVal('vat_rate') || 0,
+                                system_code: sys || null,
+                                scope_of_work: strVal('scope_of_work') || null,
+                                start_date: strVal('start_date') || null,
+                                end_date: strVal('end_date') || null,
+                                warranty_months: numVal('warranty_months') || 12,
+                                status: strVal('status') || 'Đang thực hiện',
+                                signing_status: strVal('signing_status') || 'Chưa ký',
+                                notes: strVal('notes') || null,
+                                pct_rough: numVal('pct_rough') ?? sched.pct_rough,
+                                pct_install: numVal('pct_install') ?? sched.pct_install,
+                                pct_acceptance: numVal('pct_acceptance') ?? sched.pct_acceptance,
+                                pct_settlement: numVal('pct_settlement') ?? sched.pct_settlement,
+                                advance_type: strVal('advance_type') || 'fixed',
+                                advance_value: numVal('advance_value') || 0,
+                                advance_amount: numVal('advance_value') || 0,
+                            });
+                        });
+
+                        if (payload.length === 0) throw new Error('Không có dữ liệu hợp lệ để import.');
+
+                        // 4. Upsert in chunks (contract_code as unique key if exists)
+                        const CHUNK = 200;
+                        for (let i = 0; i < payload.length; i += CHUNK) {
+                            const chunk = payload.slice(i, i + CHUNK);
+                            const { error } = await supabase.from('subcontractor_contracts').insert(chunk);
+                            if (error) throw error;
+                        }
+
+                        if (skipped > 0) console.warn(`Bỏ qua ${skipped} dòng trống.`);
+                        return payload.length;
+                    }}
+                    onSuccess={(count) => {
+                        smartToast(`Đã import ${count} hợp đồng thành công!`);
+                        handleRefresh();
+                    }}
                 />
             )}
 

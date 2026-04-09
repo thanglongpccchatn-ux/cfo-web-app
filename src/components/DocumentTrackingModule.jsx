@@ -364,7 +364,10 @@ export default function DocumentTrackingModule() {
     }
 
     const handleNumChange = (field, value) => {
-        const cleanValue = value.replace(/[^0-9]/g, '');
+        let cleanValue = value.replace(/[^0-9-]/g, '');
+        if (cleanValue.lastIndexOf('-') > 0) {
+            cleanValue = cleanValue.replace(/(?!^-)-/g, '');
+        }
         setForm(prev => ({ ...prev, [field]: cleanValue }));
     };
 

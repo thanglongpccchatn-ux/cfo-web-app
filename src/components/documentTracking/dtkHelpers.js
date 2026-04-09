@@ -20,15 +20,16 @@ export function getDocStatus(stage) {
 
 // Numeric helper: parse "1.000.000" -> 1000000
 export const parseNum = (str) => {
-    if (!str) return 0;
+    if (!str || str === '-') return 0;
     return Number(String(str).replace(/\./g, '').replace(/,/g, ''));
 };
 
 // Numeric helper: format 1000000 -> "1.000.000"
 export const formatInput = (val) => {
     if (val === '' || val === null || val === undefined) return '';
-    // If it's already a string with dots, just return it or parse then format
-    const num = parseNum(val);
+    if (String(val) === '-') return '-';
+    const num = Number(String(val).replace(/\./g, '').replace(/,/g, ''));
+    if (isNaN(num)) return '';
     return num.toLocaleString('vi-VN');
 };
 

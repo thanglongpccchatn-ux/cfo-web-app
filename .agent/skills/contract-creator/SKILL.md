@@ -1,93 +1,249 @@
 ---
-name: contract-creator
+name: contract-creator-expert
 description: |
-  Hướng dẫn tạo mới Hợp đồng/Dự án trong hệ thống CFO. Dùng khi user nói
-  "tạo hợp đồng mới", "thêm dự án", "nhập hợp đồng", "add contract",
-  "tôi có hợp đồng mới cần nhập", hoặc hỏi về tỷ lệ phân bổ Sateco.
-  Cũng kích hoạt khi user muốn biết cần nhập những thông tin gì cho hợp đồng.
+  CHUYÊN GIA tạo và quản lý Hợp đồng/Dự án trong hệ thống CFO Sateco.
+  Trigger: "tạo hợp đồng", "thêm dự án", "nhập hợp đồng", "add contract",
+  "chỉnh sửa HĐ", "phụ lục", "addenda", "tỷ lệ Sateco", "tỷ lệ khoán",
+  "giá trị hợp đồng", "VAT", "bảo hành", "bảo lãnh", "mốc thanh toán",
+  "milestone", "payment schedule", "thông tin ngân hàng", "Google Drive",
+  hoặc bất kỳ câu hỏi nào về quá trình setup hợp đồng từ đầu đến cuối.
 ---
 
-# Goal
+# 📋 Expert Skill: Tạo & Quản Lý Hợp Đồng
 
-Hướng dẫn user hoàn thành form tạo Hợp đồng mới trong hệ thống, đảm bảo
-điền đủ 4 nhóm thông tin bắt buộc và tính đúng giá trị phân bổ Sateco.
+## Bối cảnh nghiệp vụ
 
----
+Sateco hoạt động trong cấu trúc 3 pháp nhân:
+- **Thăng Long** (TL) — Công ty mẹ, ký HĐ với CĐT
+- **Sateco** (STC) — Công ty con, thi công thực tế, nhận khoán từ TL
+- **Thành Phát** (TP) — Công ty liên kết, xử lý một số dòng tiền
 
-# Instructions
-
-## Quy trình 4 bước tạo Hợp đồng:
-
-### Bước 1 — Thông tin chung (BẮT BUỘC)
-Thu thập:
-- **Tên hợp đồng** *(bắt buộc)*: Tên đầy đủ, mô tả rõ công trình
-- **Mã hợp đồng** *(bắt buộc)*: Mã định danh nội bộ (VD: HĐ-2024-001)
-- **Đối tác/Chủ đầu tư** *(bắt buộc)*: Chọn từ danh sách (Bộ Quốc phòng, Tập đoàn Vingroup, Công ty Sun Group) hoặc nhập mới
-- **Điều khoản thanh toán** *(tùy chọn)*: Tạm ứng X%, thanh toán theo giai đoạn...
-
-### Bước 2 — Giá trị & Thời gian
-Thu thập:
-- **Giá trị trước VAT** (VNĐ): Giá trị hợp đồng gốc chưa thuế
-- **VAT (%)**: Thường là 8% hoặc 10%
-- Hệ thống tự tính: `Tổng sau VAT = Giá trị × (1 + VAT%)`
-
-### Bước 3 — Phân bổ Sateco (tự động)
-- **Tỷ lệ mặc định: 95.5%** — có thể điều chỉnh
-- Công thức: `Sateco Value = Giá trị trước VAT × (ratio/100)`
-- Công thức: `Sateco Total = Sateco Value × (1 + VAT%)`
-- ⚠️ Tỷ lệ này xác định bao nhiêu % hợp đồng thuộc về Sateco (công ty con thi công thực tế)
-
-### Bước 4 — Tiến độ thanh toán
-- **Lưu ý:** Chỉ thiết lập ĐƯỢC sau khi đã lưu hợp đồng
-- Sau khi "Hoàn tất" → vào module PaymentTracking → "Thêm đợt thanh toán"
-
-## Quy tắc lưu:
-- Validate trước khi lưu: thiếu Tên/Mã/Đối tác → KHÔNG lưu
-- Status mặc định khi tạo mới: `"Đang thi công"`
-- Sau khi lưu thành công → quay về danh sách hợp đồng
+Module này quản lý **toàn bộ vòng đời hợp đồng**: từ tạo mới, thiết lập tỷ lệ phân bổ,
+mốc thanh toán, bảo hành, đến tích hợp Google Drive.
 
 ---
 
-# Examples
+## 1. KIẾN TRÚC DATABASE
 
-## Ví dụ 1: User nhập thông tin đầy đủ
+### Bảng `projects` (Hợp đồng / Dự án)
+```sql
+-- Thông tin pháp lý
+name                 TEXT        -- Tên HĐ đầy đủ (BẮT BUỘC)
+code                 TEXT UNIQUE -- Mã HĐ CĐT (BẮT BUỘC, VD: "2024/HĐTC/VG-STC")
+internal_code        TEXT UNIQUE -- Mã nội bộ Sateco (VD: "HP4-01")
+partner_id           UUID → partners(id)   -- FK Chủ đầu tư
+client               TEXT        -- Tên CĐT (denormalized)
+contract_type        TEXT        -- 'Thi công' | 'Cung cấp' | 'Thiết kế' | 'EPC'
+contract_form        TEXT        -- 'Trọn gói' | 'Đơn giá' | 'Đơn giá điều chỉnh'
+acting_entity_key    TEXT        -- 'thanglong' | 'thanhphat' (đơn vị ký HĐ)
+signature_status     TEXT        -- 'Chưa ký' | 'Đã ký' | 'Đã ký PL'
+settlement_status    TEXT        -- 'Chưa quyết toán' | 'Đang quyết toán' | 'Đã quyết toán'
+location, description, payment_terms  TEXT
 
-**User:** "Tôi cần tạo hợp đồng với Vingroup, giá trị 50 tỷ chưa VAT, VAT 8%, tỷ lệ Sateco 95%"
+-- Giá trị tài chính (cốt lõi)
+original_value           NUMERIC -- Giá trị trước VAT (BẮT BUỘC)
+vat_percentage           NUMERIC -- % VAT CĐT (thường 8%)
+vat_amount               NUMERIC -- Tiền VAT = original_value × vat%
+total_value_post_vat     NUMERIC -- Tổng sau VAT
+internal_vat_percentage  NUMERIC -- % VAT nội bộ (có thể khác VAT CĐT)
 
-**Tóm tắt thông tin để nhập vào hệ thống:**
-| Trường | Giá trị |
-|--------|---------|
-| Tên HĐ | *(cần hỏi thêm)* |
-| Mã HĐ | *(cần hỏi thêm)* |
-| Đối tác | Tập đoàn Vingroup |
-| Giá trị trước VAT | 50,000,000,000 VNĐ |
-| VAT | 8% |
-| Tổng sau VAT | **54,000,000,000 VNĐ** |
-| Tỷ lệ Sateco | 95% |
-| Sateco Value | 47,500,000,000 VNĐ |
-| Sateco Total | **51,300,000,000 VNĐ** |
+-- Phân bổ Sateco (Dual Ratio System)
+sateco_contract_ratio    NUMERIC -- Tỷ lệ HĐ (dòng giấy tờ): mặc định 98%
+sateco_actual_ratio      NUMERIC -- Tỷ lệ thực (dòng tiền mặt): AUTO-CALC
+internal_deduction       NUMERIC -- Chiết khấu nội bộ (%)
 
-→ Còn thiếu Tên HĐ và Mã HĐ. Hỏi bổ sung trước khi submit.
+-- Thời gian
+sign_date, start_date, end_date  DATE
+status    TEXT  -- 'Đang thi công' | 'Hoàn thành' | 'Tạm dừng' | 'Bảo hành'
 
-## Ví dụ 2: User hỏi về tỷ lệ Sateco
+-- Bảo hành
+warranty_percentage        NUMERIC -- % giữ lại BH (thường 5%)
+warranty_duration_months   INT     -- Thời gian BH (tháng)
+has_warranty_bond          BOOLEAN -- Có bảo lãnh BH thay thế không
+handover_date              DATE    -- Ngày bàn giao
+warranty_schedule          JSONB   -- [{year, percentage, amount, date}]
 
-**User:** "Tỷ lệ Sateco là gì? Tôi có cần thay đổi không?"
+-- Mốc thanh toán
+payment_schedule  JSONB  -- [{name, percentage, amount, condition, has_guarantee, due_days, base_type}]
 
-**Trả lời:**
-Sateco là công ty con thực hiện thi công. Tỷ lệ này xác định phần giá trị
-hợp đồng mà Sateco được phân bổ — mặc định 95.5%.
+-- Ngân hàng (3 công ty)
+tl_bank_account, tl_bank_name, tl_bank_branch, tl_account_holder  TEXT
+tp_bank_account, tp_bank_name, tp_bank_branch, tp_account_holder  TEXT
+st_bank_account, st_bank_name, st_bank_branch, st_account_holder  TEXT
 
-**Không cần đổi** nếu: Sateco thi công gần như toàn bộ hợp đồng.
-**Nên đổi** nếu: Một phần công việc do Thăng Long trực tiếp làm (không qua Sateco).
+-- Google Drive
+google_drive_folder_id  TEXT
+document_link           TEXT
+```
+
+### Bảng `partners` (Đối tác)
+```sql
+-- Filter: type = 'Client'
+id, code, name, short_name, tax_code, address, phone, email, type
+```
+
+### Bảng `addendas` (Phụ lục HĐ)
+```sql
+project_id       UUID → projects(id)
+name             TEXT
+requested_value  NUMERIC
+status           TEXT  -- 'Chờ duyệt' | 'Đã duyệt' | 'Từ chối'
+```
 
 ---
 
-# Constraints
+## 2. DUAL RATIO SYSTEM (Quan trọng nhất)
 
-- 🚫 KHÔNG lưu khi thiếu Tên HĐ, Mã HĐ, hoặc Đối tác
-- ✅ Tỷ lệ Sateco phải trong khoảng 0–100%
-- ✅ Nhắc user: Tiến độ thanh toán phải thiết lập SAU KHI đã lưu HĐ
-- 📌 Module: `ContractCreate.jsx` → DB table: `projects`
-- 🔑 Fields quan trọng: `name`, `code`, `client`, `original_value`, `sateco_ratio`, `status`
+### Concept: 2 tỷ lệ phân bổ
+```
+┌─────────────────────────────────────────────┐
+│ CĐT trả Thăng Long: 100% giá trị HĐ       │
+│                                             │
+│ Thăng Long chuyển Sateco theo 2 dòng:       │
+│                                             │
+│ 1. DÒNG GIẤY TỜ (sateco_contract_ratio)    │
+│    → Mặc định 98% → Xuất hóa đơn nội bộ    │
+│    → Dùng để tính công nợ trên sổ sách      │
+│                                             │
+│ 2. DÒNG TIỀN MẶT (sateco_actual_ratio)     │
+│    → = contract_ratio - internal_deduction  │
+│    → Mặc định 98% - 2.5% = 95.5%           │
+│    → Tiền thực tế Sateco được giữ           │
+│                                             │
+│ Chênh lệch (2.5%):                          │
+│    → Sateco hoàn trả TL bằng tiền mặt      │
+│    → Là "phí quản lý nội bộ"               │
+└─────────────────────────────────────────────┘
+```
 
-<!-- Generated by Skill Creator Ultra v1.1 -->
+### Auto-calculate (contractHelpers.js)
+```js
+function calculateAllocations(totalValue, vat, internalVat, contractRatio, internalDeduction) {
+    const actualRatio = contractRatio - internalDeduction; // 98 - 2.5 = 95.5
+    
+    // Thăng Long giữ
+    const tl_cutPercent = 100 - contractRatio;  // 2%
+    const tl_preVat = totalValue * (1 + vat/100);
+    
+    // Sateco nhận (dòng giấy tờ - hóa đơn)
+    const st_invoice_preVat = totalValue * contractRatio / 100;
+    const st_invoice_postVat = st_invoice_preVat * (1 + internalVat/100);
+    
+    // Sateco nhận (dòng tiền mặt - thực tế)
+    const st_actual_preVat = totalValue * actualRatio / 100;
+    const st_actual_postVat = st_actual_preVat * (1 + internalVat/100);
+    
+    return { actualRatio, tl_preVat, st_invoice_preVat, st_actual_preVat, ... };
+}
+```
+
+---
+
+## 3. FORM TẠO HỢP ĐỒNG (7 sections)
+
+### Section 1: Thông tin Pháp lý (ContractLegalInfo)
+- Tên HĐ, Mã HĐ (CĐT), Mã nội bộ
+- Loại HĐ: Thi công / Cung cấp / Thiết kế / EPC
+- Hình thức: Trọn gói / Đơn giá / Đơn giá điều chỉnh
+- Đơn vị ký: Thăng Long / Thành Phát
+- Trạng thái ký: Chưa ký → Đã ký → Đã ký PL
+- Địa chỉ, Mô tả
+
+### Section 2: Chủ Đầu tư (ContractPartner)
+- Dropdown chọn từ `partners` (type = 'Client')
+- Tạo mới CĐT inline (ContractPartnerModal)
+- Thông tin: Tên, MST, Địa chỉ, SĐT, Email
+
+### Section 3: Giá trị & Thời gian (ContractValueTime)
+- **Input giá trị**: Nhập trước VAT HOẶC sau VAT → auto-calc ngược
+- **VAT%**: Mặc định 8%, có thể đổi
+- **Ngày ký / Khởi công / Hoàn thành**
+- Format: `formatInputNumber()` — hiện dấu phẩy ngàn khi blur
+
+### Section 4: Mốc Thanh toán (ContractMilestones)
+- Danh sách milestones: [{name, percentage, amount, condition}]
+- Base type: Trước VAT / Sau VAT (chọn 1)
+- Tự động tính amount khi thay đổi %
+- Mặc định có 1 mốc "Tạm ứng 20%"
+- Thêm/xóa milestone tùy ý
+
+### Section 5: Phân bổ Sateco (ContractSateco)
+- Tỷ lệ HĐ (contract_ratio): mặc định 98%
+- Chiết khấu nội bộ: mặc định 2.5%
+- VAT nội bộ: mặc định 8%
+- Hiện bảng tính: TL giữ / STC HĐ / STC Thực
+
+### Section 6: Bảo hành (ContractWarranty)
+- Tỷ lệ giữ lại BH: 5%
+- Thời hạn BH: 24 tháng
+- Bảo lãnh thay thế: có/không
+- Ngày bàn giao
+- Lịch hoàn trả BH: [{year, percentage, amount}]
+
+### Section 7: Thông tin Ngân hàng (ContractBanking)
+- 3 bộ TK ngân hàng: TL, TP, STC
+- Bank profiles: chọn từ template đã lưu
+- Hiện đầy đủ: STK, Tên NH, Chi nhánh, Chủ TK
+
+---
+
+## 4. BUSINESS RULES
+
+### 4.1 Validation
+- ❗ BẮT BUỘC: name, code, partner_id, original_value > 0
+- ❗ contract_ratio: 0-100%
+- ❗ internal_deduction: 0 ≤ deduction ≤ contract_ratio
+- ❗ start_date ≤ end_date
+- ❗ VAT: 0-30%
+- ❗ code + internal_code: UNIQUE (kiểm tra trước khi lưu)
+
+### 4.2 Auto behaviors
+- Khi thay đổi `original_value` hoặc `vat` → recalc tất cả allocations
+- Khi thay đổi milestone % → recalc amount (và ngược lại)
+- Khi save → auto-create Google Drive folder (nếu connected)
+- Khi save → ghi audit log + send notification
+- Default status: 'Đang thi công'
+
+### 4.3 Google Drive Integration
+- Auto-create folder structure khi tạo HĐ mới
+- Folder name: `{name} ({internal_code || code})`
+- Save `google_drive_folder_id` và `document_link`
+
+---
+
+## 5. FILE MAP
+
+```
+src/components/
+├── ContractCreate.jsx              -- Main form orchestrator (602 lines)
+├── contract/
+│   ├── contractHelpers.js          -- Shared: formatInputNumber, calculateAllocations, navItems
+│   ├── ContractLegalInfo.jsx       -- Section 1: Pháp lý
+│   ├── ContractPartner.jsx         -- Section 2: CĐT
+│   ├── ContractPartnerModal.jsx    -- Modal tạo CĐT mới
+│   ├── ContractValueTime.jsx       -- Section 3: Giá trị + Thời gian
+│   ├── ContractMilestones.jsx      -- Section 4: Mốc thanh toán
+│   ├── ContractSateco.jsx          -- Section 5: Phân bổ Sateco
+│   ├── ContractWarranty.jsx        -- Section 6: Bảo hành
+│   ├── ContractBanking.jsx         -- Section 7: Ngân hàng
+│   ├── ContractExpenseTab.jsx      -- Chi phí (trong Dashboard)
+│   ├── ContractAddendaTab.jsx      -- Phụ lục (trong Dashboard)
+│   └── ContractDriveTab.jsx        -- Tài liệu Drive (trong Dashboard)
+```
+
+---
+
+## 6. COMMON PATTERNS
+
+### ✅ DO:
+- Luôn validate uniqueness cho code + internal_code trước khi save
+- Dùng `formatInputNumber` khi hiển thị, `parseFormattedNumber` khi đọc
+- Lưu cả warranty_ratio + warranty_percentage (backward compat)
+- Upsert `company_settings` khi save (sync bank info)
+- Ghi audit log cho CREATE và UPDATE
+
+### ❌ DON'T:
+- Không mix actual_ratio với contract_ratio — chúng khác nhau!
+- Không cho phép VAT > 30% hoặc < 0%
+- Không lưu HĐ nếu thiếu CĐT (partner_id)
+- Không xóa Google Drive folder khi sửa HĐ
