@@ -27,6 +27,21 @@ export default function WarrantyTracking() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState({ handover_date: '', warranty_duration_months: '', warranty_percentage: '' });
     
+    // Add-warranty modal states
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [availableProjects, setAvailableProjects] = useState<any[]>([]);
+    const [loadingProjects, setLoadingProjects] = useState(false);
+    const [projectSearch, setProjectSearch] = useState('');
+    const [addForm, setAddForm] = useState({
+        project_id: '',
+        project_label: '',
+        handover_date: new Date().toISOString().split('T')[0],
+        warranty_duration_months: '12',
+        warranty_percentage: '5',
+        has_warranty_guarantee: false
+    });
+    const [savingAdd, setSavingAdd] = useState(false);
+    
     const toast = useToast();
 
     const fetchWarrantyData = async () => {
@@ -91,6 +106,82 @@ export default function WarrantyTracking() {
     useEffect(() => {
         fetchWarrantyData();
     }, []);
+
+    // Fetch projects eligible for warranty registration (no handover_date yet)
+    const fetchAvailableProjects = async () => {
+        setLoadingProjects(true);
+        try {
+            const { data, error } = await supabase
+                .from('projects')
+                .select('id, code, internal_code, name, total_value_post_vat, partners!projects_partner_id_fkey(short_name)')
+                .is('handover_date', null)
+                .order('code', { ascending: true });
+
+            if (error) throw error;
+            setAvailableProjects(data || []);
+        } catch (err: any) {
+            toast.error('Lỗi tải danh sách dự án: ' + err.message);
+        } finally {
+            setLoadingProjects(false);
+        }
+    };
+
+    const handleOpenAddModal = () => {
+        setAddForm({
+            project_id: '',
+            project_label: '',
+            handover_date: new Date().toISOString().split('T')[0],
+            warranty_duration_months: '12',
+            warranty_percentage: '5',
+            has_warranty_guarantee: false
+        });
+        setProjectSearch('');
+        setShowAddModal(true);
+        fetchAvailableProjects();
+    };
+
+    const handleSaveAdd = async () => {
+        if (!addForm.project_id) {
+            toast.error('Vui lòng chọn dự án!');
+            return;
+        }
+        if (!addForm.handover_date) {
+            toast.error('Vui lòng nhập ngày bàn giao!');
+            return;
+        }
+        setSavingAdd(true);
+        try {
+            const { error } = await supabase
+                .from('projects')
+                .update({
+                    handover_date: addForm.handover_date,
+                    warranty_duration_months: Number(addForm.warranty_duration_months) || 12,
+                    warranty_percentage: Number(addForm.warranty_percentage) || 5,
+                    has_warranty_guarantee: addForm.has_warranty_guarantee
+                })
+                .eq('id', addForm.project_id);
+
+            if (error) throw error;
+            toast.success(`Đã ghi nhận bảo hành cho dự án ${addForm.project_label}`);
+            setShowAddModal(false);
+            fetchWarrantyData();
+        } catch (err: any) {
+            toast.error('Lỗi lưu: ' + err.message);
+        } finally {
+            setSavingAdd(false);
+        }
+    };
+
+    const filteredAvailableProjects = useMemo(() => {
+        if (!projectSearch.trim()) return availableProjects;
+        const q = projectSearch.toLowerCase();
+        return availableProjects.filter((p: any) =>
+            (p.code || '').toLowerCase().includes(q) ||
+            (p.internal_code || '').toLowerCase().includes(q) ||
+            (p.name || '').toLowerCase().includes(q) ||
+            (p.partners?.short_name || '').toLowerCase().includes(q)
+        );
+    }, [availableProjects, projectSearch]);
 
     const handleMarkCollected = async (id: string, currentStatus: boolean, code: string) => {
         try {
@@ -208,6 +299,10 @@ export default function WarrantyTracking() {
                             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-amber-500 outline-none transition-all text-sm font-medium bg-slate-50/50"
                          />
                     </div>
+                    <button onClick={handleOpenAddModal} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm shadow-lg shadow-amber-500/20 transition-all active:scale-95" title="Ghi nhận bảo hành cho dự án mới">
+                         <span className="material-symbols-outlined notranslate text-[18px]" translate="no">add_circle</span>
+                         <span className="hidden sm:inline">Ghi nhận BH</span>
+                    </button>
                     <button onClick={fetchWarrantyData} className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors text-slate-600 bg-white shadow-sm">
                          <span className="material-symbols-outlined notranslate block" translate="no">refresh</span>
                     </button>
@@ -436,6 +531,175 @@ export default function WarrantyTracking() {
                      </div>
                  </div>
              </div>
+            {/* ══════ MODAL: Ghi nhận Bảo hành ══════ */}
+            {showAddModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowAddModal(false)}>
+                    <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-slide-in" onClick={e => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-white">
+                            <div>
+                                <h3 className="font-black text-lg text-slate-800 flex items-center gap-2">
+                                    <span className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-white shadow-sm">
+                                        <span className="material-symbols-outlined text-[18px]" translate="no">add_task</span>
+                                    </span>
+                                    Ghi nhận Bảo hành
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-1 font-medium">Chọn dự án đã bàn giao và nhập thông tin bảo hành</p>
+                            </div>
+                            <button onClick={() => setShowAddModal(false)} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+                                <span className="material-symbols-outlined text-[18px]">close</span>
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="px-6 py-5 space-y-5">
+                            {/* Project Selector */}
+                            <div>
+                                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Chọn Dự án</label>
+                                {addForm.project_id ? (
+                                    <div className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-200">
+                                        <div>
+                                            <p className="font-black text-slate-800 text-sm">{addForm.project_label}</p>
+                                        </div>
+                                        <button onClick={() => setAddForm({...addForm, project_id: '', project_label: ''})} className="text-slate-400 hover:text-rose-500 transition-colors">
+                                            <span className="material-symbols-outlined text-[18px]">close</span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <div className="relative mb-2">
+                                            <span className="material-symbols-outlined notranslate absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[16px]" translate="no">search</span>
+                                            <input
+                                                type="text"
+                                                placeholder="Tìm theo mã, tên dự án..."
+                                                value={projectSearch}
+                                                onChange={e => setProjectSearch(e.target.value)}
+                                                className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 focus:border-amber-500 outline-none text-sm font-medium bg-slate-50/50 transition-all"
+                                                autoFocus
+                                            />
+                                        </div>
+                                        <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-50">
+                                            {loadingProjects ? (
+                                                <div className="flex items-center justify-center py-6 text-slate-400">
+                                                    <span className="material-symbols-outlined animate-spin text-[20px] mr-2">progress_activity</span>
+                                                    <span className="text-xs font-bold">Đang tải...</span>
+                                                </div>
+                                            ) : filteredAvailableProjects.length === 0 ? (
+                                                <div className="py-6 text-center">
+                                                    <span className="material-symbols-outlined text-3xl text-slate-200 mb-1 block">search_off</span>
+                                                    <p className="text-xs font-bold text-slate-400">{availableProjects.length === 0 ? 'Tất cả dự án đã được ghi nhận bảo hành' : 'Không tìm thấy dự án phù hợp'}</p>
+                                                </div>
+                                            ) : filteredAvailableProjects.map((p: any) => (
+                                                <button
+                                                    key={p.id}
+                                                    onClick={() => setAddForm({...addForm, project_id: p.id, project_label: `${p.internal_code || p.code} — ${p.name}`})}
+                                                    className="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors flex items-center justify-between group"
+                                                >
+                                                    <div>
+                                                        <p className="text-sm font-bold text-slate-800 group-hover:text-amber-700 transition-colors">{p.internal_code || p.code}</p>
+                                                        <p className="text-[11px] text-slate-400 truncate max-w-[280px]">{p.name}</p>
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase">{p.partners?.short_name || ''}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Date + Duration + Percentage */}
+                            <div className="grid grid-cols-3 gap-4">
+                                <div className="col-span-3 sm:col-span-1">
+                                    <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Ngày Bàn giao</label>
+                                    <input
+                                        type="date"
+                                        value={addForm.handover_date}
+                                        onChange={e => setAddForm({...addForm, handover_date: e.target.value})}
+                                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-amber-500 outline-none text-sm font-bold bg-white transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Thời gian BH</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={addForm.warranty_duration_months}
+                                            onChange={e => setAddForm({...addForm, warranty_duration_months: e.target.value})}
+                                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-amber-500 outline-none text-sm font-bold bg-white transition-all pr-14"
+                                        />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400">tháng</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Tỷ lệ BH</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            value={addForm.warranty_percentage}
+                                            onChange={e => setAddForm({...addForm, warranty_percentage: e.target.value})}
+                                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-amber-500 outline-none text-sm font-bold bg-white transition-all pr-8"
+                                        />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400">%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Warranty Guarantee Toggle */}
+                            <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
+                                <input
+                                    type="checkbox"
+                                    checked={addForm.has_warranty_guarantee}
+                                    onChange={e => setAddForm({...addForm, has_warranty_guarantee: e.target.checked})}
+                                    className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                                />
+                                <div>
+                                    <p className="text-sm font-bold text-slate-700">Có chứng thư bảo hành</p>
+                                    <p className="text-[11px] text-slate-400">Bảo lãnh bảo hành từ ngân hàng hoặc tổ chức tín dụng</p>
+                                </div>
+                            </label>
+
+                            {/* Preview */}
+                            {addForm.project_id && addForm.handover_date && (
+                                <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
+                                    <p className="text-[11px] font-bold text-blue-500 uppercase tracking-widest mb-1">Xem trước</p>
+                                    <p className="text-xs text-slate-600">
+                                        Hết hạn BH: <span className="font-black text-slate-800">
+                                            {(() => {
+                                                const d = new Date(addForm.handover_date);
+                                                d.setMonth(d.getMonth() + (Number(addForm.warranty_duration_months) || 0));
+                                                return d.toLocaleDateString('vi-VN');
+                                            })()}
+                                        </span>
+                                        {' · '}Giữ lại <span className="font-black text-amber-600">{addForm.warranty_percentage}%</span> giá trị hợp đồng
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50">
+                            <button onClick={() => setShowAddModal(false)} className="px-5 py-2.5 rounded-xl text-slate-600 font-semibold hover:bg-slate-100 transition-colors">
+                                Hủy bỏ
+                            </button>
+                            <button
+                                onClick={handleSaveAdd}
+                                disabled={savingAdd || !addForm.project_id}
+                                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold flex items-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {savingAdd ? (
+                                    <span className="material-symbols-outlined animate-spin text-[18px]">sync</span>
+                                ) : (
+                                    <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                                )}
+                                Ghi nhận Bảo hành
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
