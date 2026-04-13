@@ -109,8 +109,14 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
 
     const approvedAddendas = addendas?.filter(a => a.status === 'Đã duyệt') || [];
     const originalValue = Number(project?.original_value || 0);
+    const vatPercent = Number(project?.vat_percentage ?? 8) / 100;
+    const originalValuePostVat = Number(project?.total_value_post_vat) || Math.round(originalValue * (1 + vatPercent));
+    
     const totalAddendasValue = approvedAddendas.reduce((s, a) => s + Number(a.requested_value || 0), 0);
-    const totalContractValueThangLong = originalValue + totalAddendasValue; // Tổng giá trị CĐT/Thăng Long
+    const totalAddendasValuePostVat = Math.round(totalAddendasValue * (1 + vatPercent));
+    
+    // Tổng giá trị CĐT/Thăng Long (Gồm VAT)
+    const totalContractValueThangLong = originalValuePostVat + totalAddendasValuePostVat;
     
     // Sateco Allocations based on dual ratios
     const contractValueSateco = totalContractValueThangLong * SATECO_CONTRACT_RATIO; // Doanh thu nội bộ Sateco xuất HĐ

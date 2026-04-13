@@ -3,7 +3,7 @@
 
 -- 1. Site Diary Table
 CREATE TABLE IF NOT EXISTS public.site_diary (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id),
     report_date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.site_diary (
 
 -- 2. Site Diary Images Table
 CREATE TABLE IF NOT EXISTS public.site_diary_images (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     diary_id UUID NOT NULL REFERENCES public.site_diary(id) ON DELETE CASCADE,
     storage_path TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()

@@ -35,9 +35,11 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC)
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Everyone can INSERT (to log actions)
+DROP POLICY IF EXISTS "Anyone can insert audit logs" ON audit_logs;
 CREATE POLICY "Anyone can insert audit logs" ON audit_logs
     FOR INSERT WITH CHECK (true);
 
 -- Policy: Only admins can read audit logs
+DROP POLICY IF EXISTS "Admins can read audit logs" ON audit_logs;
 CREATE POLICY "Admins can read audit logs" ON audit_logs
     FOR SELECT USING (true);
