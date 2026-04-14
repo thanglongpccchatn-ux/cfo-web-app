@@ -5,6 +5,7 @@ import { fmt, formatInputNumber } from '../utils/formatters';
 import SearchableSelect from './SearchableSelect';
 import ExcelImportModal from './ExcelImportModal';
 import { smartToast } from '../utils/globalToast';
+import PartnerModal from './PartnerModal';
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUS_MAP = {
@@ -84,12 +85,16 @@ function generateContractCode({ partner, project, systemCode, date }) {
 
 // ─── CREATE/EDIT MODAL ─────────────────────────────────────────────────────
 function ContractModal({ isOpen, onClose, onSuccess, editData, partners, projects }) {
+    const queryClient = useQueryClient();
+    const [isAddPartnerOpen, setIsAddPartnerOpen] = useState(false);
     const [form, setForm] = useState(() => {
+        const normPct = (v) => { const n = Number(v) || 0; return (n > 0 && n <= 1) ? n * 100 : n; };
+        
         const sched = editData ? {
-            pctRough: String(editData.pct_rough ?? 70),
-            pctInstall: String(editData.pct_install ?? 85),
-            pctAcceptance: String(editData.pct_acceptance ?? 0),
-            pctSettlement: String(editData.pct_settlement ?? 95),
+            pctRough: String(normPct(editData.pct_rough ?? 70)),
+            pctInstall: String(normPct(editData.pct_install ?? 85)),
+            pctAcceptance: String(normPct(editData.pct_acceptance ?? 0)),
+            pctSettlement: String(normPct(editData.pct_settlement ?? 95)),
         } : getScheduleForSystem('');
 
         return editData ? {
@@ -99,7 +104,7 @@ function ContractModal({ isOpen, onClose, onSuccess, editData, partners, project
             contractName: editData.contract_name || '',
             contractType: editData.contract_type || 'Tổ đội',
             contractValue: String(editData.contract_value || ''),
-            vatRate: String(editData.vat_rate || 0),
+            vatRate: String(normPct(editData.vat_rate || 0)),
             invoicedAmount: String(editData.invoiced_amount || 0),
             scopeOfWork: editData.scope_of_work || '',
             systemCode: editData.system_code || '',
@@ -254,6 +259,7 @@ function ContractModal({ isOpen, onClose, onSuccess, editData, partners, project
         : Number(form.advanceValue) || 0;
 
     return (
+        <>
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden border border-slate-200/50 animate-slide-up">
                 {/* Header */}
@@ -274,10 +280,21 @@ function ContractModal({ isOpen, onClose, onSuccess, editData, partners, project
                     {/* Row 1: Thầu phụ + Dự án */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="space-y-2">
-                            <label className="block text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
-                                <span className="material-symbols-outlined text-[13px] align-middle mr-1 text-purple-500">group</span>
-                                Nhà thầu / Tổ đội <span className="text-rose-500">*</span>
-                            </label>
+                            <div className="flex items-center justify-between">
+                                <label className="block text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
+                                    <span className="material-symbols-outlined text-[13px] align-middle mr-1 text-purple-500">group</span>
+                                    Nhà thầu / Tổ đội <span className="text-rose-500">*</span>
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAddPartnerOpen(true)}
+                                    className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded transition-colors"
+                                    title="Thêm nhanh Thầu phụ/Tổ đội mới"
+                                >
+                                    <span className="material-symbols-outlined text-[12px]">add</span>
+                                    Thêm mới
+                                </button>
+                            </div>
                             <SearchableSelect
                                 value={form.partnerId}
                                 onChange={handlePartnerChange}
@@ -751,6 +768,19 @@ function ContractModal({ isOpen, onClose, onSuccess, editData, partners, project
                 </div>
             </div>
         </div>
+
+        {/* Inline Partner Modal */}
+        <PartnerModal 
+            isOpen={isAddPartnerOpen}
+            onClose={() => setIsAddPartnerOpen(false)}
+            activeTab="Subcontractor"
+            onSuccess={(newPartner) => {
+                queryClient.invalidateQueries({ queryKey: ['partners-subcontractor-dropdown'] });
+                // We add a tiny delay to ensure the dropdown list updates first
+                setTimeout(() => handlePartnerChange(newPartner.id), 200);
+            }}
+        />
+        </>
     );
 }
 
@@ -793,7 +823,16 @@ export default function SubcontractorContracts() {
                 .from('subcontractor_contracts')
                 .select('*, partners:partner_id(id, code, name, short_name), projects:project_id(id, code, name, internal_code)')
                 .order('created_at', { ascending: false });
-            return data || [];
+            
+            const normPct = (v) => { const n = Number(v) || 0; return (n > 0 && n <= 1) ? n * 100 : n; };
+            return (data || []).map(c => ({
+                ...c,
+                vat_rate: normPct(c.vat_rate),
+                pct_rough: normPct(c.pct_rough),
+                pct_install: normPct(c.pct_install),
+                pct_acceptance: normPct(c.pct_acceptance),
+                pct_settlement: normPct(c.pct_settlement),
+            }));
         },
     });
 
@@ -1329,14 +1368,32 @@ export default function SubcontractorContracts() {
                             const partnerId = partnerName ? partnerMap.get(String(partnerName).toLowerCase().trim()) : null;
                             
                             if (!contractName && !contractCode) { skipped++; return; }
+                            const finalContractName = contractName 
+                                ? String(contractName).trim() 
+                                : (contractCode ? String(contractCode).trim() : `Hợp đồng ${partnerName || 'Mới'}`);
                             
                             const numVal = (key) => {
                                 const v = getVal(row, key);
                                 return v !== null ? (Number(String(v).replace(/[^0-9.-]/g, '')) || 0) : null;
                             };
+                            const pctVal = (key) => {
+                                const v = numVal(key);
+                                return v !== null ? ((v > 0 && v <= 1) ? v * 100 : v) : null;
+                            };
                             const strVal = (key) => {
                                 const v = getVal(row, key);
                                 return v !== null ? String(v).trim() : null;
+                            };
+                            const dateVal = (key) => {
+                                const v = getVal(row, key);
+                                if (v === null || v === '') return null;
+                                if (v instanceof Date) {
+                                    const y = v.getUTCFullYear();
+                                    const m = String(v.getUTCMonth() + 1).padStart(2, '0');
+                                    const d = String(v.getUTCDate()).padStart(2, '0');
+                                    return `${y}-${m}-${d}`;
+                                }
+                                return String(v).trim();
                             };
 
                             // Auto-fill payment schedule from system if not provided
@@ -1349,22 +1406,22 @@ export default function SubcontractorContracts() {
                                         unresolved_project: !projectId ? projectCode : null,
                                         unresolved_partner: !partnerId ? partnerName : null,
                                 contract_code: contractCode ? String(contractCode).trim() : null,
-                                contract_name: contractName ? String(contractName).trim() : null,
+                                contract_name: finalContractName,
                                 contract_type: strVal('contract_type') || 'Tổ đội',
                                 contract_value: numVal('contract_value') || 0,
-                                vat_rate: numVal('vat_rate') || 0,
+                                vat_rate: pctVal('vat_rate') || 0,
                                 system_code: sys || null,
                                 scope_of_work: strVal('scope_of_work') || null,
-                                start_date: strVal('start_date') || null,
-                                end_date: strVal('end_date') || null,
+                                start_date: dateVal('start_date') || null,
+                                end_date: dateVal('end_date') || null,
                                 warranty_months: numVal('warranty_months') || 12,
                                 status: strVal('status') || 'Đang thực hiện',
                                 signing_status: strVal('signing_status') || 'Chưa ký',
                                 notes: strVal('notes') || null,
-                                pct_rough: numVal('pct_rough') ?? sched.pct_rough,
-                                pct_install: numVal('pct_install') ?? sched.pct_install,
-                                pct_acceptance: numVal('pct_acceptance') ?? sched.pct_acceptance,
-                                pct_settlement: numVal('pct_settlement') ?? sched.pct_settlement,
+                                pct_rough: pctVal('pct_rough') ?? sched.pct_rough,
+                                pct_install: pctVal('pct_install') ?? sched.pct_install,
+                                pct_acceptance: pctVal('pct_acceptance') ?? sched.pct_acceptance,
+                                pct_settlement: pctVal('pct_settlement') ?? sched.pct_settlement,
                                 advance_type: strVal('advance_type') || 'fixed',
                                 advance_value: numVal('advance_value') || 0,
                                 advance_amount: numVal('advance_value') || 0,

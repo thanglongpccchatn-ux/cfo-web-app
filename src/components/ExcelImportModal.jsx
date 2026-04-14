@@ -101,7 +101,7 @@ export default function ExcelImportModal({
     reader.onload = (evt) => {
       try {
         const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wb = XLSX.read(bstr, { type: 'binary', cellDates: true });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
@@ -143,7 +143,14 @@ export default function ExcelImportModal({
 
             // Map the found data to the EXPECTED header name so the UI table renders it correctly under "Tên Đối tác" 
             let finalValue = colIndex !== -1 && row[colIndex] !== undefined ? row[colIndex] : '';
-            if (finalValue === '' || (typeof finalValue === 'string' && finalValue.trim() === '')) finalValue = '';
+            if (finalValue === '' || (typeof finalValue === 'string' && finalValue.trim() === '')) {
+                finalValue = '';
+            } else if (finalValue instanceof Date) {
+                const y = finalValue.getUTCFullYear();
+                const m = String(finalValue.getUTCMonth() + 1).padStart(2, '0');
+                const d = String(finalValue.getUTCDate()).padStart(2, '0');
+                finalValue = `${y}-${m}-${d}`;
+            }
             rowObj[expectedHeaderName] = finalValue;
           });
           
@@ -181,7 +188,7 @@ export default function ExcelImportModal({
       reader.onload = async (evt) => {
         try {
           const bstr = evt.target.result;
-          const wb = XLSX.read(bstr, { type: 'binary' });
+          const wb = XLSX.read(bstr, { type: 'binary', cellDates: true });
           const wsname = wb.SheetNames[0];
           const ws = wb.Sheets[wsname];
           const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
@@ -273,6 +280,11 @@ export default function ExcelImportModal({
                 let cellValue = row[colIndex];
                 if (cellValue === '' || (typeof cellValue === 'string' && cellValue.trim() === '')) {
                     cellValue = null;
+                } else if (cellValue instanceof Date) {
+                    const y = cellValue.getUTCFullYear();
+                    const m = String(cellValue.getUTCMonth() + 1).padStart(2, '0');
+                    const d = String(cellValue.getUTCDate()).padStart(2, '0');
+                    cellValue = `${y}-${m}-${d}`;
                 } else if (tableName === 'materials' && dbCol === 'category_code') {
                     const mappedCode = finalCategoriesMap.get(cellValue.toString().toLowerCase().trim());
                     if (mappedCode) cellValue = mappedCode;

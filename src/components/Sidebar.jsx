@@ -230,12 +230,39 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
             </nav>
 
             {/* System / Administration Section */}
-            <div className={`border-t border-slate-100 dark:border-slate-700/50 pt-5 pb-3 space-y-0.5 ${isSidebarOpen ? 'px-3' : 'px-2'} max-h-[30vh] overflow-y-auto no-scrollbar`}>
-                {isSidebarOpen && <p className="px-3 text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Hệ Thống</p>}
-                {systemTabs.map(item => (
-                    <NavItem key={item.id} item={item} />
-                ))}
-            </div>
+            {systemTabs.length > 0 && (
+                <div className={`border-t border-slate-100 dark:border-slate-700/50 pt-2 pb-3 mb-1 ${isSidebarOpen ? 'px-3' : 'px-2'}`}>
+                    {isSidebarOpen ? (
+                        <button
+                            onClick={() => toggleGroup('system')}
+                            aria-expanded={!collapsed['system']}
+                            className={`w-full flex items-center justify-between px-3 pt-4 pb-2 mb-1 text-xs font-black uppercase tracking-widest transition-colors cursor-pointer outline-none ${
+                                systemTabs.some(item => activeTab === item.id) ? 'text-primary' : 'text-slate-400 hover:text-slate-700'
+                            }`}
+                        >
+                            <div className="flex items-center gap-2.5">
+                                <span className="material-symbols-outlined font-medium text-[20px]">admin_panel_settings</span>
+                                <span className="mt-0.5">Hệ Thống</span>
+                            </div>
+                            <span className={`material-symbols-outlined text-[16px] transition-transform ${collapsed['system'] ? '-rotate-90' : ''}`}>
+                                expand_more
+                            </span>
+                        </button>
+                    ) : (
+                        <div className="w-full flex justify-center py-2 mb-1">
+                            <div className="w-5 h-px bg-slate-200 dark:bg-slate-700 rounded-full" />
+                        </div>
+                    )}
+                    
+                    {(!collapsed['system'] || !isSidebarOpen) && (
+                        <div className="space-y-0.5 max-h-[30vh] overflow-y-auto no-scrollbar">
+                            {systemTabs.map(item => (
+                                <NavItem key={item.id} item={item} />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             <div className={`pb-4 ${isSidebarOpen ? 'px-3' : 'px-2'}`}>
                 <div className={`mt-2 pt-3 border-t border-slate-100 dark:border-slate-700/50 flex items-center ${isSidebarOpen ? 'gap-3 px-1' : 'flex-col gap-3 justify-center'}`}>

@@ -9,6 +9,7 @@ import { fmt, formatBillion } from '../utils/formatters';
 import ReceiveGoodsModal from './supplier/ReceiveGoodsModal';
 import SupplierPaymentModal from './supplier/SupplierPaymentModal';
 import SkeletonTable from './ui/SkeletonTable';
+import SearchableSelect from './common/SearchableSelect';
 
 const EMPTY_LINE = () => ({ _key: Date.now() + Math.random(), materialId: '', productName: '', unit: 'Cái', quantity: '', unitPrice: '', vatRate: '8', notes: '', _showSuggestions: false });
 
@@ -34,13 +35,11 @@ export default function SuppliersMaster() {
     const [paymentPO, setPaymentPO] = useState(null);
     const [paymentSupplier, setPaymentSupplier] = useState(null);
 
+    const [quickMaterialData, setQuickMaterialData] = useState({ isOpen: false, key: null, name: '', unit: 'Cái', basePrice: '' });
     const [purchaseHeader, setPurchaseHeader] = useState({
         supplierId: '', projectId: '', expenseDate: new Date().toISOString().split('T')[0]
     });
     const [purchaseLines, setPurchaseLines] = useState([EMPTY_LINE()]);
-
-
-
     // Định nghĩa cấu hình Import cho Nhà cung cấp
     const supplierMapping = {
         code: "Mã NCC",
@@ -129,7 +128,29 @@ export default function SuppliersMaster() {
     };
 
     const handleProductNameChange = (key, value) => {
-        setPurchaseLines(prev => prev.map(l => l._key === key ? { ...l, productName: value, materialId: '', _showSuggestions: value.length > 0 } : l));
+        setPurchaseLines(prev => prev.map(l => l._key === key ? { ...l, productName: value, materialId: '', _showSuggestions: true } : l));
+    };
+
+    const handleQuickAddMaterial = (key, name) => {
+        setQuickMaterialData({ isOpen: true, key, name, unit: 'Cái', basePrice: '' });
+    };
+
+    const handleConfirmQuickMaterial = async (e) => {
+        e.preventDefault();
+        const { key, name, unit, basePrice } = quickMaterialData;
+        if (!name) return;
+        const code = 'M-' + Date.now().toString().slice(-4);
+        try {
+            const bp = Number(String(basePrice).replace(/[^0-9]/g, '')) || 0;
+            const { data, error } = await supabase.from('materials').insert([{ code, name, unit: unit || 'Cái', base_price: bp }]).select().single();
+            if (error) throw error;
+            smartToast('Đã lưu vật tư: ' + name);
+            queryClient.invalidateQueries(['supplierMaterialsCatalog']);
+            handleSelectMaterial(key, data);
+            setQuickMaterialData({ isOpen: false, key: null, name: '', unit: 'Cái', basePrice: '' });
+        } catch (e) {
+            smartToast('Lỗi: ' + e.message);
+        }
     };
 
     const hideSuggestions = (key) => {
@@ -607,17 +628,11 @@ export default function SuppliersMaster() {
                                             <span className="material-symbols-outlined notranslate text-[12px]" translate="no">add_circle</span> Thêm mới
                                         </button>
                                     </div>
-                                    <select required value={purchaseHeader.supplierId} onChange={(e) => setPurchaseHeader({...purchaseHeader, supplierId: e.target.value})} className="w-full bg-slate-50 border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 font-semibold">
-                                        <option value="">Chọn NCC...</option>
-                                        {suppliersData.map(s => <option key={s.id} value={s.id}>[{s.code}] {s.name}</option>)}
-                                    </select>
+                                    <SearchableSelect options={suppliersData.map(s => ({ value: s.id, label: s.name, sub: s.code }))} value={purchaseHeader.supplierId} onChange={(val) => setPurchaseHeader({...purchaseHeader, supplierId: val})} placeholder="Chọn NCC..." required={true} />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="block text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Dự án</label>
-                                    <select required value={purchaseHeader.projectId} onChange={(e) => setPurchaseHeader({...purchaseHeader, projectId: e.target.value})} className="w-full bg-slate-50 border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500">
-                                        <option value="">Chọn dự án...</option>
-                                        {projects.map(p => <option key={p.id} value={p.id}>{p.internal_code || p.code} — {p.name}</option>)}
-                                    </select>
+                                    <SearchableSelect options={projects.map(p => ({ value: p.id, label: p.internal_code || p.code || p.name, sub: p.name }))} value={purchaseHeader.projectId} onChange={(val) => setPurchaseHeader({...purchaseHeader, projectId: val})} placeholder="Chọn dự án..." required={true} />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="block text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Ngày mua</label>
@@ -636,9 +651,9 @@ export default function SuppliersMaster() {
                                         <span className="material-symbols-outlined notranslate text-[16px]" translate="no">add</span> Thêm dòng
                                     </button>
                                 </div>
-                                <div className="rounded-xl border border-slate-200 overflow-hidden">
+                                <div className="rounded-xl border border-slate-200 min-h-[280px]">
                                     <table className="w-full text-xs text-left">
-                                        <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold">
+                                        <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold [&_th:first-child]:rounded-tl-xl [&_th:last-child]:rounded-tr-xl">
                                             <tr>
                                                 <th className="px-2 py-2.5 w-8 text-center">#</th>
                                                 <th className="px-2 py-2.5 min-w-[250px]">Tên vật tư</th>
@@ -660,25 +675,37 @@ export default function SuppliersMaster() {
                                                             placeholder="Gõ tìm vật tư..."
                                                             value={line.productName}
                                                             onChange={(e) => handleProductNameChange(line._key, e.target.value)}
-                                                            onFocus={() => setPurchaseLines(prev => prev.map(l => l._key === line._key ? { ...l, _showSuggestions: l.productName.length > 0 } : l))}
+                                                            onFocus={() => setPurchaseLines(prev => prev.map(l => l._key === line._key ? { ...l, _showSuggestions: true } : l))}
                                                             onBlur={() => hideSuggestions(line._key)}
                                                             className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-orange-400 focus:border-orange-400 outline-none font-semibold"
                                                         />
                                                         {line._showSuggestions && (() => {
                                                             const q = line.productName.toLowerCase();
-                                                            const matches = materialsCatalog.filter(m => m.name.toLowerCase().includes(q) || (m.code && m.code.toLowerCase().includes(q)));
-                                                            return matches.length > 0 ? (
-                                                                <div className="absolute left-2 right-2 top-full z-30 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto mt-0.5">
-                                                                    {matches.slice(0, 12).map(m => (
-                                                                        <button key={m.id} type="button" onMouseDown={() => handleSelectMaterial(line._key, m)} className="w-full text-left px-3 py-2 text-xs hover:bg-orange-50 flex items-center gap-2 border-b border-slate-50 last:border-0 transition-colors">
-                                                                            <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-mono font-bold text-slate-500 shrink-0">{m.code}</span>
-                                                                            <span className="font-semibold text-slate-800 truncate">{m.name}</span>
-                                                                            {m.brand && <span className="text-[10px] text-slate-400 shrink-0">{m.brand}</span>}
-                                                                            <span className="ml-auto text-[10px] text-orange-500 font-bold shrink-0">{m.unit} • {fmt(m.base_price)}₫</span>
+                                                            const isExactMatch = materialsCatalog.some(m => m.name && m.name.toLowerCase() === q);
+                                                            const matches = materialsCatalog.filter(m => (m.name && m.name.toLowerCase().includes(q)) || (m.code && m.code.toLowerCase().includes(q)));
+                                                            return (
+                                                                <div className="absolute left-2 right-2 top-full z-30 bg-white border border-slate-200 rounded-lg shadow-xl flex flex-col mt-0.5 overflow-hidden min-w-[300px]">
+                                                                    <div className="overflow-y-auto max-h-48">
+                                                                        {matches.slice(0, 12).map(m => (
+                                                                            <button key={m.id} type="button" onMouseDown={() => handleSelectMaterial(line._key, m)} className="w-full text-left px-3 py-2 text-xs hover:bg-orange-50 flex items-center gap-2 border-b border-slate-50 last:border-0 transition-colors">
+                                                                                <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-mono font-bold text-slate-500 shrink-0">{m.code}</span>
+                                                                                <span className="font-semibold text-slate-800 truncate">{m.name}</span>
+                                                                                {m.brand && <span className="text-[10px] text-slate-400 shrink-0">{m.brand}</span>}
+                                                                                <span className="ml-auto text-[10px] text-orange-500 font-bold shrink-0">{m.unit} • {fmt(m.base_price)}₫</span>
+                                                                            </button>
+                                                                        ))}
+                                                                        {matches.length === 0 && (
+                                                                            <div className="px-3 py-2 text-xs text-slate-400 italic">Không tìm thấy "{line.productName}"</div>
+                                                                        )}
+                                                                    </div>
+                                                                    {!isExactMatch && line.productName.trim().length > 0 && (
+                                                                        <button type="button" onMouseDown={() => handleQuickAddMaterial(line._key, line.productName)} className="w-full text-left px-3 py-2.5 text-xs text-orange-600 font-bold hover:bg-orange-50 bg-orange-50/50 border-t border-orange-100 flex items-center gap-2 transition-colors">
+                                                                            <span className="material-symbols-outlined notranslate text-[14px]" translate="no">add_circle</span>
+                                                                            Lưu nhanh "{line.productName}"
                                                                         </button>
-                                                                    ))}
+                                                                    )}
                                                                 </div>
-                                                            ) : null;
+                                                            );
                                                         })()}
                                                     </td>
                                                     <td className="px-2 py-2">
@@ -781,6 +808,49 @@ export default function SuppliersMaster() {
                         if (paymentPO?.supplier_id) toggleSupplierPOs(paymentPO.supplier_id);
                     }}
                 />
+            )}
+            {/* Quick Material Modal */}
+            {quickMaterialData.isOpen && (
+                <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-orange-50/80 to-amber-50/40 relative">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-400 to-amber-500"></div>
+                            <h3 className="text-xl font-extrabold text-slate-800 flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0 border border-orange-200/50 shadow-sm">
+                                    <span className="material-symbols-outlined text-[20px] font-bold">add</span>
+                                </div>
+                                Thêm Nhanh Vật Tư
+                            </h3>
+                            <button onClick={() => setQuickMaterialData({...quickMaterialData, isOpen: false})} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-slate-200/50 text-slate-400 hover:text-slate-600 transition-colors">
+                                <span className="material-symbols-outlined notranslate text-[22px]" translate="no">close</span>
+                            </button>
+                        </div>
+                        <form onSubmit={handleConfirmQuickMaterial} className="p-8 pb-8 space-y-6">
+                            <div>
+                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Tên vật tư <span className="text-red-500">*</span></label>
+                                <input autoFocus type="text" value={quickMaterialData.name} onChange={e => setQuickMaterialData({...quickMaterialData, name: e.target.value})} className="w-full px-5 py-3.5 border border-slate-200 rounded-[16px] text-sm focus:ring-2 focus:ring-orange-500 font-semibold text-slate-800 placeholder:text-slate-400 transition-shadow outline-none" required />
+                            </div>
+                            <div className="grid grid-cols-2 gap-5">
+                                <div>
+                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Đơn vị tính <span className="text-red-500">*</span></label>
+                                    <input type="text" value={quickMaterialData.unit} onChange={e => setQuickMaterialData({...quickMaterialData, unit: e.target.value})} className="w-full px-5 py-3.5 border border-slate-200 rounded-[16px] text-sm focus:ring-2 focus:ring-orange-500 font-semibold text-slate-800 outline-none" required />
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">Đơn giá <span className="text-[10px] lowercase font-semibold opacity-70">(ko vat)</span></label>
+                                    <input type="text" value={quickMaterialData.basePrice ? String(quickMaterialData.basePrice).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''} onChange={e => setQuickMaterialData({...quickMaterialData, basePrice: e.target.value.replace(/[^0-9]/g, '')})} className="w-full px-5 py-3.5 border border-slate-200 rounded-[16px] text-sm focus:ring-2 focus:ring-orange-500 text-right font-black text-slate-800 outline-none" placeholder="0" />
+                                </div>
+                            </div>
+                            <div className="mt-8 flex justify-center gap-3 pt-4">
+                                <button type="button" onClick={() => setQuickMaterialData({...quickMaterialData, isOpen: false})} className="px-8 py-3.5 rounded-full font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 transition-colors border border-slate-200/50">
+                                    Hủy bỏ
+                                </button>
+                                <button type="submit" className="px-10 py-3.5 rounded-full font-black text-white bg-[#ea580c] hover:bg-[#c2410c] shadow-lg shadow-orange-500/30 active:scale-95 transition-all">
+                                    Xác nhận Lưu
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             )}
         </div>
     );

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import LaborTracking from './LaborTracking';
 import SubcontractorsMaster from './SubcontractorsMaster';
 import SubcontractorContracts from './SubcontractorContracts';
+import PartnerManagement from './PartnerManagement';
 
 export default function LaborSubcontractorHub() {
     const location = useLocation();
@@ -17,6 +18,7 @@ export default function LaborSubcontractorHub() {
         const tab = urlParams.get('tab');
         if (tab === 'master') setActiveTab('master');
         else if (tab === 'contracts') setActiveTab('contracts');
+        else if (tab === 'danh_muc') setActiveTab('danh_muc');
         else if (tab === 'labor' || tab === 'labor_tracking') setActiveTab('labor_tracking');
     }, [location]);
 
@@ -36,24 +38,31 @@ export default function LaborSubcontractorHub() {
                     <p className="text-slate-500 font-semibold text-xs tracking-widest uppercase mt-0.5">Trung tâm thanh toán và Theo dõi công nợ</p>
                 </div>
 
-                <div className="flex gap-2 -mb-px">
+                <div className="flex gap-2 -mb-px overflow-x-auto">
+                    <button 
+                        onClick={() => setTab('danh_muc')}
+                        className={`px-5 py-3 text-sm font-bold border-b-[3px] transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === 'danh_muc' ? 'border-primary text-primary bg-primary/5 dark:bg-primary/10 rounded-t-lg' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
+                    >
+                        <span className="material-symbols-outlined text-[18px]">contact_page</span>
+                        Danh Mục
+                    </button>
                     <button 
                         onClick={() => setTab('contracts')}
-                        className={`px-5 py-3 text-sm font-bold border-b-[3px] transition-all flex items-center gap-2 ${activeTab === 'contracts' ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-t-lg' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
+                        className={`px-5 py-3 text-sm font-bold border-b-[3px] transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === 'contracts' ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-t-lg' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
                     >
                         <span className="material-symbols-outlined text-[18px]">description</span>
                         Hợp đồng Thầu phụ
                     </button>
                     <button 
                         onClick={() => setTab('labor_tracking')}
-                        className={`px-5 py-3 text-sm font-bold border-b-[3px] transition-all flex items-center gap-2 ${activeTab === 'labor_tracking' ? 'border-purple-600 text-purple-600 bg-purple-50/50 dark:bg-purple-900/10 rounded-t-lg' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
+                        className={`px-5 py-3 text-sm font-bold border-b-[3px] transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === 'labor_tracking' ? 'border-purple-600 text-purple-600 bg-purple-50/50 dark:bg-purple-900/10 rounded-t-lg' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
                     >
                         <span className="material-symbols-outlined text-[18px]">list_alt</span>
                         Sổ Thanh Toán
                     </button>
                     <button 
                         onClick={() => setTab('master')}
-                        className={`px-5 py-3 text-sm font-bold border-b-[3px] transition-all flex items-center gap-2 ${activeTab === 'master' ? 'border-purple-600 text-purple-600 bg-purple-50/50 dark:bg-purple-900/10 rounded-t-lg' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
+                        className={`px-5 py-3 text-sm font-bold border-b-[3px] transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === 'master' ? 'border-purple-600 text-purple-600 bg-purple-50/50 dark:bg-purple-900/10 rounded-t-lg' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
                     >
                         <span className="material-symbols-outlined text-[18px]">groups</span>
                         Công Nợ & Hồ Sơ
@@ -63,6 +72,13 @@ export default function LaborSubcontractorHub() {
 
             {/* Content Area */}
             <div className="flex-1 overflow-hidden relative bg-slate-50">
+                {activeTab === 'danh_muc' && (
+                    <div className="absolute inset-0 flex flex-col p-4 md:p-6 pb-20 overflow-hidden">
+                        <div className="h-full overflow-y-auto custom-scrollbar">
+                            <PartnerManagement forcedTab="Subcontractor" hideHeader={true} />
+                        </div>
+                    </div>
+                )}
                 {activeTab === 'labor_tracking' && (
                     <div className="absolute inset-0 flex flex-col p-4 md:p-6 pb-20 overflow-hidden">
                         <LaborTracking embedded={true} />

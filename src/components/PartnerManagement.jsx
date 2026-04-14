@@ -11,8 +11,8 @@ const EMPTY_PARTNER = {
     notes: ''
 };
 
-export default function PartnerManagement() {
-    const [activeTab, setActiveTab] = useState('Client'); // Client, Supplier, Subcontractor
+export default function PartnerManagement({ forcedTab, hideHeader }) {
+    const [activeTab, setActiveTab] = useState(forcedTab || 'Client'); // Client, Supplier, Subcontractor
     const [partners, setPartners] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -48,28 +48,44 @@ export default function PartnerManagement() {
         fetchPartners();
     };
 
+    const getTableName = (tab) => {
+        if (tab === 'Supplier') return 'suppliers';
+        if (tab === 'Subcontractor') return 'subcontractors';
+        return 'partners'; // Client
+    };
+
     const handleSavePartner = async (e) => {
         e.preventDefault();
         if (!newPartner.name) {
-            smartToast('Vui lòng nhập Tên nhà cung cấp');
+            smartToast('Vui lòng nhập Tên đối tác');
             return;
         }
 
         setIsSubmitting(true);
         try {
+            const table = getTableName(activeTab);
             const payload = { ...newPartner };
 
-            // Tự động gán short_name cho code nếu code bị trống
             if (!payload.code && payload.short_name) {
                 payload.code = payload.short_name;
             }
 
+            // Clean up and map columns based on target table
+            if (table !== 'partners') {
+                payload.contact_person = payload.representative;
+                delete payload.representative;
+                delete payload.representative_title;
+                delete payload.type; // type doesn't exist in suppliers/subcontractors
+            } else {
+                payload.type = activeTab;
+            }
+
             let error;
             if (editingPartnerId) {
-                const res = await supabase.from('partners').update(payload).eq('id', editingPartnerId);
+                const res = await supabase.from(table).update(payload).eq('id', editingPartnerId);
                 error = res.error;
             } else {
-                const res = await supabase.from('partners').insert([{ ...payload, type: activeTab }]);
+                const res = await supabase.from(table).insert([payload]);
                 error = res.error;
             }
 
@@ -80,7 +96,7 @@ export default function PartnerManagement() {
             setNewPartner(EMPTY_PARTNER);
             fetchPartners();
         } catch (error) {
-            console.error('Error saving partner:', error);
+            console.error(`Error saving ${activeTab}:`, error);
             smartToast('Đã xảy ra lỗi khi lưu: ' + error.message);
         } finally {
             setIsSubmitting(false);
@@ -96,7 +112,7 @@ export default function PartnerManagement() {
             phone: partner.phone || '',
             email: partner.email || '',
             address: partner.address || '',
-            representative: partner.representative || '',
+            representative: partner.contact_person || partner.representative || '',
             representative_title: partner.representative_title || '',
             bank_name: partner.bank_name || '',
             bank_account: partner.bank_account || '',
@@ -109,14 +125,15 @@ export default function PartnerManagement() {
     };
 
     const handleDelete = async (id, name) => {
-        if (window.confirm(`Bạn có chắc chắn muốn xóa "${name}" không?\nLưu ý: Thao tác này có thể bị từ chối nếu đã được gắn vào hợp đồng.`)) {
+        if (window.confirm(`Bạn có chắc chắn muốn xóa "${name}" không?\nLưu ý: Thao tác này có thể bị từ chối nếu đã được sử dụng.`)) {
             try {
-                const { error } = await supabase.from('partners').delete().eq('id', id);
+                const table = getTableName(activeTab);
+                const { error } = await supabase.from(table).delete().eq('id', id);
                 if (error) throw error;
                 fetchPartners();
             } catch (error) {
-                console.error('Lỗi khi xóa đối tác:', error);
-                smartToast('Có lỗi xảy ra. Khả năng NCC này đang được sử dụng ở hợp đồng nào đó nên không thể xóa.');
+                console.error(`Lỗi khi xóa ${activeTab}:`, error);
+                smartToast('Có lỗi xảy ra. Khả năng đối tác này đang được sử dụng nên không thể xóa.');
             }
         }
     };
@@ -124,17 +141,26 @@ export default function PartnerManagement() {
     async function fetchPartners() {
         setIsLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('partners')
-                .select('*')
-                .eq('type', activeTab)
-                .order('created_at', { ascending: false });
+            const table = getTableName(activeTab);
+            let query = supabase.from(table).select('*').order('created_at', { ascending: false });
+            
+            if (table === 'partners') {
+                query = query.eq('type', activeTab);
+            }
 
+            const { data, error } = await query;
             if (error) throw error;
-            setPartners(data || []);
+            
+            // Map table-specific fields back to UI common fields
+            const mapped = (data || []).map(p => ({
+                ...p,
+                representative: p.contact_person || p.representative || ''
+            }));
+            
+            setPartners(mapped);
         } catch (error) {
-            console.error('Error fetching partners:', error);
-            smartToast('Không thể tải danh sách nhà cung cấp.');
+            console.error(`Error fetching ${activeTab}:`, error);
+            smartToast('Không thể tải danh sách dữ liệu.');
         } finally {
             setIsLoading(false);
         }
@@ -164,14 +190,16 @@ export default function PartnerManagement() {
     return (
         <div className="space-y-6">
             {/* Header section */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Danh mục Nhà Cung Cấp</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                        Quản lý chủ đầu tư, nhà cung cấp và thầu phụ thi công
-                    </p>
-                </div>
-                <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3 w-full md:w-auto">
+            <div className={`flex flex-col md:flex-row ${hideHeader ? 'justify-end' : 'md:items-end justify-between'} gap-4`}>
+                {!hideHeader && (
+                    <div>
+                        <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Danh mục Nhà Cung Cấp</h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            Quản lý chủ đầu tư, nhà cung cấp và thầu phụ thi công
+                        </p>
+                    </div>
+                )}
+                <div className={`flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3 w-full ${hideHeader ? '' : 'md:w-auto'}`}>
                     <div className="relative">
                         <span className="material-symbols-outlined notranslate absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]" translate="no">search</span>
                         <input
@@ -206,23 +234,25 @@ export default function PartnerManagement() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
-                {['Client', 'Supplier', 'Subcontractor'].map((type) => (
-                    <button
-                        key={type}
-                        onClick={() => setActiveTab(type)}
-                        className={`px-4 py-3 text-sm font-medium transition-colors relative ${activeTab === type
-                            ? 'text-primary'
-                            : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
-                            }`}
-                    >
-                        {getTabLabel(type)}
-                        {activeTab === type && (
-                            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-t-full"></div>
-                        )}
-                    </button>
-                ))}
-            </div>
+            {!hideHeader && (
+                <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
+                    {['Client', 'Supplier'].map((type) => (
+                        <button
+                            key={type}
+                            onClick={() => setActiveTab(type)}
+                            className={`px-4 py-3 text-sm font-medium transition-colors relative ${activeTab === type
+                                ? 'text-primary'
+                                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+                                }`}
+                        >
+                            {getTabLabel(type)}
+                            {activeTab === type && (
+                                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-t-full"></div>
+                            )}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             {/* Data Table */}
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden">
@@ -469,15 +499,19 @@ export default function PartnerManagement() {
                 isOpen={isExcelImportModalOpen}
                 onClose={() => setIsExcelImportModalOpen(false)}
                 title={`Nhập Danh Sách ${getTabLabel(activeTab)}`}
-                tableName="partners"
-                columnMapping={partnerMapping}
+                tableName={activeTab === 'Client' ? 'partners' : (activeTab === 'Supplier' ? 'suppliers' : 'subcontractors')}
+                columnMapping={
+                    activeTab === 'Client' 
+                    ? partnerMapping 
+                    : { ...partnerMapping, contact_person: "Người đại diện" } // Map Excel's "Người đại diện" to contact_person for suppliers/subcontractors
+                }
                 templateFilename={`mau_ncc_${activeTab.toLowerCase()}.xlsx`}
                 templateSampleRows={[
                     ['ZYF', 'CÔNG TY TNHH XÂY DỰNG ZYF VIỆT NAM', 'ZYF', 'Client', '0105720857', '107572897', '', 'Tòa nhà 22, Lô 4D KCN 102 Hà Nội', 'CHEN JING BO', 'Tổng giám đốc', 'INDUSTRIAL AND CO', '1270001000011000', 'CN Hà Nội', 'CHEN JING BO', ''],
                     ['HOANGVINH', 'CÔNG TY CỔ PHẦN HOÀNG VINH', 'HOÀNG VINH', 'Supplier', '0104987600', '0380.937760', '', 'Số 5, Tổ 7, P. Trần Đức Hoàng, Nam Định', 'C HOÀNG VINH', 'Giám đốc', 'Ngân hàng Vietinbank', '114403713959', 'CN Nam Định', 'C HOÀNG VINH', ''],
                 ]}
                 onSuccess={handleImportSuccess}
-                fixedData={{ type: activeTab }}
+                fixedData={activeTab === 'Client' ? { type: activeTab } : {}}
             />
         </div>
     );
