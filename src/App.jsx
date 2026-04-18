@@ -48,6 +48,7 @@ const BiddingManagement = lazy(() => import('./components/BiddingManagement'));
 const ExpenseTracking = lazy(() => import('./components/ExpenseTracking'));
 const WeeklyExpensePlan = lazy(() => import('./components/WeeklyExpensePlan'));
 const ConstructionModule = lazy(() => import('./components/ConstructionModule'));
+const TaskManagement = lazy(() => import('./components/TaskManagement'));
 const UserGuide = lazy(() => import('./components/UserGuide'));
 const LoanManagement = lazy(() => import('./components/LoanManagement'));
 const AuditTrailViewer = lazy(() => import('./components/AuditTrailViewer'));
@@ -160,6 +161,7 @@ function MainLayout() {
       case 'accounting/journals': return { title: 'Bút toán', subtitle: 'Tạo và quản lý bút toán kế toán kép' };
       case 'accounting/ledger': return { title: 'Sổ Cái', subtitle: 'Xem sổ cái theo tài khoản và kỳ kế toán' };
       case 'accounting/reports': return { title: 'Báo cáo Tài chính', subtitle: 'Bảng CĐPS, CĐKT (B01-DN), KQKD (B02-DN) theo TT200' };
+      case 'task_management': return { title: 'Quản lý Công việc', subtitle: 'Kanban · Lịch · Phân công · Tiến độ' };
       default: return { title: 'Hệ thống Quản trị', subtitle: `${currentTheme.company_name}` };
     }
   };
@@ -234,6 +236,7 @@ function MainLayout() {
             {/* Other Modules */}
             <Route path="/planning_hub" element={<ProtectedRoute><PlanningModule /></ProtectedRoute>} />
             <Route path="/construction" element={<ProtectedRoute><ConstructionModule /></ProtectedRoute>} />
+            <Route path="/task_management" element={<ProtectedRoute><TaskManagement /></ProtectedRoute>} />
             <Route path="/partners" element={<ProtectedRoute><PartnerManagement /></ProtectedRoute>} />
             <Route path="/permissions" element={<ProtectedRoute><RoleManagement /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
