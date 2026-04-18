@@ -53,7 +53,7 @@ export default function TaskManagement() {
         const [{ data: t }, { data: p }, { data: u }, { data: c }] = await Promise.all([
             supabase.from('tasks').select('*').order('sort_order', { ascending: true }),
             supabase.from('projects').select('id, name, code'),
-            supabase.from('user_roles').select('user_id, full_name, avatar_url'),
+            supabase.from('profiles').select('id, full_name, avatar_url, roles:role_code(name)').order('full_name', { ascending: true }),
             supabase.from('task_categories').select('*').order('sort_order', { ascending: true }),
         ]);
         setTasks(t || []);
@@ -127,7 +127,7 @@ export default function TaskManagement() {
         if (!error) setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
     };
 
-    const getUserName = (userId) => users.find(u => u.user_id === userId)?.full_name || '—';
+    const getUserName = (userId) => users.find(u => u.id === userId)?.full_name || '—';
     const getProjectName = (projectId) => projects.find(p => p.id === projectId)?.name || '';
     const getCategory = (categoryId) => categories.find(c => c.id === categoryId);
 
@@ -732,7 +732,20 @@ function TaskModal({ task, projects, users, categories, onAddCategory, onSave, o
                             <select value={form.assigned_to} onChange={e => setForm(f => ({ ...f, assigned_to: e.target.value }))}
                                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-white text-[13px] outline-none cursor-pointer">
                                 <option value="">— Chưa giao —</option>
-                                {users.map(u => <option key={u.user_id} value={u.user_id}>{u.full_name}</option>)}
+                                {Object.entries(
+                                    users.reduce((acc, u) => {
+                                        const groupName = u.roles?.name || 'Khác';
+                                        if (!acc[groupName]) acc[groupName] = [];
+                                        acc[groupName].push(u);
+                                        return acc;
+                                    }, {})
+                                ).map(([groupName, groupUsers]) => (
+                                    <optgroup key={groupName} label={groupName}>
+                                        {groupUsers.map(u => (
+                                            <option key={u.id} value={u.id}>{u.full_name || u.id}</option>
+                                        ))}
+                                    </optgroup>
+                                ))}
                             </select>
                         </div>
                     </div>
