@@ -1,5 +1,51 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { formatInput } from './dtkHelpers';
+
+const CurrencyInput = ({ value, onChange, className, placeholder }) => {
+    const inputRef = useRef(null);
+
+    const handleChange = (e) => {
+        const input = e.target;
+        const currentCursor = input.selectionStart;
+        const rawValue = input.value;
+        const digitsBeforeCursor = (rawValue.slice(0, currentCursor).match(/\d/g) || []).length;
+        
+        onChange(e);
+
+        window.requestAnimationFrame(() => {
+            if (!inputRef.current) return;
+            const newFormattedValue = inputRef.current.value;
+            let newCursor = 0;
+            let digitCount = 0;
+            
+            if (digitsBeforeCursor === 0 && rawValue.startsWith('-')) {
+                newCursor = 1;
+            } else {
+                for (let i = 0; i < newFormattedValue.length; i++) {
+                    if (/\d/.test(newFormattedValue[i])) {
+                        digitCount++;
+                    }
+                    if (digitCount === digitsBeforeCursor) {
+                        newCursor = i + 1;
+                        break;
+                    }
+                }
+            }
+            inputRef.current.setSelectionRange(newCursor, newCursor);
+        });
+    };
+
+    return (
+        <input 
+            ref={inputRef}
+            type="text"
+            className={className}
+            placeholder={placeholder}
+            value={value}
+            onChange={handleChange}
+        />
+    );
+};
 
 export default function PaymentFormModal({
     showModal, setShowModal, isEditing,
@@ -91,8 +137,7 @@ export default function PaymentFormModal({
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Giá trị HĐ xuất (₫)</label>
-                                    <input 
-                                        type="text" 
+                                    <CurrencyInput 
                                         value={formatInput(form.invoiceAmount)}
                                         onChange={(e) => handleNumChange('invoiceAmount', e.target.value)}
                                         className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all font-black text-slate-800 text-right pr-6"
@@ -101,8 +146,7 @@ export default function PaymentFormModal({
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Giá trị ĐNTT (₫)</label>
-                                    <input 
-                                        type="text" 
+                                    <CurrencyInput 
                                         value={formatInput(form.requestAmount)}
                                         onChange={(e) => handleNumChange('requestAmount', e.target.value)}
                                         className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all font-black text-slate-800 text-right pr-6"
