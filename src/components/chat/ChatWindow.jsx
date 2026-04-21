@@ -256,8 +256,22 @@ export default function ChatWindow({
                 </div>
             )}
 
-            {/* ─── Message Input ─── */}
-            <MessageInput
+            {/* ─── Message Input & Scroll Button ─── */}
+            <div className="relative">
+                {/* Scroll to bottom button */}
+                {!autoScroll && (
+                    <button
+                        onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                        className="absolute -top-12 right-6 w-10 h-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 shadow-lg rounded-full flex items-center justify-center text-blue-500 hover:text-blue-600 hover:bg-slate-50 transition-all z-20 animate-fade-in cursor-pointer group"
+                        title="Cuộn xuống cuối"
+                    >
+                        <span className="material-symbols-outlined text-[20px] group-hover:translate-y-0.5 transition-transform">arrow_downward</span>
+                        
+                        {/* Unread badge logic could go here in future */}
+                    </button>
+                )}
+
+                <MessageInput
                 onSend={(content) => {
                     onSendMessage(content, replyTo?.id);
                     setReplyTo(null);
@@ -269,6 +283,7 @@ export default function ChatWindow({
                 onTyping={onBroadcastTyping}
                 isSending={isSending}
             />
+            </div>
 
             {/* ─── Image Viewer ─── */}
             {viewingImage && (

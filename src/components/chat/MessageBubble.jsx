@@ -142,7 +142,17 @@ export default function MessageBubble({
                         {(message.type === 'text' || (message.type === 'image' && message.content && message.content !== '📷 Hình ảnh')) && (
                             <div className="px-4 py-2.5">
                                 <p className="text-[14px] leading-relaxed whitespace-pre-wrap break-words">
-                                    {message.type === 'text' ? message.content : null}
+                                    {message.type === 'text' ? (
+                                        message.content.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
+                                            part.match(/(https?:\/\/[^\s]+)/g) ? (
+                                                <a key={i} href={part} target="_blank" rel="noopener noreferrer" className={`hover:underline font-medium ${isOwn ? 'text-white underline-offset-2' : 'text-blue-500'}`}>
+                                                    {part}
+                                                </a>
+                                            ) : (
+                                                <React.Fragment key={i}>{part}</React.Fragment>
+                                            )
+                                        )
+                                    ) : null}
                                 </p>
                             </div>
                         )}
@@ -164,7 +174,16 @@ export default function MessageBubble({
 
                     {/* Quick Actions (on hover) */}
                     {showActions && !message.is_deleted && (
-                        <div className={`absolute top-0 ${isOwn ? '-left-28' : '-right-28'} flex items-center gap-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg p-0.5 z-10 animate-fade-in`}>
+                        <div className={`absolute top-0 ${isOwn ? '-left-36' : '-right-36'} flex items-center gap-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg p-0.5 z-10 animate-fade-in`}>
+                            {message.type === 'text' && (
+                                <button
+                                    onClick={() => navigator.clipboard.writeText(message.content)}
+                                    className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 transition-colors cursor-pointer"
+                                    title="Sao chép"
+                                >
+                                    <span className="material-symbols-outlined text-[15px]">content_copy</span>
+                                </button>
+                            )}
                             <button
                                 onClick={() => setShowReactions(!showReactions)}
                                 className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 transition-colors cursor-pointer"
