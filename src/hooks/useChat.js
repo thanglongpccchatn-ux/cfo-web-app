@@ -80,22 +80,27 @@ export function useChat() {
                         .neq('sender_id', user.id)
                         .gt('created_at', lastReadAt);
 
-                    // For direct chats, get the other user's profile
+                    // Load profiles for all members in the conversation
+                    let chat_users = [];
+                    const memberIds = conv.chat_members?.map(m => m.user_id) || [];
+                    if (memberIds.length > 0) {
+                        const { data: profilesData } = await supabase
+                            .from('profiles')
+                            .select('id, full_name, avatar_url')
+                            .in('id', memberIds);
+                        chat_users = profilesData || [];
+                    }
+
+                    // For direct chats, get the other user's profile specifically
                     let otherUser = null;
                     if (conv.type === 'direct') {
-                        const otherMember = conv.chat_members?.find(m => m.user_id !== user.id);
-                        if (otherMember) {
-                            const { data: profileData } = await supabase
-                                .from('profiles')
-                                .select('id, full_name, avatar_url')
-                                .eq('id', otherMember.user_id)
-                                .single();
-                            otherUser = profileData;
-                        }
+                        const otherMemberId = conv.chat_members?.find(m => m.user_id !== user.id)?.user_id;
+                        otherUser = chat_users.find(u => u.id === otherMemberId) || null;
                     }
 
                     return {
                         ...conv,
+                        chat_users, // List of all member profiles {id, full_name, avatar_url}
                         lastMessage: lastMsgData?.[0] || null,
                         unreadCount: unreadCount || 0,
                         otherUser,

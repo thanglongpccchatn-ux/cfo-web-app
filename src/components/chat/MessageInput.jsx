@@ -15,13 +15,27 @@ export default function MessageInput({
     onSendFile,
     onTyping,
     isSending,
+    chatUsers = [],
 }) {
     const [text, setText] = useState('');
     const [pendingFiles, setPendingFiles] = useState([]); // [{file, previewUrl}]
     const [isDragOver, setIsDragOver] = useState(false);
+    
+    // Mention state
+    const [mentionOpen, setMentionOpen] = useState(false);
+    const [mentionSearch, setMentionSearch] = useState('');
+    const [mentionIndex, setMentionIndex] = useState(0);
+
     const textareaRef = useRef(null);
     const fileInputRef = useRef(null);
     const typingTimeoutRef = useRef(null);
+
+    // Filtered users for mentions
+    const filteredUsers = React.useMemo(() => {
+        if (!mentionOpen || !chatUsers) return [];
+        const q = mentionSearch.toLowerCase();
+        return chatUsers.filter(u => u.full_name?.toLowerCase().includes(q));
+    }, [mentionOpen, mentionSearch, chatUsers]);
 
     // Auto-resize textarea
     useEffect(() => {
@@ -32,9 +46,23 @@ export default function MessageInput({
         }
     }, [text]);
 
-    // Handle text change + typing indicator
+    // Handle text change + typing indicator + mentions
     const handleTextChange = (e) => {
-        setText(e.target.value);
+        const val = e.target.value;
+        setText(val);
+
+        // Mention detection
+        const cursorPosition = e.target.selectionStart;
+        const textBeforeCursor = val.slice(0, cursorPosition);
+        const match = textBeforeCursor.match(/@(\S*)$/);
+        
+        if (match) {
+            setMentionOpen(true);
+            setMentionSearch(match[1]);
+            setMentionIndex(0);
+        } else {
+            setMentionOpen(false);
+        }
 
         // Debounce typing indicator
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -42,6 +70,33 @@ export default function MessageInput({
         typingTimeoutRef.current = setTimeout(() => {
             // Typing stopped
         }, 2000);
+    };
+
+    // Insert Mention
+    const insertMention = (user) => {
+        const cursorPosition = textareaRef.current.selectionStart;
+        const textBeforeCursor = text.slice(0, cursorPosition);
+        const textAfterCursor = text.slice(cursorPosition);
+        
+        const match = textBeforeCursor.match(/@(\S*)$/);
+        if (match) {
+            const beforeMention = textBeforeCursor.slice(0, match.index);
+            // Replace spaces with underscores so MessageBubble can parse it easily, will be reverted in render
+            const mentionText = '@' + user.full_name.replace(/\s+/g, '_') + ' ';
+            
+            const newText = beforeMention + mentionText + textAfterCursor;
+            setText(newText);
+            setMentionOpen(false);
+            
+            // Focus and restore cursor
+            setTimeout(() => {
+                const ta = textareaRef.current;
+                if (ta) {
+                    ta.focus();
+                    ta.selectionStart = ta.selectionEnd = beforeMention.length + mentionText.length;
+                }
+            }, 0);
+        }
     };
 
     // Handle send
@@ -62,8 +117,27 @@ export default function MessageInput({
         }
     }, [text, pendingFiles, onSend, onSendFile]);
 
-    // Handle key press (Enter to send, Shift+Enter for new line)
+    // Handle key press
     const handleKeyDown = (e) => {
+        if (mentionOpen && filteredUsers.length > 0) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setMentionIndex(prev => (prev + 1) % filteredUsers.length);
+                return;
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setMentionIndex(prev => (prev - 1 + filteredUsers.length) % filteredUsers.length);
+                return;
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                insertMention(filteredUsers[mentionIndex]);
+                return;
+            } else if (e.key === 'Escape') {
+                setMentionOpen(false);
+                return;
+            }
+        }
+
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSend();
@@ -226,6 +300,28 @@ export default function MessageInput({
 
                 {/* Text input */}
                 <div className="flex-1 relative">
+                    {/* Mentions popup */}
+                    {mentionOpen && filteredUsers.length > 0 && (
+                        <div className="absolute bottom-full mb-2 left-0 w-64 max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 animate-slide-up py-1">
+                            {filteredUsers.map((u, i) => (
+                                <button
+                                    key={u.id}
+                                    onClick={() => insertMention(u)}
+                                    className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors cursor-pointer ${
+                                        i === mentionIndex ? 'bg-blue-50 dark:bg-slate-700' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                                    }`}
+                                >
+                                    <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600 overflow-hidden flex-shrink-0">
+                                        {u.avatar_url ? <img src={u.avatar_url} alt="" className="w-full h-full object-cover" /> : u.full_name?.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
+                                        {u.full_name}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
                     <textarea
                         ref={textareaRef}
                         value={text}

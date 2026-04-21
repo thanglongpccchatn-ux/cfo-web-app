@@ -14,6 +14,8 @@ export default function MessageBubble({
     message,
     isOwn,
     showAvatar,
+    senderName,
+    senderAvatar,
     onReply,
     onDelete,
     onReaction,
@@ -65,14 +67,23 @@ export default function MessageBubble({
                 {!isOwn && (
                     <div className="flex-shrink-0 w-8">
                         {showAvatar ? (
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-300 to-slate-400 dark:from-slate-600 dark:to-slate-700 flex items-center justify-center text-white text-[11px] font-bold overflow-hidden">
-                                <span className="material-symbols-outlined text-[16px]">person</span>
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-300 to-slate-400 dark:from-slate-600 dark:to-slate-700 flex items-center justify-center text-white text-[11px] font-bold overflow-hidden" title={senderName}>
+                                {senderAvatar ? (
+                                    <img src={senderAvatar} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                    <span>{senderName ? senderName.charAt(0).toUpperCase() : <span className="material-symbols-outlined text-[16px]">person</span>}</span>
+                                )}
                             </div>
                         ) : null}
                     </div>
                 )}
 
                 <div className={`relative ${isOwn ? 'items-end' : 'items-start'} flex flex-col`}>
+                    {/* Sender Name label (only for others and if showAvatar is true, mainly for groups) */}
+                    {!isOwn && showAvatar && senderName && (
+                        <span className="text-[11px] text-slate-500 font-semibold mb-1 ml-1">{senderName}</span>
+                    )}
+
                     {/* Reply preview */}
                     {message.reply_msg && (
                         <div className={`mb-1 px-3 py-1.5 rounded-lg bg-slate-100/80 dark:bg-slate-800/40 border-l-2 border-blue-400 max-w-full`}>
@@ -143,15 +154,22 @@ export default function MessageBubble({
                             <div className="px-4 py-2.5">
                                 <p className="text-[14px] leading-relaxed whitespace-pre-wrap break-words">
                                     {message.type === 'text' ? (
-                                        message.content.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
-                                            part.match(/(https?:\/\/[^\s]+)/g) ? (
-                                                <a key={i} href={part} target="_blank" rel="noopener noreferrer" className={`hover:underline font-medium ${isOwn ? 'text-white underline-offset-2' : 'text-blue-500'}`}>
-                                                    {part}
-                                                </a>
-                                            ) : (
-                                                <React.Fragment key={i}>{part}</React.Fragment>
-                                            )
-                                        )
+                                        message.content.split(/(https?:\/\/[^\s]+|@\S+)/g).map((part, i) => {
+                                            if (part.match(/(https?:\/\/[^\s]+)/g)) {
+                                                return (
+                                                    <a key={i} href={part} target="_blank" rel="noopener noreferrer" className={`hover:underline font-medium ${isOwn ? 'text-white underline-offset-2' : 'text-blue-500'}`}>
+                                                        {part}
+                                                    </a>
+                                                );
+                                            } else if (part.startsWith('@')) {
+                                                return (
+                                                    <span key={i} className={`font-bold ${isOwn ? 'text-white bg-white/20' : 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/20'} px-1 rounded-md`}>
+                                                        {part.replace(/_/g, ' ')}
+                                                    </span>
+                                                );
+                                            }
+                                            return <React.Fragment key={i}>{part}</React.Fragment>;
+                                        })
                                     ) : null}
                                 </p>
                             </div>

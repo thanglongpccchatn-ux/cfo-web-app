@@ -189,6 +189,9 @@ export default function ChatWindow({
                     const prevMsg = i > 0 && groupedMessages[i - 1].type === 'message'
                         ? groupedMessages[i - 1].data : null;
                     const showAvatar = !isOwn && (!prevMsg || prevMsg.sender_id !== msg.sender_id);
+                    
+                    // Find sender profile
+                    const senderProfile = conversation.chat_users?.find(u => u.id === msg.sender_id);
 
                     return (
                         <MessageBubble
@@ -196,6 +199,8 @@ export default function ChatWindow({
                             message={msg}
                             isOwn={isOwn}
                             showAvatar={showAvatar}
+                            senderName={senderProfile?.full_name}
+                            senderAvatar={senderProfile?.avatar_url}
                             onReply={() => setReplyTo(msg)}
                             onDelete={() => onDeleteMessage(msg.id)}
                             onReaction={(emoji) => onReaction(msg.id, emoji)}
@@ -287,6 +292,7 @@ export default function ChatWindow({
                 }}
                 onTyping={onBroadcastTyping}
                 isSending={isSending}
+                chatUsers={conversation?.chat_users}
             />
             </div>
 
