@@ -239,7 +239,7 @@ function MainLayout() {
             <Route path="/planning_hub" element={<ProtectedRoute><PlanningModule /></ProtectedRoute>} />
             <Route path="/construction" element={<ProtectedRoute><ConstructionModule /></ProtectedRoute>} />
             <Route path="/task_management" element={<ProtectedRoute><TaskManagement /></ProtectedRoute>} />
-            <Route path="/chat" element={<ProtectedRoute moduleName="Tin nhắn nội bộ"><ChatModule /></ProtectedRoute>} />
+            <Route path="/chat" element={<ProtectedRoute requiredPerms={['view_chat']} moduleName="Tin nhắn nội bộ"><ChatModule /></ProtectedRoute>} />
             <Route path="/partners" element={<ProtectedRoute><PartnerManagement /></ProtectedRoute>} />
             <Route path="/permissions" element={<ProtectedRoute><RoleManagement /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />

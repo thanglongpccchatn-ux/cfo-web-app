@@ -40,7 +40,7 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
             icon: 'space_dashboard',
             items: [
                 { id: 'dashboard', icon: 'grid_view', label: 'Tổng quan', perms: ['view_dashboard'] },
-                { id: 'chat', icon: 'chat', label: 'Tin nhắn', perms: ['*'] },
+                { id: 'chat', icon: 'chat', label: 'Tin nhắn', perms: ['view_chat'] },
                 { id: 'planning_hub', icon: 'analytics', label: 'Kế hoạch & Báo cáo', perms: ['view_planning', 'manage_planning'] },
             ]
         },
