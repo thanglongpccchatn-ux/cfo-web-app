@@ -96,6 +96,7 @@ export default function ChatModule() {
                         onReaction={chat.addReaction}
                         onBack={handleBackToList}
                         onBroadcastTyping={() => broadcastTyping(profile?.full_name)}
+                        onDeleteConversation={chat.deleteConversation}
                         currentUserId={profile?.id}
                     />
                 ) : (

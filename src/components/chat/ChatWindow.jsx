@@ -25,6 +25,7 @@ export default function ChatWindow({
     onReaction,
     onBack,
     onBroadcastTyping,
+    onDeleteConversation,
     currentUserId,
 }) {
     const messagesEndRef = useRef(null);
@@ -142,8 +143,12 @@ export default function ChatWindow({
                     <button className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors cursor-pointer" title="Tìm kiếm">
                         <span className="material-symbols-outlined text-[20px]">search</span>
                     </button>
-                    <button className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors cursor-pointer" title="Thông tin">
-                        <span className="material-symbols-outlined text-[20px]">info</span>
+                    <button 
+                        onClick={() => onDeleteConversation(conversation.id)}
+                        className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 transition-colors cursor-pointer" 
+                        title="Xóa cuộc trò chuyện"
+                    >
+                        <span className="material-symbols-outlined text-[20px]">delete</span>
                     </button>
                 </div>
             </div>

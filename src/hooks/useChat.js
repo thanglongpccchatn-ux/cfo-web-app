@@ -384,6 +384,28 @@ export function useChat() {
         }
     }, [user, conversations, loadConversations, setActiveConversation]);
 
+    // ─── DELETE CONVERSATION ───
+    const deleteConversation = useCallback(async (convId) => {
+        if (!convId || !window.confirm('Bạn có chắc chắn muốn xóa cuộc trò chuyện này? Toàn bộ dữ liệu sẽ bị xóa vĩnh viễn khỏi hệ thống.')) return false;
+        try {
+            // Because chat_members and chat_messages have ON DELETE CASCADE, deleting the conversation deletes everything.
+            const { error: convError } = await supabase.from('chat_conversations').delete().eq('id', convId);
+            if (convError) throw convError;
+            
+            // Delete associated files from storage
+            // Note: Ideally handled by an edge function or DB trigger, but omitting for frontend simplicity
+            
+            // Update local state immediately
+            setConversations(prev => prev.filter(c => c.id !== convId));
+            if (activeConversationId === convId) setActiveConversationId(null);
+            return true;
+        } catch (err) {
+            console.error('[useChat] deleteConversation error:', err);
+            alert('Lỗi: Bạn không có quyền xóa cuộc trò chuyện này.');
+            return false;
+        }
+    }, [activeConversationId]);
+
     // ─── DELETE MESSAGE (soft) ───
     const deleteMessage = useCallback(async (messageId) => {
         if (!messageId || !user) return;
@@ -542,5 +564,6 @@ export function useChat() {
         loadMoreMessages,
         loadConversations,
         handleNewMessage,
+        deleteConversation,
     };
 }
