@@ -203,10 +203,17 @@ export function useChat() {
                     type: 'text',
                     reply_to: replyTo,
                 })
-                .select()
+                .select(`
+                    *,
+                    reply_msg:reply_to(id, content, sender_id, type, file_name)
+                `)
                 .single();
 
             if (error) throw error;
+            
+            // Update local state immediately
+            setMessages(prev => [...prev, data]);
+            
             return data;
         } catch (err) {
             console.error('[useChat] sendMessage error:', err);
@@ -256,10 +263,16 @@ export function useChat() {
                     file_type: file.type,
                     reply_to: replyTo,
                 })
-                .select()
+                .select(`
+                    *,
+                    reply_msg:reply_to(id, content, sender_id, type, file_name)
+                `)
                 .single();
 
             if (error) throw error;
+
+            // Update local state immediately (with signed url for immediate view)
+            setMessages(prev => [...prev, { ...data, file_signed_url: path }]);
 
             setUploadProgress({ fileName: file.name, progress: 100 });
             setTimeout(() => setUploadProgress(null), 1000);
