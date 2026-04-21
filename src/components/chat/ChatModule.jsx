@@ -30,18 +30,23 @@ export default function ChatModule() {
     }, [chat.handleNewMessage]);
 
     const handleMessageUpdate = useCallback((msg) => {
-        // Handled by refreshing messages
-    }, []);
+        chat.handleMessageUpdate(msg);
+    }, [chat.handleMessageUpdate]);
 
     const handleConversationChange = useCallback(() => {
         chat.loadConversations();
     }, [chat.loadConversations]);
+
+    const handleReactionChange = useCallback((payload) => {
+        chat.handleReactionChange(payload);
+    }, [chat.handleReactionChange]);
 
     const { typingUsers, broadcastTyping } = useChatRealtime({
         activeConversationId: chat.activeConversationId,
         conversationIds,
         onNewMessage: handleNewMessage,
         onMessageUpdate: handleMessageUpdate,
+        onReactionChange: handleReactionChange,
         onConversationChange: handleConversationChange,
     });
 

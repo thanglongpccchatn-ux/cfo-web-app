@@ -23,6 +23,7 @@ export function useChatRealtime({
     conversationIds = [],
     onNewMessage,
     onMessageUpdate,
+    onReactionChange,
     onConversationChange,
 }) {
     const { user } = useAuth();
@@ -76,6 +77,20 @@ export function useChatRealtime({
                     }
                 }
             )
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'chat_reactions',
+                },
+                (payload) => {
+                    // Reactions insert or delete
+                    if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
+                        onReactionChange?.(payload);
+                    }
+                }
+            )
             .subscribe();
 
         channelsRef.current.set('messages', msgChannel);
@@ -107,7 +122,7 @@ export function useChatRealtime({
             });
             channelsRef.current.clear();
         };
-    }, [user, conversationIds.join(','), onNewMessage, onMessageUpdate, onConversationChange]);
+    }, [user, conversationIds.join(','), onNewMessage, onMessageUpdate, onReactionChange, onConversationChange]);
 
     // ─── TYPING INDICATOR ───
     useEffect(() => {

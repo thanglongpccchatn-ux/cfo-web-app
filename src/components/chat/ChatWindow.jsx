@@ -201,6 +201,7 @@ export default function ChatWindow({
                             showAvatar={showAvatar}
                             senderName={senderProfile?.full_name}
                             senderAvatar={senderProfile?.avatar_url}
+                            currentUserId={currentUserId}
                             onReply={() => setReplyTo(msg)}
                             onDelete={() => onDeleteMessage(msg.id)}
                             onReaction={(emoji) => onReaction(msg.id, emoji)}

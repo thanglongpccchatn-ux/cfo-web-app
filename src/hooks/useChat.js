@@ -132,7 +132,8 @@ export function useChat() {
                 .from('chat_messages')
                 .select(`
                     *,
-                    reply_msg:reply_to(id, content, sender_id, type, file_name)
+                    reply_msg:reply_to(id, content, sender_id, type, file_name),
+                    reactions:chat_reactions(id, emoji, user_id)
                 `)
                 .eq('conversation_id', conversationId)
                 .order('created_at', { ascending: false })
@@ -417,13 +418,13 @@ export function useChat() {
         try {
             await supabase
                 .from('chat_messages')
-                .update({ is_deleted: true, content: 'Tin nhắn đã bị xóa', updated_at: new Date().toISOString() })
+                .update({ is_deleted: true, content: 'Tin nhắn đã bị thu hồi', updated_at: new Date().toISOString() })
                 .eq('id', messageId)
                 .eq('sender_id', user.id);
 
             setMessages(prev =>
                 prev.map(m => m.id === messageId
-                    ? { ...m, is_deleted: true, content: 'Tin nhắn đã bị xóa' }
+                    ? { ...m, is_deleted: true, content: 'Tin nhắn đã bị thu hồi' }
                     : m
                 )
             );
@@ -459,23 +460,80 @@ export function useChat() {
         }
     }, [user]);
 
-    // ─── ADD REACTION ───
+    // ─── TOGGLE REACTION ───
     const addReaction = useCallback(async (messageId, emoji) => {
         if (!messageId || !emoji || !user) return;
         try {
-            const { error } = await supabase
-                .from('chat_reactions')
-                .upsert({
-                    message_id: messageId,
-                    user_id: user.id,
-                    emoji,
-                }, { onConflict: 'message_id,user_id,emoji' });
+            let isDelete = false;
+            let targetId = null;
 
-            if (error) throw error;
+            setMessages(prev => {
+                const msgIndex = prev.findIndex(m => m.id === messageId);
+                if (msgIndex === -1) return prev;
+                const msg = prev[msgIndex];
+                const existing = (msg.reactions || []).find(r => r.emoji === emoji && r.user_id === user.id);
+                
+                const newMessages = [...prev];
+                if (existing) {
+                    isDelete = true;
+                    targetId = existing.id;
+                    newMessages[msgIndex] = { ...msg, reactions: msg.reactions.filter(r => r.id !== existing.id) };
+                } else {
+                    newMessages[msgIndex] = { 
+                        ...msg, 
+                        reactions: [...(msg.reactions || []), { id: 'temp', message_id: messageId, user_id: user.id, emoji }] 
+                    };
+                }
+                return newMessages;
+            });
+
+            if (isDelete && targetId && targetId !== 'temp') {
+                const { error } = await supabase.from('chat_reactions').delete().eq('id', targetId);
+                if (error) throw error;
+            } else if (!isDelete) {
+                const { data, error } = await supabase.from('chat_reactions').insert({ message_id: messageId, user_id: user.id, emoji }).select().single();
+                if (error) throw error;
+                // Replace temp with real
+                setMessages(prev => {
+                    const msgIndex = prev.findIndex(m => m.id === messageId);
+                    if (msgIndex === -1) return prev;
+                    const msg = prev[msgIndex];
+                    return prev.map((m, i) => i === msgIndex ? {
+                        ...msg,
+                        reactions: msg.reactions.map(r => (r.id === 'temp' && r.emoji === emoji && r.user_id === user.id) ? data : r)
+                    } : m);
+                });
+            }
         } catch (err) {
-            console.error('[useChat] addReaction error:', err);
+            console.error('[useChat] toggleReaction error:', err);
         }
     }, [user]);
+
+    // ─── HANDLE REALTIME REACTION ───
+    const handleReactionChange = useCallback((payload) => {
+        const { eventType, new: newRec, old: oldRec } = payload;
+        setMessages(prev => {
+            const messageId = newRec?.message_id || oldRec?.message_id;
+            if (!messageId) return prev;
+            
+            const msgIndex = prev.findIndex(m => m.id === messageId);
+            if (msgIndex === -1) return prev;
+            
+            const msg = prev[msgIndex];
+            let newReactions = [...(msg.reactions || [])];
+            
+            if (eventType === 'INSERT') {
+                if (!newReactions.some(r => r.id === newRec.id)) {
+                    newReactions.push(newRec);
+                }
+            } else if (eventType === 'DELETE') {
+                newReactions = newReactions.filter(r => r.id !== oldRec.id);
+            }
+
+            const updatedMsg = { ...msg, reactions: newReactions };
+            return prev.map((m, i) => i === msgIndex ? updatedMsg : m);
+        });
+    }, []);
 
     // ─── HANDLE INCOMING REALTIME MESSAGE ───
     const handleNewMessage = useCallback(async (newMsg) => {
@@ -531,6 +589,21 @@ export function useChat() {
         });
     }, [activeConversationId, user, markAsRead]);
 
+    // ─── HANDLE INCOMING REALTIME MESSAGE UPDATE ───
+    const handleMessageUpdate = useCallback((updatedMsg) => {
+        if (updatedMsg.conversation_id === activeConversationId) {
+            setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+            
+            // Also update the conversation list if it's the last message
+            setConversations(prev => prev.map(c => {
+                if (c.id === updatedMsg.conversation_id && c.lastMessage?.created_at === updatedMsg.created_at) {
+                    return { ...c, lastMessage: { ...c.lastMessage, content: updatedMsg.content, type: updatedMsg.type } };
+                }
+                return c;
+            }));
+        }
+    }, [activeConversationId]);
+
     // ─── TOTAL UNREAD COUNT ───
     const totalUnreadCount = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
 
@@ -569,6 +642,8 @@ export function useChat() {
         loadMoreMessages,
         loadConversations,
         handleNewMessage,
+        handleMessageUpdate,
+        handleReactionChange,
         deleteConversation,
     };
 }

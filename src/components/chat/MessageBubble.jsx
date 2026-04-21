@@ -188,6 +188,29 @@ export default function MessageBubble({
                                 {time}
                             </span>
                         </div>
+
+                        {/* Reactions render */}
+                        {message.reactions && message.reactions.length > 0 && !message.is_deleted && (
+                            <div className={`absolute -bottom-3 ${isOwn ? 'right-4' : 'left-4'} flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 shadow-sm rounded-full px-1.5 py-0.5 z-10`}>
+                                {Object.entries(
+                                    message.reactions.reduce((acc, r) => {
+                                        acc[r.emoji] = acc[r.emoji] || { count: 0, users: [] };
+                                        acc[r.emoji].count++;
+                                        acc[r.emoji].users.push(r.user_id);
+                                        return acc;
+                                    }, {})
+                                ).map(([emoji, data]) => (
+                                    <button 
+                                        key={emoji} 
+                                        onClick={() => onReaction?.(emoji)} 
+                                        className={`flex items-center gap-0.5 text-[11px] font-medium px-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer ${data.users.includes(currentUserId) ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'text-slate-600 dark:text-slate-300'}`}
+                                    >
+                                        <span className="text-[12px] -mt-0.5">{emoji}</span>
+                                        <span className="opacity-80">{data.count > 1 ? data.count : ''}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     {/* Quick Actions (on hover) */}
@@ -220,7 +243,7 @@ export default function MessageBubble({
                                 <button
                                     onClick={onDelete}
                                     className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
-                                    title="Xóa"
+                                    title="Thu hồi tin nhắn"
                                 >
                                     <span className="material-symbols-outlined text-[16px]">delete</span>
                                 </button>
