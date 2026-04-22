@@ -20,6 +20,7 @@ export default function MessageBubble({
     onDelete,
     onReaction,
     onImageClick,
+    currentUserId,
 }) {
     const [showActions, setShowActions] = useState(false);
     const [showReactions, setShowReactions] = useState(false);
