@@ -100,10 +100,10 @@ export default function UserManagement() {
         if (user) {
             setEditingUser(user);
             const existingRoleCodes = (user.user_roles || []).map(ur => ur.role_code);
-            setForm({ full_name: user.full_name || '', email: user.email || '', password: '', role_codes: existingRoleCodes.length > 0 ? existingRoleCodes : [user.role_code || 'GUEST'], status: user.status || 'Hoạt động' });
+            setForm({ full_name: user.full_name || '', email: user.email || '', password: '', role_codes: existingRoleCodes.length > 0 ? existingRoleCodes : (user.role_code ? [user.role_code] : []), status: user.status || 'Hoạt động' });
         } else {
             setEditingUser(null);
-            setForm({ full_name: '', email: '', password: '', role_codes: ['GUEST'], status: 'Hoạt động' });
+            setForm({ full_name: '', email: '', password: '', role_codes: [], status: 'Hoạt động' });
         }
         setIsModalOpen(true);
     };
@@ -112,7 +112,7 @@ export default function UserManagement() {
         e.preventDefault();
         setIsSaving(true);
         try {
-            const primaryRole = form.role_codes[0] || 'GUEST';
+            const primaryRole = form.role_codes[0];
             if (editingUser) {
                 // Update profile (primary role)
                 const { error } = await supabase.from('profiles').update({
@@ -210,7 +210,7 @@ export default function UserManagement() {
                     email: cols[emailIdx],
                     full_name: nameIdx >= 0 ? cols[nameIdx] : '',
                     password: passIdx >= 0 ? cols[passIdx] : 'Sateco@123',
-                    role_codes: roleIdx >= 0 ? cols[roleIdx].split(';').map(r => r.trim()).filter(Boolean) : ['GUEST'],
+                    role_codes: roleIdx >= 0 ? cols[roleIdx].split(';').map(r => r.trim()).filter(Boolean) : [],
                     status: 'pending'
                 });
             }
@@ -228,7 +228,8 @@ export default function UserManagement() {
         for (let i = 0; i < importData.length; i++) {
             const row = importData[i];
             try {
-                const primaryRole = row.role_codes[0] || 'GUEST';
+                const primaryRole = row.role_codes[0];
+                if (!primaryRole) throw new Error('Bắt buộc phải có vai trò hợp lệ (role_code).');
                 const { data, error } = await supabase.rpc('admin_create_user', {
                     p_email: row.email,
                     p_password: row.password || 'Sateco@123',
