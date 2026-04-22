@@ -15,6 +15,7 @@ export default function UserManagement() {
     const [editingUser, setEditingUser] = useState(null);
     const [form, setForm] = useState({ full_name: '', email: '', password: '', role_codes: [], status: 'Hoạt động' });
     const [isSaving, setIsSaving] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Assignment modal
     const [showTransferModal, setShowTransferModal] = useState(false);
@@ -95,6 +96,16 @@ export default function UserManagement() {
     const users = queryData?.users || [];
     const roles = queryData?.roles || [];
     const projects = queryData?.projects || [];
+
+    const filteredUsers = users.filter(u => {
+        if (!searchQuery) return true;
+        const q = searchQuery.toLowerCase();
+        const roleNames = (u.user_roles || []).map(ur => ur.roles?.name || ur.role_code).join(' ').toLowerCase();
+        return (u.full_name && u.full_name.toLowerCase().includes(q)) || 
+               (u.email && u.email.toLowerCase().includes(q)) ||
+               (u.roles?.name && u.roles.name.toLowerCase().includes(q)) ||
+               roleNames.includes(q);
+    });
 
     const handleOpenModal = (user = null) => {
         if (user) {
@@ -358,15 +369,27 @@ export default function UserManagement() {
                     <h2 className="text-2xl font-bold tracking-tight text-slate-800 dark:text-white">Quản lý người dùng</h2>
                     <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Quản lý nhân sự, phân quyền và gán dự án.</p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button onClick={() => { setImportData([]); setImportResults(null); setShowImportModal(true); }} className="h-10 flex items-center gap-2 px-4 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 active:scale-95 transition-all shadow-sm">
-                        <span className="material-symbols-outlined notranslate text-[18px]" translate="no">upload_file</span>
-                        Import CSV
-                    </button>
-                    <button onClick={() => handleOpenModal()} className="h-10 flex items-center gap-2 px-4 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 active:scale-95 transition-all shadow-sm">
-                        <span className="material-symbols-outlined notranslate text-[18px]" translate="no">person_add</span>
-                        Thêm người dùng
-                    </button>
+                <div className="flex flex-col md:flex-row items-center gap-3">
+                    <div className="relative w-full md:w-auto">
+                        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px] notranslate" translate="no">search</span>
+                        <input 
+                            type="text" 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Tìm tên, email, vai trò..." 
+                            className="h-10 pl-9 pr-4 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-full md:w-64 dark:bg-slate-800 dark:border-slate-700 dark:text-white transition-all"
+                        />
+                    </div>
+                    <div className="flex gap-2 w-full md:w-auto">
+                        <button onClick={() => { setImportData([]); setImportResults(null); setShowImportModal(true); }} className="flex-1 md:flex-none h-10 flex items-center justify-center gap-2 px-4 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 active:scale-95 transition-all shadow-sm">
+                            <span className="material-symbols-outlined notranslate text-[18px]" translate="no">upload_file</span>
+                            Import CSV
+                        </button>
+                        <button onClick={() => handleOpenModal()} className="flex-1 md:flex-none h-10 flex items-center justify-center gap-2 px-4 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 active:scale-95 transition-all shadow-sm">
+                            <span className="material-symbols-outlined notranslate text-[18px]" translate="no">person_add</span>
+                            Thêm mới
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -385,10 +408,10 @@ export default function UserManagement() {
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                             {isLoading ? (
                                 <tr><td colSpan="5"><SkeletonTable rows={5} cols={5} mode="table" /></td></tr>
-                            ) : users.length === 0 ? (
-                                <tr><td colSpan="5"><EmptyState icon="group" title="Chưa có người dùng" description="Thêm người dùng đầu tiên để bắt đầu quản lý nhân sự" actionLabel="Thêm người dùng" onAction={() => handleOpenModal()} /></td></tr>
+                            ) : filteredUsers.length === 0 ? (
+                                <tr><td colSpan="5"><EmptyState icon={searchQuery ? "search_off" : "group"} title={searchQuery ? "Không tìm thấy" : "Chưa có người dùng"} description={searchQuery ? `Không có kết quả nào cho "${searchQuery}"` : "Thêm người dùng đầu tiên để bắt đầu quản lý nhân sự"} actionLabel={searchQuery ? "" : "Thêm người dùng"} onAction={() => handleOpenModal()} /></td></tr>
                             ) : (
-                                users.map(user => (
+                                filteredUsers.map(user => (
                                     <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
