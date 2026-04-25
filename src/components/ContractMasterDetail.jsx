@@ -645,6 +645,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                 <Th label="HĐ Trước VAT" sortKey="preVat" align="right" extraClass="border-l border-slate-100 bg-blue-50/30" />
                                                 <Th label="VAT (%)" sortKey="vatPercent" align="center" extraClass="bg-blue-50/30 text-blue-400" />
                                                 <Th label="Giá trị Sau VAT" sortKey="postVat" align="right" extraClass="font-black text-blue-700 bg-blue-50/30" />
+                                                <Th label="TL Sateco" sortKey="satecoContractRatio" align="center" extraClass="border-l border-emerald-100 bg-emerald-50/30 text-emerald-600" />
                                                 <Th label="Tổng Xuất HĐ" sortKey="totalInvoice" align="right" extraClass="border-l border-slate-100" />
                                                 <Th label="Tổng Đề nghị" sortKey="totalRequested" align="right" />
                                                 <Th label="Tổng Thanh toán" sortKey="totalIncome" align="right" />
@@ -721,6 +722,15 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                     </td>
                                                     <td className="px-1.5 py-1.5 text-right font-medium text-blue-700 bg-blue-50/10" title={proj.total_approved_variations ? `Gốc: ${fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.totalValuePostVat * (proj.sateco_contract_ratio||98)/100 - ((proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100))*(proj.sateco_contract_ratio||98)/100) : proj.totalValuePostVat - (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)))} + PS: ${fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)) * (proj.sateco_contract_ratio||98)/100 : (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)))}` : ''}>
                                                         {fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue : proj.totalValuePostVat)}
+                                                    </td>
+                                                    <td className="px-1.5 py-1.5 text-center border-l border-emerald-50 bg-emerald-50/10">
+                                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-black border ${
+                                                            proj.satecoContractRatio >= 98 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                            proj.satecoContractRatio >= 95 ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                            'bg-amber-50 text-amber-700 border-amber-200'
+                                                        }`}>
+                                                            {proj.satecoContractRatio}%
+                                                        </span>
                                                     </td>
                                                     <td className="px-1.5 py-1.5 text-right text-slate-600 border-l border-slate-50">
                                                         {fmt(proj.totalInvoice)}
@@ -804,6 +814,9 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                 <td className="px-1.5 py-3 text-right text-blue-700 text-[14px] font-black bg-blue-50/30">
                                                     {fmt(totalValueAll)}
                                                 </td>
+                                                <td className="px-1.5 py-3 text-center text-emerald-600 text-[10px] font-black bg-emerald-50/20 border-l border-emerald-100">
+                                                    —
+                                                </td>
                                                 <td className="px-1.5 py-3 text-right text-slate-600 text-[14px] font-black border-l border-slate-100">
                                                     {fmt(totalInvoiceAll)}
                                                 </td>
@@ -820,6 +833,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                     {fmt(totalRequestedAll - totalIncomeAll)}
                                                 </td>
                                                 <td colSpan={4} className="bg-slate-50"></td>
+
                                             </tr>
                                         </tfoot>
                                     </table>

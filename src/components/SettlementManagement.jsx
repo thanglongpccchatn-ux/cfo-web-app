@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { fmt, fmtB } from '../utils/formatters';
@@ -14,6 +15,10 @@ const DEFAULT_DOCS = [
 ];
 
 export default function SettlementManagement() {
+    const { hasPermission, profile } = useAuth();
+    const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
+    const canEdit = isAdmin || hasPermission('edit_settlement');
+
     const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedId, setExpandedId] = useState(null);
@@ -425,11 +430,11 @@ export default function SettlementManagement() {
                                                             <span className="material-symbols-outlined text-[14px]">close</span>
                                                         </button>
                                                     </div>
-                                                ) : (
+                                                ) : canEdit ? (
                                                     <button onClick={() => startEdit(p)} className="p-2 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Chỉnh sửa">
                                                         <span className="material-symbols-outlined text-[18px]">edit</span>
                                                     </button>
-                                                )}
+                                                ) : null}
                                             </td>
                                         </tr>
 

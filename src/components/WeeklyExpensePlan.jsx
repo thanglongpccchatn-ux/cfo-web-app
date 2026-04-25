@@ -1,9 +1,14 @@
 import React, { useState, useMemo } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { fmt, fmtB, fmtDate } from '../utils/formatters';
 
 export default function WeeklyExpensePlan() {
+    const { hasPermission, profile } = useAuth();
+    const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
+    // Read-only module — no CRUD guards needed, route guard handles access
+
     const [currentDate, setCurrentDate] = useState(new Date());
     const [groupByProject, setGroupByProject] = useState(true);
     const [compareMode, setCompareMode] = useState('prev_week'); // 'prev_week' | 'custom'

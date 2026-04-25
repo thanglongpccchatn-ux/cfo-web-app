@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
@@ -43,6 +44,9 @@ async function fetchProjectsList() {
 
 export default function SubcontractorsMaster() {
     const queryClient = useQueryClient();
+    const { hasPermission, profile } = useAuth();
+    const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
+    const canCreate = isAdmin || hasPermission('create_subcontractors');
     const [searchQuery, setSearchQuery] = useState('');
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -148,6 +152,7 @@ export default function SubcontractorsMaster() {
                     <p className="text-slate-500 text-sm mt-1 uppercase font-semibold tracking-wider">Tổng hợp Đề nghị thanh toán & Công nợ nhân công</p>
                 </div>
                 <div className="flex gap-3">
+                    {canCreate && (
                     <button 
                         onClick={() => setShowPaymentModal(true)}
                         className="p-2.5 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-bold flex items-center gap-2 transition-all shadow-md shadow-purple-200"
@@ -155,6 +160,8 @@ export default function SubcontractorsMaster() {
                         <span className="material-symbols-outlined notranslate" translate="no">add_task</span>
                         Nhập thanh toán nhân công
                     </button>
+                    )}
+                    {canCreate && (
                     <button 
                         onClick={() => setIsImportModalOpen(true)}
                         className="p-2.5 px-4 bg-purple-50 dark:bg-purple-900/10 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/20 font-semibold border border-purple-200 dark:border-purple-800/50 flex items-center gap-2 transition-all shadow-sm"
@@ -162,6 +169,7 @@ export default function SubcontractorsMaster() {
                         <span className="material-symbols-outlined notranslate" translate="no">upload_file</span>
                         Import Excel
                     </button>
+                    )}
                     <button onClick={refetchAll} className="p-2.5 bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm border border-slate-200 dark:border-slate-700 flex items-center">
                         <span className="material-symbols-outlined notranslate" translate="no">refresh</span>
                     </button>

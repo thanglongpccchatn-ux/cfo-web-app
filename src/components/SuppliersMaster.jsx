@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
@@ -14,6 +15,12 @@ import SearchableSelect from './common/SearchableSelect';
 const EMPTY_LINE = () => ({ _key: Date.now() + Math.random(), materialId: '', productName: '', unit: 'Cái', quantity: '', unitPrice: '', vatRate: '8', notes: '', _showSuggestions: false });
 
 export default function SuppliersMaster() {
+    const { hasPermission, profile } = useAuth();
+    const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
+    const canCreate = isAdmin || hasPermission('create_suppliers');
+    const canEdit = isAdmin || hasPermission('edit_suppliers');
+    const canDelete = isAdmin || hasPermission('delete_suppliers');
+
     const [activeSubTab, setActiveSubTab] = useState('suppliers');
     // loading and suppliersData managed by React Query below
     const [searchQuery, setSearchQuery] = useState('');
@@ -321,6 +328,7 @@ export default function SuppliersMaster() {
                 </div>
                 {activeSubTab === 'suppliers' && (
                     <div className="flex gap-3">
+                        {canCreate && (
                         <button 
                             onClick={() => setShowPurchaseModal(true)}
                             className="p-2.5 px-4 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-bold flex items-center gap-2 transition-all shadow-md shadow-orange-200"
@@ -328,6 +336,8 @@ export default function SuppliersMaster() {
                             <span className="material-symbols-outlined notranslate" translate="no">add_shopping_cart</span>
                             Nhập đơn mua hàng
                         </button>
+                        )}
+                        {canCreate && (
                         <button 
                             onClick={() => setIsImportModalOpen(true)}
                             className="p-2.5 px-4 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-500/20 font-semibold border border-emerald-200 dark:border-emerald-500/20 flex items-center gap-2 transition-all shadow-sm"
@@ -335,6 +345,7 @@ export default function SuppliersMaster() {
                             <span className="material-symbols-outlined notranslate" translate="no">upload_file</span>
                             Import Excel
                         </button>
+                        )}
                         <button onClick={invalidateSuppliers} className="p-2.5 bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm border border-slate-200 dark:border-slate-700 flex items-center">
                             <span className="material-symbols-outlined notranslate" translate="no">refresh</span>
                         </button>

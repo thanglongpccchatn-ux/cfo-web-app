@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
 import ReactDOM from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -75,6 +76,12 @@ function SearchSelect({ value, onChange, options, placeholder = 'Chọn...' }) {
 }
 
 export default function ExpenseTracking() {
+    const { hasPermission, profile } = useAuth();
+    const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
+    const canCreate = isAdmin || hasPermission('create_expenses');
+    const canEdit = isAdmin || hasPermission('edit_expenses');
+    const canDelete = isAdmin || hasPermission('delete_expenses');
+
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [filterProject, setFilterProject] = useState('all');
@@ -336,6 +343,7 @@ export default function ExpenseTracking() {
                                     <div className="text-[10px] text-slate-400 uppercase font-bold mt-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 w-fit">{item.projects?.code}</div>
                                 </div>
                                 <div className="flex gap-1 shrink-0">
+                                    {canEdit && (
                                     <button 
                                         onClick={() => {
                                             setEditingId(item.id);
@@ -355,12 +363,15 @@ export default function ExpenseTracking() {
                                     >
                                         <span className="material-symbols-outlined text-[18px]">edit</span>
                                     </button>
+                                    )}
+                                    {canDelete && (
                                     <button 
                                         onClick={() => setDeleteConfirm(item)}
                                         className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100 shadow-sm active:scale-95 transition-transform"
                                     >
                                         <span className="material-symbols-outlined text-[18px]">delete</span>
                                     </button>
+                                    )}
                                 </div>
                             </div>
 
@@ -443,7 +454,7 @@ export default function ExpenseTracking() {
                                                 <span className="material-symbols-outlined text-[14px]">payments</span> Duyệt
                                             </button>
                                         )}
-                                        <button 
+                                        {canEdit && (<button 
                                             onClick={() => {
                                                 setEditingId(item.id);
                                                 setIsEditing(true);
@@ -463,12 +474,14 @@ export default function ExpenseTracking() {
                                         >
                                             Sửa
                                         </button>
-                                        <button 
+                                        )}
+                                        {canDelete && (<button 
                                             onClick={() => setDeleteConfirm(item)}
                                             className="p-1 px-2 text-rose-600 hover:bg-rose-50 rounded-lg font-bold text-xs"
                                         >
                                             Xóa
                                         </button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
@@ -514,9 +527,11 @@ export default function ExpenseTracking() {
                             <tr>
                                 <td colSpan={9} className="px-4 py-2">
                                     <div className="flex items-center gap-3">
+                                        {canCreate && (
                                         <button onClick={() => setDraftRows(prev => [...prev, emptyRow()])} className="text-indigo-600 hover:text-indigo-800 font-bold text-xs flex items-center gap-1 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors">
                                             <span className="material-symbols-outlined text-[16px]">add</span> Thêm dòng
                                         </button>
+                                        )}
                                         {draftRows.length > 0 && (
                                             <>
                                                 <button onClick={handleSaveAll} className="bg-indigo-600 text-white font-bold text-xs flex items-center gap-1 px-4 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
@@ -24,6 +25,11 @@ const EMPTY_MATERIAL = {
 };
 
 export default function MaterialsMaster() {
+    const { hasPermission, profile } = useAuth();
+    const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
+    const canCreate = isAdmin || hasPermission('edit_materials_master');
+    const canDelete = isAdmin || hasPermission('edit_materials_master');
+
     const [searchQuery, setSearchQuery] = useState('');
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
@@ -291,6 +297,7 @@ export default function MaterialsMaster() {
                             Cập nhật giá ({selectedIds.size})
                         </button>
                     )}
+                    {canCreate && (
                     <button 
                         onClick={() => setIsManualModalOpen(true)}
                         className="h-10 px-4 bg-primary text-white rounded-xl hover:bg-primary-hover font-bold flex items-center gap-2 transition-all shadow-md active:scale-95"
@@ -298,6 +305,8 @@ export default function MaterialsMaster() {
                         <span className="material-symbols-outlined notranslate text-[18px]" translate="no">add</span>
                         Thêm Vật tư
                     </button>
+                    )}
+                    {canCreate && (
                     <button 
                         onClick={() => setIsImportModalOpen(true)}
                         className="h-10 px-4 bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 rounded-xl hover:bg-emerald-50 border border-emerald-200 dark:border-emerald-500/30 font-bold flex items-center gap-2 transition-all shadow-sm"
@@ -305,6 +314,7 @@ export default function MaterialsMaster() {
                         <span className="material-symbols-outlined notranslate text-[18px]" translate="no">upload_file</span>
                         Import Excel
                     </button>
+                    )}
                     <button onClick={invalidateMaterials} className="h-10 w-10 flex items-center justify-center bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-50 border border-slate-200 dark:border-slate-700 transition-all shadow-sm">
                         <span className="material-symbols-outlined notranslate" translate="no">refresh</span>
                     </button>

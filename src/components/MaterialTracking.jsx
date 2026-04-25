@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
@@ -6,6 +7,12 @@ import { smartToast } from '../utils/globalToast';
 import InlineSearchDropdown from './common/InlineSearchDropdown';
 
 export default function MaterialTracking({ project, onBack, embedded }) {
+    const { hasPermission, profile } = useAuth();
+    const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
+    const canCreate = isAdmin || hasPermission('create_materials_tracking');
+    const canEdit = isAdmin || hasPermission('manage_materials_tracking');
+    const canDelete = isAdmin || hasPermission('manage_materials_tracking');
+
     const [materials, setMaterials] = useState([]);
     const [showSummary, setShowSummary] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
@@ -373,6 +380,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                         <span className="material-symbols-outlined notranslate text-[16px]" translate="no">{showSummary ? 'grid_on' : 'donut_large'}</span>
                         {showSummary ? 'Bảng kê' : 'Phân tích'}
                     </button>
+                    {canCreate && (
                     <button
                         onClick={() => setShowImportModal(true)}
                         className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-emerald-300 text-emerald-700 font-bold text-xs hover:bg-emerald-50 transition-all"
@@ -380,6 +388,7 @@ export default function MaterialTracking({ project, onBack, embedded }) {
                         <span className="material-symbols-outlined notranslate text-[16px]" translate="no">upload_file</span>
                         Import Excel
                     </button>
+                    )}
                     <div className="flex-1"></div>
                     <div className="flex items-center gap-4">
                         <div className="text-right">

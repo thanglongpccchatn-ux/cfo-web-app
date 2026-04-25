@@ -1,6 +1,7 @@
 /**
  * exportExcel.js — Reusable Excel export utility
- * Uses dynamic import to keep xlsx out of main bundle
+ * Uses dynamic import to get the real CJS module (avoids Vite ESM proxy issues)
+ * Uses File System Access API to bypass download managers that strip filenames
  */
 
 /**
@@ -12,7 +13,9 @@
  * @param {string} sheetName - Sheet name (default: 'Sheet1')
  */
 export async function exportToExcel(data, columns, fileName = 'export', sheetName = 'Sheet1') {
-    const XLSX = await import('xlsx');
+    // Dynamic import to get the real CJS module object (not Vite's ESM proxy)
+    const xlsxModule = await import('xlsx');
+    const XLSX = xlsxModule.default || xlsxModule;
     
     // Transform data using column definitions
     const rows = data.map(item => {
@@ -35,6 +38,7 @@ export async function exportToExcel(data, columns, fileName = 'export', sheetNam
     });
     
     const ws = XLSX.utils.json_to_sheet(rows);
+
     
     // Auto-width columns
     const colWidths = columns.map(col => {
@@ -48,7 +52,46 @@ export async function exportToExcel(data, columns, fileName = 'export', sheetNam
     
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    XLSX.writeFile(wb, `${fileName}.xlsx`);
+    
+    const fullName = `${fileName}.xlsx`;
+    const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+
+    const blob = new Blob([wbOut], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    });
+    
+    // Use File System Access API to bypass download managers (Cốc Cốc Savior, IDM)
+    // that intercept Blob URLs and strip the filename to UUIDs
+    if (window.showSaveFilePicker) {
+        try {
+            const fileHandle = await window.showSaveFilePicker({
+                suggestedName: fullName,
+                types: [{
+                    description: 'Excel Spreadsheet',
+                    accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] },
+                }],
+            });
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            return;
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            console.warn('File System Access API failed, falling back:', err);
+        }
+    }
+    
+    // Fallback: traditional blob download
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fullName;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 200);
 }
 
 /**
@@ -63,13 +106,14 @@ export const EXPORT_CONFIGS = {
         { key: 'totalValuePreVat', label: 'Giá trị trước VAT', format: 'currency' },
         { key: 'vat_percentage', label: 'VAT (%)', format: 'number' },
         { key: 'totalValuePostVat', label: 'Giá trị sau VAT', format: 'currency' },
+        { key: 'satecoContractRatio', label: 'TL Sateco (%)', format: 'number' },
         { key: 'totalInvoice', label: 'Tổng xuất HĐ', format: 'currency' },
         { key: 'totalRequested', label: 'Tổng đề nghị', format: 'currency' },
         { key: 'totalIncome', label: 'Tổng thực thu', format: 'currency' },
         { key: 'debtInvoice', label: 'Công nợ HĐ', format: 'currency' },
-        { key: 'debtPayment', label: 'Công nợ ĐN', format: 'currency' },
-        { key: 'contract_signing_status', label: 'Tình trạng ký' },
-        { key: 'settlement_status', label: 'Quyết toán' },
+        { key: item => (item.totalRequested || 0) - (item.totalIncome || 0), label: 'Công nợ ĐN', format: 'currency' },
+        { key: item => item.signature_status || 'Chưa ký', label: 'Tình trạng ký' },
+        { key: item => item.settlement_status || 'Chưa quyết toán', label: 'Quyết toán' },
         { key: 'status', label: 'TT thi công' },
     ],
     

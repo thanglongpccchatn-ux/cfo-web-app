@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
@@ -9,6 +10,11 @@ import { exportToExcel } from '../utils/exportExcel';
 import { fmt, fmtDate, fmtB } from '../utils/formatters';
 
 export default function LaborTracking({ project, onBack, embedded }) {
+    const { hasPermission, profile } = useAuth();
+    const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
+    const canCreate = isAdmin || hasPermission('create_labor');
+    const canApprove = isAdmin || hasPermission('approve_labor');
+
     const [labors, setLabors] = useState([]);
     const [showImportModal, setShowImportModal] = useState(false);
     const [showRequestModal, setShowRequestModal] = useState(false);
@@ -278,17 +284,20 @@ export default function LaborTracking({ project, onBack, embedded }) {
                         </button>
 
                         {/* Import */}
+                        {canCreate && (
                         <button onClick={() => setShowImportModal(true)}
                             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-emerald-300 text-emerald-700 font-bold text-sm hover:bg-emerald-50 transition-all shadow-sm h-10">
                             <span className="material-symbols-outlined notranslate text-[18px]" translate="no">upload_file</span>
                             <span className="hidden lg:inline">Import</span>
                         </button>
-
+                        )}
+                        {canCreate && (
                         <button onClick={() => setShowRequestModal(true)}
                             className="btn bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-md shadow-purple-500/20 px-5 flex items-center gap-2 h-10">
                             <span className="material-symbols-outlined notranslate text-[20px]" translate="no">add_task</span>
                             <span className="hidden sm:inline">TẠO YÊU CẦU</span>
                         </button>
+                        )}
                     </div>
                 </div>
 

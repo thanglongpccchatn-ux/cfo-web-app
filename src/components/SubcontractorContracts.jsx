@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { fmt, formatInputNumber } from '../utils/formatters';
@@ -805,6 +806,12 @@ function StageCell({ amount, total }) {
 
 // ─── MAIN COMPONENT ────────────────────────────────────────────────────────
 export default function SubcontractorContracts() {
+    const { hasPermission, profile } = useAuth();
+    const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
+    const canCreate = isAdmin || hasPermission('create_subcontractors');
+    const canEdit = isAdmin || hasPermission('edit_subcontractors');
+    const canDelete = isAdmin || hasPermission('delete_subcontractors');
+
     const queryClient = useQueryClient();
     const [modalOpen, setModalOpen] = useState(false);
     const [editData, setEditData] = useState(null);
@@ -1013,16 +1020,20 @@ export default function SubcontractorContracts() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    {canCreate && (
                     <button onClick={() => setImportOpen(true)}
                         className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm rounded-xl shadow-lg flex items-center gap-2 transition-all">
                         <span className="material-symbols-outlined text-[18px]">upload_file</span>
                         Import Excel
                     </button>
+                    )}
+                    {canCreate && (
                     <button onClick={() => { setEditData(null); setModalOpen(true); }}
                         className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-lg flex items-center gap-2 transition-all">
                         <span className="material-symbols-outlined text-[18px]">add</span>
                         Tạo HĐ mới
                     </button>
+                    )}
                 </div>
             </div>
 
@@ -1166,12 +1177,16 @@ export default function SubcontractorContracts() {
                                                     className={`p-1 rounded transition-colors ${expandedContract === c.id ? 'bg-orange-100 text-orange-600' : 'text-slate-400 hover:bg-orange-50 hover:text-orange-600'}`} title="Phát sinh">
                                                     <span className="material-symbols-outlined text-[14px]">{expandedContract === c.id ? 'expand_less' : 'add_circle'}</span>
                                                 </button>
+                                                {canEdit && (
                                                 <button onClick={() => handleEdit(c)} className="p-1 hover:bg-indigo-50 rounded transition-colors text-slate-400 hover:text-indigo-600" title="Sửa">
                                                     <span className="material-symbols-outlined text-[14px]">edit</span>
                                                 </button>
+                                                )}
+                                                {canDelete && (
                                                 <button onClick={() => handleDelete(c.id)} className="p-1 hover:bg-rose-50 rounded transition-colors text-slate-400 hover:text-rose-600" title="Xóa">
                                                     <span className="material-symbols-outlined text-[14px]">delete</span>
                                                 </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

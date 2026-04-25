@@ -236,18 +236,18 @@ function MainLayout() {
             <Route path="/inventory" element={<ProtectedRoute requiredPerms={['view_materials']}><InventoryManager /></ProtectedRoute>} />
             
             {/* Other Modules */}
-            <Route path="/planning_hub" element={<ProtectedRoute><PlanningModule /></ProtectedRoute>} />
-            <Route path="/construction" element={<ProtectedRoute><ConstructionModule /></ProtectedRoute>} />
-            <Route path="/task_management" element={<ProtectedRoute><TaskManagement /></ProtectedRoute>} />
+            <Route path="/planning_hub" element={<ProtectedRoute requiredPerms={['view_planning', 'manage_planning']}><PlanningModule /></ProtectedRoute>} />
+            <Route path="/construction" element={<ProtectedRoute requiredPerms={['view_construction']}><ConstructionModule /></ProtectedRoute>} />
+            <Route path="/task_management" element={<ProtectedRoute requiredPerms={['view_dashboard']}><TaskManagement /></ProtectedRoute>} />
             <Route path="/chat" element={<ProtectedRoute moduleName="Tin nhắn nội bộ"><ChatModule /></ProtectedRoute>} />
-            <Route path="/partners" element={<ProtectedRoute><PartnerManagement /></ProtectedRoute>} />
-            <Route path="/permissions" element={<ProtectedRoute><RoleManagement /></ProtectedRoute>} />
-            <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
-            <Route path="/banks" element={<ProtectedRoute><BankManagement /></ProtectedRoute>} />
+            <Route path="/partners" element={<ProtectedRoute requiredPerms={['manage_partners']}><PartnerManagement /></ProtectedRoute>} />
+            <Route path="/permissions" element={<ProtectedRoute requiredPerms={['manage_users']}><RoleManagement /></ProtectedRoute>} />
+            <Route path="/users" element={<ProtectedRoute requiredPerms={['manage_users']}><UserManagement /></ProtectedRoute>} />
+            <Route path="/banks" element={<ProtectedRoute requiredPerms={['manage_treasury']}><BankManagement /></ProtectedRoute>} />
             <Route path="/treasury" element={<ProtectedRoute requiredPerms={['manage_treasury']}><TreasuryManagement /></ProtectedRoute>} />
             
             {/* App Settings */}
-            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute requiredPerms={['manage_settings']}><Settings /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
             <Route path="/guide" element={<ProtectedRoute><UserGuide /></ProtectedRoute>} />
             <Route path="/loans" element={<ProtectedRoute requiredPerms={['view_loans', 'manage_loans']}><LoanManagement /></ProtectedRoute>} />

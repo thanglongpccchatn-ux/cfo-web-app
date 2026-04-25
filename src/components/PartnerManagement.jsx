@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
 import { smartToast } from '../utils/globalToast';
@@ -12,6 +13,12 @@ const EMPTY_PARTNER = {
 };
 
 export default function PartnerManagement({ forcedTab, hideHeader }) {
+    const { hasPermission, profile } = useAuth();
+    const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
+    const canCreate = isAdmin || hasPermission('manage_partners');
+    const canEdit = isAdmin || hasPermission('manage_partners');
+    const canDelete = isAdmin || hasPermission('manage_partners');
+
     const [activeTab, setActiveTab] = useState(forcedTab || 'Client'); // Client, Supplier, Subcontractor
     const [partners, setPartners] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -211,6 +218,7 @@ export default function PartnerManagement({ forcedTab, hideHeader }) {
                         />
                     </div>
                     <div className="flex items-center gap-2">
+                        {canCreate && (
                         <button
                             onClick={() => setIsExcelImportModalOpen(true)}
                             className="h-10 flex-1 md:flex-none flex items-center justify-center gap-2 px-4 bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 text-xs md:text-sm font-semibold rounded-xl border border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-50 hover:border-emerald-300 dark:hover:bg-emerald-500/10 active:scale-95 transition-all shadow-sm"
@@ -218,6 +226,8 @@ export default function PartnerManagement({ forcedTab, hideHeader }) {
                             <span className="material-symbols-outlined notranslate text-[18px]" translate="no">upload_file</span>
                             Import Excel
                         </button>
+                        )}
+                        {canCreate && (
                         <button
                             onClick={() => {
                                 setEditingPartnerId(null);
@@ -229,6 +239,7 @@ export default function PartnerManagement({ forcedTab, hideHeader }) {
                             <span className="material-symbols-outlined notranslate text-[18px]" translate="no">add</span>
                             Thêm NCC
                         </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -328,6 +339,7 @@ export default function PartnerManagement({ forcedTab, hideHeader }) {
                                         </td>
                                         <td className="p-4 text-right whitespace-nowrap">
                                             <div className="flex items-center justify-end gap-1">
+                                                {canEdit && (
                                                 <button
                                                     onClick={() => handleEdit(partner)}
                                                     className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
@@ -335,6 +347,8 @@ export default function PartnerManagement({ forcedTab, hideHeader }) {
                                                 >
                                                     <span className="material-symbols-outlined notranslate text-[20px]" translate="no">edit</span>
                                                 </button>
+                                                )}
+                                                {canDelete && (
                                                 <button
                                                     onClick={() => handleDelete(partner.id, partner.name)}
                                                     className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
@@ -342,6 +356,7 @@ export default function PartnerManagement({ forcedTab, hideHeader }) {
                                                 >
                                                     <span className="material-symbols-outlined notranslate text-[20px]" translate="no">delete</span>
                                                 </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
