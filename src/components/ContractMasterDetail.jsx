@@ -642,6 +642,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                         <thead className="bg-slate-50 text-slate-500 uppercase tracking-widest text-[9px] font-black sticky top-0 z-20 shadow-sm border-b border-slate-200">
                                             <tr>
                                                 <Th label="Mã DA/HĐ" sortKey="code" extraClass="px-2" />
+                                                <Th label="Ngày ký" sortKey="sign_date" align="center" extraClass="px-1.5" />
                                                 <Th label="HĐ Trước VAT" sortKey="preVat" align="right" extraClass="border-l border-slate-100 bg-blue-50/30" />
                                                 <Th label="VAT (%)" sortKey="vatPercent" align="center" extraClass="bg-blue-50/30 text-blue-400" />
                                                 <Th label="Giá trị Sau VAT" sortKey="postVat" align="right" extraClass="font-black text-blue-700 bg-blue-50/30" />
@@ -699,6 +700,11 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                                 <div className="text-[10px] text-slate-400 font-medium ml-1">#{proj.code}</div>
                                                             )}
                                                         </div>
+                                                    </td>
+                                                    <td className="px-1.5 py-1.5 text-center">
+                                                        <span className={`text-[10px] font-medium ${proj.sign_date ? 'text-slate-600' : 'text-slate-300'}`}>
+                                                            {proj.sign_date ? new Date(proj.sign_date).toLocaleDateString('vi-VN') : '—'}
+                                                        </span>
                                                     </td>
                                                     <td className="px-1.5 py-1.5 text-right text-slate-500 border-l border-slate-50">
                                                         {fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue / (1 + (proj.internal_vat_percentage ?? 8) / 100) : proj.totalValuePreVat)}
@@ -832,7 +838,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                 <td className={`px-1.5 py-3 text-right text-[14px] font-black bg-amber-50/20 ${(totalRequestedAll - totalIncomeAll) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
                                                     {fmt(totalRequestedAll - totalIncomeAll)}
                                                 </td>
-                                                <td colSpan={4} className="bg-slate-50"></td>
+                                                <td colSpan={5} className="bg-slate-50"></td>
 
                                             </tr>
                                         </tfoot>
