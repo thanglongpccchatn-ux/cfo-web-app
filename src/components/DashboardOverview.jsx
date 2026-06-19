@@ -10,14 +10,15 @@ import { formatVND, formatBillion, formatBillionParts, parseFormattedNumber, for
 import { smartToast } from '../utils/globalToast';
 
 const DashboardOverview = () => {
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const queryClient = useQueryClient();
-    const invalidateDashboard = () => queryClient.invalidateQueries({ queryKey: ['dashboard-overview-data'] });
+    const invalidateDashboard = () => queryClient.invalidateQueries({ queryKey: ['dashboard-overview-data', selectedYear] });
 
     const { data: dashboardData, isLoading: loading } = useQuery({
-        queryKey: ['dashboard-overview-data'],
+        queryKey: ['dashboard-overview-data', selectedYear],
         staleTime: 1000 * 60 * 5, // 5 minutes cache
         queryFn: async () => {
-            const currentYear = new Date().getFullYear();
+            const currentYear = selectedYear;
 
             // All queries run in parallel for maximum speed
             const [planRes, projRes, pmtRes, , extHistRes, intHistRes, loansRes] = await Promise.all([
@@ -109,12 +110,19 @@ const DashboardOverview = () => {
                 const recoveryRate = totalValueAll > 0 ? (totalIncomeAll / totalValueAll) * 100 : 0;
 
                 // Tính Thực thu (Cash-in) cho năm hiện tại dựa trên ngày nhận tiền thực tế
-                const targetYear = planData?.year || new Date().getFullYear();
                 const totalIncomeThisYear = (extHist || [])
-                    .filter(h => h.payment_date && new Date(h.payment_date).getFullYear() === targetYear)
+                    .filter(h => h.payment_date && new Date(h.payment_date).getFullYear() === currentYear)
                     .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
 
-                financials = { totalValueAll, totalIncomeAll, totalDebtInvoiceAll, totalDebtRequestedAll, totalRequestedAll, totalInvoiceAll, recoveryRate, totalIncomeThisYear, totalDebtAll };
+                // Tính Tổng đã xuất hóa đơn cho năm hiện tại
+                const totalInvoiceThisYear = (pmts || [])
+                    .filter(pm => {
+                        const d = pm.invoice_date || pm.created_at;
+                        return d && new Date(d).getFullYear() === currentYear;
+                    })
+                    .reduce((sum, pm) => sum + (parseFloat(pm.invoice_amount) || 0), 0);
+
+                financials = { totalValueAll, totalIncomeAll, totalDebtInvoiceAll, totalDebtRequestedAll, totalRequestedAll, totalInvoiceAll, recoveryRate, totalIncomeThisYear, totalInvoiceThisYear, totalDebtAll };
 
                 // 3. Chart Data Processing
                 // Trend Chart (Last 6 Months Income)
@@ -217,11 +225,11 @@ const DashboardOverview = () => {
     const [targetModal, setTargetModal] = useState({ isOpen: false, target: 0, isSaving: false });
 
     // Revenue Plan Calculations
-    const currentYear = new Date().getFullYear();
-    const currentMonth = new Date().getMonth() + 1;
-    const elapsedRatio = (currentMonth - 1) / 12; // e.g March -> 2/12 = 16.7%
+    const currentYear = selectedYear;
+    const currentMonth = currentYear === new Date().getFullYear() ? new Date().getMonth() + 1 : 12;
+    const elapsedRatio = currentYear === new Date().getFullYear() ? (currentMonth - 1) / 12 : 1; // e.g March -> 2/12 = 16.7%
     const targetRevenue = parseFloat(planData?.target_revenue) || 0;
-    const achievedRevenue = financials?.totalIncomeThisYear || 0;
+    const achievedRevenue = financials?.totalInvoiceThisYear || 0;
     const remainingRevenue = Math.max(0, targetRevenue - achievedRevenue);
     
     let completionPercent = 0;
@@ -359,13 +367,22 @@ const DashboardOverview = () => {
                         </div>
                         <div>
                             <div className="flex items-center gap-3 mb-1">
-                                <h2 className="text-xl md:text-3xl font-black text-slate-800 tracking-tight">KẾ HOẠCH NĂM {currentYear}</h2>
+                                <h2 className="text-xl md:text-3xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                                    KẾ HOẠCH NĂM
+                                    <select 
+                                        value={selectedYear} 
+                                        onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                                        className="bg-slate-100/50 border-none rounded-lg text-xl md:text-3xl font-black text-slate-800 focus:ring-0 cursor-pointer py-0 pl-2 pr-8 hover:bg-slate-200 transition-colors"
+                                    >
+                                        {[2023, 2024, 2025, 2026, 2027, 2028, 2029].map(y => <option key={y} value={y}>{y}</option>)}
+                                    </select>
+                                </h2>
                                 <div className={`flex items-center gap-1.5 px-3 py-1 bg-${evalStatus.color}-50 border border-${evalStatus.color}-100 rounded-full`}>
                                     <span className={`material-symbols-outlined text-[14px] text-${evalStatus.color}-500`}>{evalStatus.icon}</span>
                                     <span className={`text-[10px] md:text-xs font-black uppercase tracking-widest text-${evalStatus.color}-600`}>{evalStatus.text}</span>
                                 </div>
                             </div>
-                            <p className="text-xs md:text-sm font-bold text-slate-400">Theo dõi tiến độ Thực thu (Cash-in) so với Mục tiêu đề ra</p>
+                            <p className="text-xs md:text-sm font-bold text-slate-400">Theo dõi tiến độ Doanh thu (Xuất HĐ) so với Mục tiêu đề ra</p>
                         </div>
                     </div>
                     <button 
@@ -377,7 +394,7 @@ const DashboardOverview = () => {
                     </button>
                 </div>
 
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 relative z-10">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 relative z-10">
                     <div className="bg-slate-50 rounded-2xl p-4 md:p-5 border border-slate-100">
                         <p className="text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5">MỤC TIÊU NĂM</p>
                         <div className="flex items-baseline gap-1">
@@ -387,10 +404,18 @@ const DashboardOverview = () => {
                     </div>
                     
                     <div className="bg-emerald-50/50 rounded-2xl p-4 md:p-5 border border-emerald-100/50">
-                        <p className="text-[10px] md:text-xs font-black text-emerald-600 uppercase tracking-widest mb-1.5">ĐÃ ĐẠT ĐƯỢC</p>
+                        <p className="text-[10px] md:text-xs font-black text-emerald-600 uppercase tracking-widest mb-1.5">ĐÃ XUẤT HÓA ĐƠN</p>
                         <div className="flex items-baseline gap-1">
                             <h3 className="text-2xl md:text-4xl font-black text-emerald-600 tracking-tighter">{formatBillion(achievedRevenue)}</h3>
                             <span className="text-xs font-black text-emerald-400">Tỷ</span>
+                        </div>
+                    </div>
+
+                    <div className="bg-sky-50/50 rounded-2xl p-4 md:p-5 border border-sky-100/50">
+                        <p className="text-[10px] md:text-xs font-black text-sky-600 uppercase tracking-widest mb-1.5">ĐÃ THU TRONG NĂM</p>
+                        <div className="flex items-baseline gap-1">
+                            <h3 className="text-2xl md:text-4xl font-black text-sky-600 tracking-tighter">{formatBillion(financials?.totalIncomeThisYear || 0)}</h3>
+                            <span className="text-xs font-black text-sky-400">Tỷ</span>
                         </div>
                     </div>
 
