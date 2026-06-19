@@ -19,6 +19,7 @@ export default function PaymentReceiptsModule() {
     const [filterPartnerId, setFilterPartnerId] = useState('');
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
     const [quickFilter, setQuickFilter] = useState('all');
+    const [sortConfig, setSortConfig] = useState({ key: 'payment_date', direction: 'desc' });
     const toast = useToast();
     const queryClient = useQueryClient();
 
@@ -389,9 +390,51 @@ export default function PaymentReceiptsModule() {
         setShowModal(true);
     };
 
+    const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+        setSortConfig({ key, direction });
+    };
 
+    const sortedList = [...filteredReceipts].sort((a, b) => {
+        let valA, valB;
+        if (sortConfig.key === 'payment_date') {
+            valA = new Date(a.payment_date).getTime() || 0;
+            valB = new Date(b.payment_date).getTime() || 0;
+        } else if (sortConfig.key === 'project') {
+            valA = a.payments?.projects?.internal_code || a.payments?.projects?.code || '';
+            valB = b.payments?.projects?.internal_code || b.payments?.projects?.code || '';
+        } else if (sortConfig.key === 'payment_stage') {
+            valA = a.payments?.payment_code || '';
+            valB = b.payments?.payment_code || '';
+        } else if (sortConfig.key === 'amount') {
+            valA = Number(a.amount) || 0;
+            valB = Number(b.amount) || 0;
+        } else {
+            valA = a[sortConfig.key] || '';
+            valB = b[sortConfig.key] || '';
+        }
 
-    const currentList = filteredReceipts;
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    const currentList = sortedList;
+
+    const renderTh = (label, sortKey, align = 'left') => (
+        <th 
+            className={`px-6 py-4 cursor-pointer select-none group text-${align}`}
+            onClick={() => handleSort(sortKey)}
+        >
+            <div className={`flex items-center gap-1 justify-${align === 'right' ? 'end' : 'start'}`}>
+                {label}
+                <span className={`material-symbols-outlined text-[14px] transition-opacity ${sortConfig.key === sortKey ? 'opacity-100 text-blue-600' : 'opacity-0 group-hover:opacity-50 text-slate-400'}`}>
+                    {sortConfig.key === sortKey ? (sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'swap_vert'}
+                </span>
+            </div>
+        </th>
+    );
 
     return (
         <div className="p-6 max-w-[1400px] mx-auto animate-fade-in space-y-6">
@@ -591,11 +634,11 @@ export default function PaymentReceiptsModule() {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-tight">
-                                <th className="px-6 py-4">{activeTab === 'external' ? 'Ngày thu tiền' : 'Ngày chuyển tiền'}</th>
-                                <th className="px-6 py-4">Dự án</th>
-                                <th className="px-6 py-4">Đợt thanh toán</th>
-                                <th className="px-6 py-4">Nội dung / Ghi chú</th>
-                                <th className="px-6 py-4 text-right">Số tiền {activeTab === 'external' ? 'thực nhận' : 'đã chuyển'}</th>
+                                {renderTh(activeTab === 'external' ? 'Ngày thu tiền' : 'Ngày chuyển tiền', 'payment_date')}
+                                {renderTh('Dự án', 'project')}
+                                {renderTh('Đợt thanh toán', 'payment_stage')}
+                                {renderTh('Nội dung / Ghi chú', 'description')}
+                                {renderTh(activeTab === 'external' ? 'Số tiền thực nhận' : 'Số tiền đã chuyển', 'amount', 'right')}
                                 <th className="px-6 py-4 text-center">Thao tác</th>
                             </tr>
                         </thead>
