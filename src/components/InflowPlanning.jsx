@@ -18,7 +18,9 @@ export default function InflowPlanning() {
         stageType: 'Nghiệm thu',
         dueDate: new Date().toISOString().split('T')[0],
         amount: '',
-        status: 'Chờ thanh toán'
+        status: 'Chờ thanh toán',
+        certaintyLevel: 'Cao',
+        notes: ''
     });
 
     const queryClient = useQueryClient();
@@ -116,7 +118,9 @@ export default function InflowPlanning() {
                 stage_type: form.stageType,
                 due_date: form.dueDate,
                 payment_request_amount: Number(form.amount),
-                status: form.status
+                status: form.status,
+                certainty_level: form.certaintyLevel,
+                notes: form.notes
             };
 
             if (form.id) {
@@ -130,7 +134,7 @@ export default function InflowPlanning() {
             }
 
             setShowModal(false);
-            setForm({ id: null, projectId: '', stageName: '', stageType: 'Nghiệm thu', dueDate: new Date().toISOString().split('T')[0], amount: '', status: 'Chờ thanh toán' });
+            setForm({ id: null, projectId: '', stageName: '', stageType: 'Nghiệm thu', dueDate: new Date().toISOString().split('T')[0], amount: '', status: 'Chờ thanh toán', certaintyLevel: 'Cao', notes: '' });
             invalidateInflow();
         } catch (err) {
             showError('Lỗi: ' + err.message);
@@ -179,7 +183,7 @@ export default function InflowPlanning() {
                     </div>
                     <button 
                         onClick={() => {
-                            setForm({ id: null, projectId: '', stageName: '', stageType: 'Nghiệm thu', dueDate: new Date().toISOString().split('T')[0], amount: '', status: 'Chờ thanh toán' });
+                            setForm({ id: null, projectId: '', stageName: '', stageType: 'Nghiệm thu', dueDate: new Date().toISOString().split('T')[0], amount: '', status: 'Chờ thanh toán', certaintyLevel: 'Cao', notes: '' });
                             setShowModal(true);
                         }}
                         className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
@@ -253,7 +257,9 @@ export default function InflowPlanning() {
                                                     stageType: item.stage_type || 'Nghiệm thu',
                                                     dueDate: item.due_date,
                                                     amount: String(item.payment_request_amount),
-                                                    status: item.status
+                                                    status: item.status,
+                                                    certaintyLevel: item.certainty_level || 'Cao',
+                                                    notes: item.notes || ''
                                                 });
                                                 setShowModal(true);
                                             }}
@@ -457,7 +463,8 @@ export default function InflowPlanning() {
                                                 type="radio" 
                                                 name="certainty" 
                                                 value={level}
-                                                defaultChecked={level === 'Cao'}
+                                                checked={form.certaintyLevel === level}
+                                                onChange={() => setForm({...form, certaintyLevel: level})}
                                                 className="peer sr-only"
                                             />
                                             <div className="px-6 py-2 text-sm font-semibold rounded-lg peer-checked:bg-white peer-checked:text-blue-700 peer-checked:shadow-sm text-slate-500 transition-all hover:text-slate-700">
@@ -474,6 +481,8 @@ export default function InflowPlanning() {
                                 <textarea 
                                     rows="3"
                                     placeholder="Nhập các thông tin bổ sung cho kế hoạch doanh thu này..."
+                                    value={form.notes}
+                                    onChange={(e) => setForm({...form, notes: e.target.value})}
                                     className="w-full bg-slate-50 border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 transition-all resize-none"
                                 ></textarea>
                             </div>
@@ -515,8 +524,8 @@ export default function InflowPlanning() {
                             <div className="bg-slate-50 rounded-xl p-3.5 flex items-start gap-2.5">
                                 <span className="material-symbols-outlined text-amber-600 text-[20px] mt-0.5">history</span>
                                 <div>
-                                    <p className="text-[10px] font-extrabold uppercase tracking-tight text-amber-600">Tự động sao lưu</p>
-                                    <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Hệ thống tự lưu bản nháp sau mỗi 30 giây.</p>
+                                    <p className="text-[10px] font-extrabold uppercase tracking-tight text-amber-600">Lưu thủ công</p>
+                                    <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">Nhấn "Lưu kế hoạch" để ghi nhận vào hệ thống.</p>
                                 </div>
                             </div>
                         </div>

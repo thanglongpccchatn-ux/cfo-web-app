@@ -1,10 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { smartToast } from '../utils/globalToast';
 import { fmt, formatInputNumber as fmtInput } from '../utils/formatters';
 import { autoJournal } from '../lib/accountingService';
+
+// ── Tính ngày đáo hạn: cộng đúng N tháng từ ngày vay ──
+const addMonths = (dateStr, months) => {
+    if (!dateStr || !months) return '';
+    const d = new Date(dateStr + 'T00:00:00');
+    const targetMonth = d.getMonth() + Number(months);
+    d.setMonth(targetMonth);
+    // Nếu ngày bị tràn (VD: 31/1 + 1 tháng → 3/3), lùi về cuối tháng đúng
+    const expectedMonth = (d.getMonth() + 12) % 12;
+    const targetExpected = (new Date(dateStr + 'T00:00:00').getMonth() + Number(months)) % 12;
+    if (expectedMonth !== targetExpected) {
+        d.setDate(0); // Lùi về ngày cuối tháng trước
+    }
+    return d.toISOString().split('T')[0];
+};
+
+// ── Tính lãi suất theo số ngày thực tế trong từng tháng ──
+// Công thức: Lãi = Dư nợ gốc × Lãi suất (%/năm) / 100 × (Số ngày thực tế / Số ngày trong năm tương ứng)
+// Ở đây tính tổng lãi từ ngày vay đến ngày hiện tại, chia đúng theo từng tháng
+const calcInterestActualDays = (principal, annualRate, startDateStr, endDateStr) => {
+    if (!principal || !annualRate || !startDateStr) return 0;
+    const start = new Date(startDateStr + 'T00:00:00');
+    const end = endDateStr ? new Date(endDateStr + 'T00:00:00') : new Date();
+    if (end <= start) return 0;
+
+    let totalInterest = 0;
+    let cursor = new Date(start);
+
+    while (cursor < end) {
+        const year = cursor.getFullYear();
+        const month = cursor.getMonth();
+        // Số ngày trong tháng hiện tại
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        // Số ngày trong năm hiện tại
+        const daysInYear = new Date(year, 1, 29).getDate() === 29 ? 366 : 365;
+        // Ngày cuối kỳ trong tháng này
+        const monthEnd = new Date(year, month + 1, 0);
+        const periodEnd = end < monthEnd ? end : monthEnd;
+        // Số ngày thực tế trong kỳ này
+        const periodStart = cursor < start ? start : cursor;
+        const actualDays = Math.round((periodEnd - periodStart) / (1000 * 60 * 60 * 24));
+
+        if (actualDays > 0) {
+            totalInterest += principal * (annualRate / 100) * (actualDays / daysInYear);
+        }
+
+        // Chuyển sang ngày đầu tháng tiếp theo
+        cursor = new Date(year, month + 1, 1);
+    }
+
+    return Math.round(totalInterest);
+};
 
 const LENDER_TYPES = [
     { value: 'company', label: 'Công ty', icon: 'domain', color: 'bg-blue-100 text-blue-700' },
@@ -34,7 +86,7 @@ export default function LoanManagement() {
     const [form, setForm] = useState({
         lender_type: 'company', lender_name: '', project_id: '',
         loan_amount: '', interest_rate: '', interest_type: 'fixed',
-        loan_date: new Date().toISOString().split('T')[0], due_date: '', notes: ''
+        loan_date: new Date().toISOString().split('T')[0], loan_term: '', due_date: '', notes: ''
     });
 
     const [payForm, setPayForm] = useState({
@@ -95,6 +147,18 @@ export default function LoanManagement() {
     };
 
     // CRUD
+    // Auto-update due_date when loan_date or loan_term changes
+    const updateFormWithTerm = useCallback((updates) => {
+        setForm(prev => {
+            const next = { ...prev, ...updates };
+            // Auto-calculate due_date if loan_term is provided
+            if (next.loan_term && next.loan_date) {
+                next.due_date = addMonths(next.loan_date, next.loan_term);
+            }
+            return next;
+        });
+    }, []);
+
     const handleOpenForm = (loan = null) => {
         if (loan) {
             setEditingLoan(loan);
@@ -102,14 +166,14 @@ export default function LoanManagement() {
                 lender_type: loan.lender_type, lender_name: loan.lender_name,
                 project_id: loan.project_id || '', loan_amount: loan.loan_amount,
                 interest_rate: loan.interest_rate || '', interest_type: loan.interest_type || 'fixed',
-                loan_date: loan.loan_date, due_date: loan.due_date || '', notes: loan.notes || ''
+                loan_date: loan.loan_date, loan_term: loan.loan_term || '', due_date: loan.due_date || '', notes: loan.notes || ''
             });
         } else {
             setEditingLoan(null);
             setForm({
                 lender_type: 'company', lender_name: '', project_id: '',
                 loan_amount: '', interest_rate: '', interest_type: 'fixed',
-                loan_date: new Date().toISOString().split('T')[0], due_date: '', notes: ''
+                loan_date: new Date().toISOString().split('T')[0], loan_term: '', due_date: '', notes: ''
             });
         }
         setIsFormOpen(true);
@@ -125,6 +189,7 @@ export default function LoanManagement() {
             interest_rate: Number(form.interest_rate) || 0,
             interest_type: form.interest_type,
             loan_date: form.loan_date,
+            loan_term: form.loan_term ? Number(form.loan_term) : null,
             due_date: form.due_date || null,
             notes: form.notes || null,
         };
@@ -232,13 +297,15 @@ export default function LoanManagement() {
         invalidateLoans();
     };
 
-    // Interest suggestion
+    // Interest suggestion — tính theo số ngày thực tế từng tháng
     const suggestInterest = () => {
         if (!selectedLoan) return 0;
         const rate = Number(selectedLoan.interest_rate) || 0;
-        const principal = Number(selectedLoan.loan_amount) - (loans.find(l => l.id === selectedLoan.id)?.total_paid || 0);
-        const days = Math.floor((new Date() - new Date(selectedLoan.loan_date)) / (1000 * 60 * 60 * 24));
-        return Math.round(principal * (rate / 100) * (days / 365));
+        const loanRecord = loans.find(l => l.id === selectedLoan.id);
+        const totalPrincipalPaid = Number(loanRecord?.total_paid || 0);
+        // Dư nợ gốc hiện tại (chỉ tính phần gốc đã trả, không tính lãi đã trả)
+        const outstandingPrincipal = Number(selectedLoan.loan_amount) - totalPrincipalPaid;
+        return calcInterestActualDays(outstandingPrincipal, rate, selectedLoan.loan_date);
     };
 
     const kpis = [
@@ -301,6 +368,7 @@ export default function LoanManagement() {
                                         <th className="px-4 py-3">Dự án</th>
                                         <th className="px-4 py-3 text-right">Số tiền vay</th>
                                         <th className="px-4 py-3 text-center">Lãi suất</th>
+                                        <th className="px-4 py-3 text-center">Kỳ hạn</th>
                                         <th className="px-4 py-3 text-right">Đã trả</th>
                                         <th className="px-4 py-3 text-right">Còn nợ</th>
                                         <th className="px-4 py-3 text-center">Trạng thái</th>
@@ -331,6 +399,14 @@ export default function LoanManagement() {
                                                     <td className="px-4 py-3.5 text-[13px] text-slate-600">{loan.projects?.name || '—'}</td>
                                                     <td className="px-4 py-3.5 text-right font-bold text-[13px] text-slate-800">{fmt(loan.loan_amount)}</td>
                                                     <td className="px-4 py-3.5 text-center text-[13px] text-slate-600">{loan.interest_rate || 0}%/năm</td>
+                                                    <td className="px-4 py-3.5 text-center text-[13px] text-slate-600">
+                                                        {loan.loan_term ? (
+                                                            <div>
+                                                                <div className="font-semibold">{loan.loan_term} tháng</div>
+                                                                {loan.due_date && <div className="text-[10px] text-slate-400">Đáo hạn: {new Date(loan.due_date).toLocaleDateString('vi-VN')}</div>}
+                                                            </div>
+                                                        ) : '—'}
+                                                    </td>
                                                     <td className="px-4 py-3.5 text-right text-[13px] text-emerald-600 font-semibold">{fmt(loan.total_paid || 0)}</td>
                                                     <td className="px-4 py-3.5 text-right text-[13px] font-bold text-red-600">{fmt(remaining > 0 ? remaining : 0)}</td>
                                                     <td className="px-4 py-3.5 text-center">
@@ -362,7 +438,7 @@ export default function LoanManagement() {
                                                 {/* Expanded payment history */}
                                                 {expandedLoan === loan.id && (
                                                     <tr>
-                                                        <td colSpan="8" className="px-5 py-4 bg-slate-50/80">
+                                                        <td colSpan="9" className="px-5 py-4 bg-slate-50/80">
                                                             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Lịch sử trả nợ · {loan.lender_name}</div>
                                                             {loadingHistory ? (
                                                                 <div className="text-center py-3 text-slate-400 text-sm">Đang tải...</div>
@@ -430,6 +506,16 @@ export default function LoanManagement() {
                                                 {st.label}
                                             </span>
                                         </div>
+                                        {/* Kỳ hạn + Đáo hạn row */}
+                                        {(loan.loan_term || loan.due_date) && (
+                                            <div className="flex items-center gap-3 text-[12px] text-slate-500 bg-blue-50/50 rounded-lg px-3 py-1.5">
+                                                <span className="material-symbols-outlined notranslate text-[14px] text-blue-400" translate="no">schedule</span>
+                                                {loan.loan_term && <span>Kỳ hạn: <b className="text-slate-700">{loan.loan_term} tháng</b></span>}
+                                                {loan.loan_term && loan.due_date && <span className="text-slate-300">·</span>}
+                                                {loan.due_date && <span>Đáo hạn: <b className="text-slate-700">{new Date(loan.due_date).toLocaleDateString('vi-VN')}</b></span>}
+                                                {loan.interest_rate > 0 && <><span className="text-slate-300">·</span><span>LS: <b className="text-slate-700">{loan.interest_rate}%/năm</b></span></>}
+                                            </div>
+                                        )}
                                         <div className="grid grid-cols-3 gap-2 text-center">
                                             <div className="bg-slate-50 rounded-lg py-2">
                                                 <div className="text-[11px] text-slate-400">Vay</div>
@@ -506,16 +592,28 @@ export default function LoanManagement() {
                                         placeholder="8" className="w-full px-3 py-2.5 border rounded-xl text-sm" />
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Ngày vay *</label>
-                                    <input required type="date" value={form.loan_date} onChange={e => setForm({...form, loan_date: e.target.value})}
+                                    <input required type="date" value={form.loan_date} onChange={e => updateFormWithTerm({ loan_date: e.target.value })}
                                         className="w-full px-3 py-2.5 border rounded-xl text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Kỳ hạn (tháng)</label>
+                                    <input type="number" min="1" max="360" value={form.loan_term} onChange={e => updateFormWithTerm({ loan_term: e.target.value })}
+                                        placeholder="VD: 3, 6, 12" className="w-full px-3 py-2.5 border rounded-xl text-sm" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Ngày đáo hạn</label>
                                     <input type="date" value={form.due_date} onChange={e => setForm({...form, due_date: e.target.value})}
-                                        className="w-full px-3 py-2.5 border rounded-xl text-sm" />
+                                        className={`w-full px-3 py-2.5 border rounded-xl text-sm ${form.loan_term ? 'bg-slate-50 text-slate-500' : ''}`}
+                                        readOnly={!!form.loan_term} />
+                                    {form.loan_term && form.due_date && (
+                                        <p className="text-[11px] text-blue-500 mt-1 flex items-center gap-1">
+                                            <span className="material-symbols-outlined notranslate text-[13px]" translate="no">info</span>
+                                            Tự động tính từ kỳ hạn {form.loan_term} tháng
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             <div>

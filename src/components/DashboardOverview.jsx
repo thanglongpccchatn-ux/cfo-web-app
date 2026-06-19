@@ -83,7 +83,13 @@ const DashboardOverview = () => {
                     const totalRequested = projPmts.reduce((sum, pay) => sum + (parseFloat(pay.payment_request_amount) || 0), 0);
                     
                     const debtInvoice = totalInvoice - totalIncome;
-                    const debtRequested = totalRequested - totalIncome;
+                    
+                    // Công nợ đề nghị chỉ lấy từ các thanh toán đã tạo trong "Hồ sơ & Thanh toán"
+                    const debtRequested = projPmts.reduce((sum, pay) => {
+                        const reqAmt = parseFloat(pay.payment_request_amount) || 0;
+                        const incAmt = parseFloat(pay.external_income) || 0;
+                        return sum + Math.max(0, reqAmt - incAmt);
+                    }, 0);
                     
                     const satecoInternalRevenue = parseFloat(p.sateco_internal_revenue) || (totalValuePostVat * (parseFloat(p.sateco_contract_ratio || 98) / 100));
                     const totalExpensesSateco = projIntHist.reduce((sum, h) => sum + (parseFloat(h.amount_spent) || 0), 0);
@@ -102,11 +108,11 @@ const DashboardOverview = () => {
                 const totalDebtRequestedAll = processed.reduce((s, p) => s + Math.max(0, p.debtRequested || 0), 0);
                 const recoveryRate = totalValueAll > 0 ? (totalIncomeAll / totalValueAll) * 100 : 0;
 
-                // ADD: Calculate income for the current year based on due_date (to match DocumentTrackingModule)
+                // Tính Thực thu (Cash-in) cho năm hiện tại dựa trên ngày nhận tiền thực tế
                 const targetYear = planData?.year || new Date().getFullYear();
-                const totalIncomeThisYear = (pmts || [])
-                    .filter(pm => pm.due_date && new Date(pm.due_date).getFullYear() === targetYear)
-                    .reduce((sum, pm) => sum + (parseFloat(pm.external_income) || 0), 0);
+                const totalIncomeThisYear = (extHist || [])
+                    .filter(h => h.payment_date && new Date(h.payment_date).getFullYear() === targetYear)
+                    .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
 
                 financials = { totalValueAll, totalIncomeAll, totalDebtInvoiceAll, totalDebtRequestedAll, totalRequestedAll, totalInvoiceAll, recoveryRate, totalIncomeThisYear, totalDebtAll };
 

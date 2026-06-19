@@ -98,6 +98,7 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
             items: [
                 { id: 'labor_subcontractors', icon: 'engineering', label: 'Tổ đội & Thầu phụ', perms: ['view_labor', 'manage_labor', 'view_subcontractors'] },
                 { id: 'suppliers', icon: 'local_shipping', label: 'Nhà cung cấp', perms: ['view_partners', 'manage_partners', 'view_materials', 'manage_materials_tracking'] },
+                { id: 'supplier_payables', icon: 'request_quote', label: 'Công nợ NCC', perms: ['view_materials', 'manage_materials_tracking', 'view_suppliers'] },
                 { id: 'inventory', icon: 'warehouse', label: 'Kho vật tư', perms: ['view_inventory', 'import_inventory', 'export_inventory', 'manage_materials'] },
                 { id: 'task_management', icon: 'task_alt', label: 'Quản lý Công việc', perms: ['*'] },
                 { id: 'site_diary', icon: 'edit_calendar', label: 'Nhật ký', perms: ['view_construction', 'manage_construction'] },

@@ -271,20 +271,30 @@ export default function SettlementManagement() {
                     { label: 'HĐ chưa xuất', value: fmtB(kpi.totalInvoiceRemaining), suffix: ' Tỷ', color: 'amber', icon: 'receipt_long' },
                     { label: 'BH đang giữ lại', value: fmtB(kpi.totalWarrantyHeld), suffix: ' Tỷ', color: 'purple', icon: 'security' },
                     { label: 'Hồ sơ đầy đủ', value: kpi.docsProgress, suffix: '%', color: 'emerald', icon: 'fact_check' },
-                ].map((k, i) => (
+                ].map((k, i) => {
+                    const colorMap = {
+                        indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', value: 'text-indigo-700' },
+                        blue: { bg: 'bg-blue-50', text: 'text-blue-600', value: 'text-blue-700' },
+                        rose: { bg: 'bg-rose-50', text: 'text-rose-600', value: 'text-rose-700' },
+                        amber: { bg: 'bg-amber-50', text: 'text-amber-600', value: 'text-amber-700' },
+                        purple: { bg: 'bg-purple-50', text: 'text-purple-600', value: 'text-purple-700' },
+                        emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600', value: 'text-emerald-700' },
+                    };
+                    return (
                     <div key={i} className={`bg-white rounded-xl p-4 border border-slate-100 shadow-sm hover:shadow-md transition-all group`}>
                         <div className="flex justify-between items-start mb-2">
-                            <div className={`w-9 h-9 rounded-lg bg-${k.color}-50 text-${k.color}-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner shrink-0`}>
+                            <div className={`w-9 h-9 rounded-lg ${colorMap[k.color]?.bg} ${colorMap[k.color]?.text} flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner shrink-0`}>
                                 <span className="material-symbols-outlined text-[20px]">{k.icon}</span>
                             </div>
                         </div>
                         <p className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{k.label}</p>
                         <div className="flex items-baseline gap-0.5">
-                            <span className={`text-lg md:text-xl font-black text-${k.color}-700 tracking-tight`}>{typeof k.value === 'number' ? k.value : k.value}</span>
+                            <span className={`text-lg md:text-xl font-black ${colorMap[k.color]?.value} tracking-tight`}>{typeof k.value === 'number' ? k.value : k.value}</span>
                             <span className="text-[9px] font-bold text-slate-400">{k.suffix}</span>
                         </div>
                     </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* Main Table */}
@@ -315,6 +325,11 @@ export default function SettlementManagement() {
                                 const isExpanded = expandedId === p.id;
                                 const isEditing = editingId === p.id;
                                 const statusColor = p.isSettled ? 'emerald' : p.settlement_status === 'Đang quyết toán' ? 'amber' : 'rose';
+                                const statusColorMap = {
+                                    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+                                    amber: 'bg-amber-50 text-amber-600 border-amber-200',
+                                    rose: 'bg-rose-50 text-rose-600 border-rose-200',
+                                };
 
                                 return (
                                     <React.Fragment key={p.id}>
@@ -412,7 +427,7 @@ export default function SettlementManagement() {
                                                         <option>Đã quyết toán</option>
                                                     </select>
                                                 ) : (
-                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border bg-${statusColor}-50 text-${statusColor}-600 border-${statusColor}-200`}>
+                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${statusColorMap[statusColor]}`}>
                                                         <span className="material-symbols-outlined text-[12px]">{p.isSettled ? 'check_circle' : p.settlement_status === 'Đang quyết toán' ? 'hourglass_top' : 'pending'}</span>
                                                         {p.settlement_status || 'Chưa QT'}
                                                     </span>

@@ -51,6 +51,7 @@ const ConstructionModule = lazy(() => import('./components/ConstructionModule'))
 const TaskManagement = lazy(() => import('./components/TaskManagement'));
 const UserGuide = lazy(() => import('./components/UserGuide'));
 const LoanManagement = lazy(() => import('./components/LoanManagement'));
+const SupplierPayables = lazy(() => import('./components/supplierPayables/SupplierPayables'));
 const AuditTrailViewer = lazy(() => import('./components/AuditTrailViewer'));
 const ChatModule = lazy(() => import('./components/chat/ChatModule'));
 const ChartOfAccounts = lazy(() => import('./components/accounting/ChartOfAccounts'));
@@ -153,6 +154,7 @@ function MainLayout() {
       case 'bidding': return { title: 'Theo dõi Báo giá / Đấu thầu', subtitle: 'Quản lý vòng đời đấu thầu và phiên bản báo giá' };
       case 'labor_tracking': return { title: 'Theo dõi Nhân công', subtitle: 'Chi phí thầu phụ và nhân công' };
       case 'material_tracking': return { title: 'Theo dõi Vật tư', subtitle: 'Chi phí vật tư hiện trường' };
+      case 'supplier_payables': return { title: 'Công nợ NCC Vật tư', subtitle: 'Sổ theo dõi mua hàng & thanh toán nhà cung cấp' };
       case 'expense_tracking': return { title: 'Chi phí Chung', subtitle: 'Quản lý chi phí vận hành & văn phòng' };
       case 'guide': return { title: 'Hướng dẫn sử dụng', subtitle: 'Hướng dẫn chi tiết cho từng vai trò' };
       case 'loans': return { title: 'Quản lý Vay vốn', subtitle: 'Theo dõi khoản vay, lãi suất và trịch sử trả nợ' };
@@ -216,15 +218,16 @@ function MainLayout() {
             <Route path="/dashboard" element={<ProtectedRoute requiredPerms={['view_dashboard']}><DashboardOverview /></ProtectedRoute>} />
             <Route path="/contracts" element={<ProtectedRoute requiredPerms={['view_contracts']}><ContractMasterDetail onOpenFullscreen={(type, data) => setFullscreenView({ type, data })} /></ProtectedRoute>} />
             <Route path="/bidding" element={<ProtectedRoute requiredPerms={['view_bids']}><BiddingManagement /></ProtectedRoute>} />
-            <Route path="/variations" element={<ProtectedRoute requiredPerms={['view_contracts']}><VariationsManagement /></ProtectedRoute>} />
+            <Route path="/variations" element={<ProtectedRoute requiredPerms={['view_variations', 'manage_variations']}><VariationsManagement /></ProtectedRoute>} />
             <Route path="/doc_tracking" element={<ProtectedRoute requiredPerms={['view_payments']}><DocumentTrackingModule /></ProtectedRoute>} />
             <Route path="/payment_receipts" element={<ProtectedRoute requiredPerms={['view_payments']}><PaymentReceiptsModule /></ProtectedRoute>} />
             <Route path="/site_diary" element={<ProtectedRoute><SiteDiary /></ProtectedRoute>} />
-            <Route path="/warranty_tracking" element={<ProtectedRoute requiredPerms={['view_contracts']}><WarrantyTracking /></ProtectedRoute>} />
-            <Route path="/settlement" element={<ProtectedRoute requiredPerms={['view_contracts']}><SettlementManagement /></ProtectedRoute>} />
+            <Route path="/warranty_tracking" element={<ProtectedRoute requiredPerms={['view_warranty', 'manage_warranty']}><WarrantyTracking /></ProtectedRoute>} />
+            <Route path="/settlement" element={<ProtectedRoute requiredPerms={['view_settlement', 'manage_settlement']}><SettlementManagement /></ProtectedRoute>} />
             <Route path="/labor_subcontractors" element={<ProtectedRoute requiredPerms={['view_labor', 'manage_labor', 'view_subcontractors']}><LaborSubcontractorHub /></ProtectedRoute>} />
             <Route path="/labor_tracking" element={<Navigate to="/labor_subcontractors?tab=labor" replace />} />
             <Route path="/material_tracking" element={<ProtectedRoute requiredPerms={['view_materials', 'manage_materials_tracking', 'manage_materials']}><MaterialTracking /></ProtectedRoute>} />
+            <Route path="/supplier_payables" element={<ProtectedRoute requiredPerms={['view_materials', 'manage_materials_tracking', 'view_suppliers']} moduleName="Công nợ NCC Vật tư"><SupplierPayables /></ProtectedRoute>} />
             <Route path="/expense_tracking" element={<ProtectedRoute requiredPerms={['view_expenses', 'manage_expenses']}><ExpenseTracking /></ProtectedRoute>} />
             <Route path="/weekly_expense_plan" element={<ProtectedRoute requiredPerms={['view_planning', 'manage_planning']}><WeeklyExpensePlan /></ProtectedRoute>} />
             
