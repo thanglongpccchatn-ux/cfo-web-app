@@ -473,10 +473,12 @@ export default function DocumentTrackingModule() {
         const projEntity = (item.projects?.acting_entity_key || 'thanglong').toLowerCase();
         const matchesEntity = activeEntity === 'all' || activeEntity === 'sateco' || projEntity === activeEntity;
         
-        // Date Filter (CEO Logic: Filter by Due Date for Cash Flow Projection)
+        // Date Filter (Lọc theo Ngày xuất HĐ)
         let matchesDate = true;
-        if (item.due_date) {
-            const d = new Date(item.due_date);
+        const dateToFilter = item.invoice_date || item.created_at;
+        
+        if (dateToFilter) {
+            const d = new Date(dateToFilter);
             const y = d.getFullYear().toString();
             const m = (d.getMonth() + 1).toString();
             
