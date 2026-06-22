@@ -352,8 +352,7 @@ export default function VariationsManagement() {
                                     
                                     <div className="mb-3 space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-100 mt-3">
                                         <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-1 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">account_tree</span> Dự án</div>
-                                        <div className="text-sm font-bold text-slate-800 line-clamp-2 leading-tight">{v.projects?.name || '-'}</div>
-                                        <div className="text-[10px] text-slate-500 font-mono mt-0.5 bg-white px-1.5 py-0.5 rounded border border-slate-200 w-fit">{v.projects?.internal_code || v.projects?.code || '-'}</div>
+                                        <div className="text-sm font-bold text-slate-800" title={v.projects?.name}>{v.projects?.internal_code || v.projects?.code || '-'}</div>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-2 mb-3">
@@ -414,10 +413,9 @@ export default function VariationsManagement() {
                                         <tr key={v.id} className="hover:bg-slate-50 transition-colors group">
                                             <td className="px-4 py-3 text-center text-xs text-slate-400 font-medium">{index + 1}</td>
                                             <td className="px-4 py-3">
-                                                <div className="font-bold text-xs text-slate-800 line-clamp-2" title={v.projects?.name}>
-                                                    {v.projects?.name || '-'}
+                                                <div className="font-bold text-sm text-slate-800" title={v.projects?.name}>
+                                                    {v.projects?.internal_code || v.projects?.code || '-'}
                                                 </div>
-                                                <div className="text-[10px] text-slate-500 mt-0.5">{v.projects?.internal_code || v.projects?.code || '-'}</div>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="font-bold text-sm text-blue-700">{v.name}</div>
