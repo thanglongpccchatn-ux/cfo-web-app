@@ -15,7 +15,7 @@ export default function VariationsManagement() {
     const [editingVar, setEditingVar] = useState(null);
     const [formData, setFormData] = useState({
         project_id: '', variation_no: '', name: '', proposed_value: '', approved_value: '',
-        status: 'Chờ duyệt', approval_date: '', reason: ''
+        status: 'Chờ duyệt', approval_date: '', send_date: '', reason: ''
     });
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [historyLogs, setHistoryLogs] = useState([]);
@@ -77,6 +77,7 @@ export default function VariationsManagement() {
                 approved_value: variation.approved_value || '',
                 status: variation.status || 'Chờ duyệt',
                 approval_date: variation.approval_date || '',
+                send_date: variation.send_date || '',
                 notes: variation.notes || '',
                 reason: '' // Reset reason for new edit
             });
@@ -97,6 +98,7 @@ export default function VariationsManagement() {
                 approved_value: '',
                 status: 'Chờ duyệt',
                 approval_date: '',
+                send_date: '',
                 notes: '',
                 reason: ''
             });
@@ -115,6 +117,7 @@ export default function VariationsManagement() {
                 approved_value: parseFloat(formData.approved_value) || 0,
                 status: formData.status,
                 approval_date: formData.approval_date || null,
+                send_date: formData.send_date || null,
                 notes: formData.notes
             };
 
@@ -509,23 +512,22 @@ export default function VariationsManagement() {
                                         <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wide">Giá trị Đề nghị</label>
                                         <div className="relative">
                                             <input 
-                                                type="number"
-                                                value={formData.proposed_value}
-                                                onChange={(e) => setFormData({...formData, proposed_value: e.target.value})}
-                                                className="w-full px-3 py-2 pl-3 pr-8 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm font-mono text-right"
+                                                type="text" inputMode="numeric"
+                                                value={formData.proposed_value ? new Intl.NumberFormat('vi-VN').format(formData.proposed_value) : ''}
+                                                onChange={(e) => setFormData({...formData, proposed_value: e.target.value.replace(/[^0-9]/g, '')})}
+                                                className="w-full px-3 py-2 pl-3 pr-8 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm font-sans font-bold tabular-nums text-right"
                                             />
                                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">₫</span>
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wide">Giá trị Được Duyệt <span className="text-rose-500">*</span></label>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wide">Giá trị Được Duyệt</label>
                                         <div className="relative">
                                             <input 
-                                                type="number"
-                                                required
-                                                value={formData.approved_value}
-                                                onChange={(e) => setFormData({...formData, approved_value: e.target.value})}
-                                                className="w-full px-3 py-2 pl-3 pr-8 rounded-xl border border-emerald-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-sm font-mono text-right font-bold text-emerald-700"
+                                                type="text" inputMode="numeric"
+                                                value={formData.approved_value ? new Intl.NumberFormat('vi-VN').format(formData.approved_value) : ''}
+                                                onChange={(e) => setFormData({...formData, approved_value: e.target.value.replace(/[^0-9]/g, '')})}
+                                                className="w-full px-3 py-2 pl-3 pr-8 rounded-xl border border-emerald-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-sm font-sans font-bold tabular-nums text-right text-emerald-700"
                                             />
                                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">₫</span>
                                         </div>
@@ -535,8 +537,8 @@ export default function VariationsManagement() {
                                     {(() => {
                                         const selectedProj = projects.find(p => p.id === formData.project_id);
                                         const vatPct = selectedProj?.vat_percentage ?? 8;
-                                        const approvedPreVat = parseFloat(formData.approved_value) || 0;
-                                        const approvedPostVat = approvedPreVat * (1 + vatPct / 100);
+                                        const baseValue = parseFloat(formData.approved_value) || parseFloat(formData.proposed_value) || 0;
+                                        const postVat = baseValue * (1 + vatPct / 100);
                                         
                                         return (
                                             <>
@@ -557,8 +559,8 @@ export default function VariationsManagement() {
                                                         <input 
                                                             type="text" 
                                                             disabled
-                                                            value={new Intl.NumberFormat('vi-VN').format(Math.round(approvedPostVat))}
-                                                            className="w-full px-3 py-2 pl-3 pr-8 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 bg-slate-100 text-right font-mono"
+                                                            value={new Intl.NumberFormat('vi-VN').format(Math.round(postVat))}
+                                                            className="w-full px-3 py-2 pl-3 pr-8 rounded-xl border border-slate-200 text-sm font-sans font-bold tabular-nums text-slate-700 bg-slate-100 text-right"
                                                         />
                                                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">₫</span>
                                                     </div>
@@ -583,7 +585,16 @@ export default function VariationsManagement() {
                                             type="date"
                                             value={formData.approval_date}
                                             onChange={(e) => setFormData({...formData, approval_date: e.target.value})}
-                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm text-slate-600"
+                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm text-slate-600 font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wide">Ngày gửi đi</label>
+                                        <input 
+                                            type="date"
+                                            value={formData.send_date}
+                                            onChange={(e) => setFormData({...formData, send_date: e.target.value})}
+                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm text-slate-600 font-medium"
                                         />
                                     </div>
                                     
