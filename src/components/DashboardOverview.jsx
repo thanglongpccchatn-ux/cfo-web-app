@@ -10,7 +10,7 @@ import { formatVND, formatBillion, formatBillionParts, parseFormattedNumber, for
 import { smartToast } from '../utils/globalToast';
 
 const DashboardOverview = () => {
-    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [selectedYear, setSelectedYear] = useState('all');
     const queryClient = useQueryClient();
     const invalidateDashboard = () => queryClient.invalidateQueries({ queryKey: ['dashboard-overview-data', selectedYear] });
 
@@ -21,8 +21,12 @@ const DashboardOverview = () => {
             const currentYear = selectedYear;
 
             // All queries run in parallel for maximum speed
+            const planQuery = currentYear === 'all' 
+                ? supabase.from('revenue_plan').select('*')
+                : supabase.from('revenue_plan').select('*').eq('year', currentYear);
+
             const [planRes, projRes, pmtRes, , extHistRes, intHistRes, loansRes] = await Promise.all([
-                supabase.from('revenue_plan').select('*').eq('year', currentYear),
+                planQuery,
                 supabase.from('projects').select('*, partners!projects_partner_id_fkey(name, code, short_name)'),
                 supabase.from('payments').select('*, projects!inner(code, internal_code, name)'),
                 supabase.from('addendas').select('*').eq('status', 'Đã duyệt'),
@@ -31,12 +35,43 @@ const DashboardOverview = () => {
                 supabase.from('loans').select('loan_amount, total_paid, status')
             ]);
 
-            const planData = planRes.data?.[0] || { target_revenue: 0, year: currentYear };
-            const projs = projRes.data;
-            const pmts = pmtRes.data;
-            const extHist = extHistRes.data;
-            const intHist = intHistRes.data;
-            const loansData = loansRes.data || [];
+            let planData = { target_revenue: 0, year: currentYear };
+            if (currentYear === 'all') {
+                const totalTarget = (planRes.data || []).reduce((sum, p) => sum + (parseFloat(p.target_revenue) || 0), 0);
+                planData = { target_revenue: totalTarget, year: 'all' };
+            } else {
+                planData = planRes.data?.[0] || { target_revenue: 0, year: currentYear };
+            }
+
+            let projs = projRes.data || [];
+            let pmts = pmtRes.data || [];
+            let extHist = extHistRes.data || [];
+            let intHist = intHistRes.data || [];
+            let loansData = loansRes.data || [];
+
+            if (currentYear !== 'all') {
+                const y = parseInt(currentYear);
+                projs = projs.filter(p => {
+                    const d = p.start_date || p.created_at;
+                    return d && new Date(d).getFullYear() === y;
+                });
+                pmts = pmts.filter(pm => {
+                    const d = pm.invoice_date || pm.created_at;
+                    return d && new Date(d).getFullYear() === y;
+                });
+                extHist = extHist.filter(h => {
+                    const d = h.payment_date || h.created_at;
+                    return d && new Date(d).getFullYear() === y;
+                });
+                intHist = intHist.filter(h => {
+                    const d = h.payment_date || h.created_at;
+                    return d && new Date(d).getFullYear() === y;
+                });
+                loansData = loansData.filter(l => {
+                    const d = l.created_at;
+                    return d && new Date(d).getFullYear() === y;
+                });
+            }
 
             // Calculate Total Debt from Loans
             const activeLoans = loansData.filter(l => l.status === 'active' || l.status === 'partially_paid' || l.status === 'overdue');
@@ -111,15 +146,10 @@ const DashboardOverview = () => {
 
                 // Tính Thực thu (Cash-in) cho năm hiện tại dựa trên ngày nhận tiền thực tế
                 const totalIncomeThisYear = (extHist || [])
-                    .filter(h => h.payment_date && new Date(h.payment_date).getFullYear() === currentYear)
                     .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
 
                 // Tính Tổng đã xuất hóa đơn cho năm hiện tại
                 const totalInvoiceThisYear = (pmts || [])
-                    .filter(pm => {
-                        const d = pm.invoice_date || pm.created_at;
-                        return d && new Date(d).getFullYear() === currentYear;
-                    })
                     .reduce((sum, pm) => sum + (parseFloat(pm.invoice_amount) || 0), 0);
 
                 financials = { totalValueAll, totalIncomeAll, totalDebtInvoiceAll, totalDebtRequestedAll, totalRequestedAll, totalInvoiceAll, recoveryRate, totalIncomeThisYear, totalInvoiceThisYear, totalDebtAll };
@@ -368,12 +398,13 @@ const DashboardOverview = () => {
                         <div>
                             <div className="flex items-center gap-3 mb-1">
                                 <h2 className="text-xl md:text-3xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                                    KẾ HOẠCH NĂM
+                                    KẾ HOẠCH DOANH THU
                                     <select 
                                         value={selectedYear} 
-                                        onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                                        onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
                                         className="bg-slate-100/50 border-none rounded-lg text-xl md:text-3xl font-black text-slate-800 focus:ring-0 cursor-pointer py-0 pl-2 pr-8 hover:bg-slate-200 transition-colors"
                                     >
+                                        <option value="all">Tất cả</option>
                                         {[2023, 2024, 2025, 2026, 2027, 2028, 2029].map(y => <option key={y} value={y}>{y}</option>)}
                                     </select>
                                 </h2>
