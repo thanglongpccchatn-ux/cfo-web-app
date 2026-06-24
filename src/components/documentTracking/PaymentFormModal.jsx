@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { formatInput } from './dtkHelpers';
+import SearchableSelect from '../SearchableSelect';
 
 const CurrencyInput = ({ value, onChange, className, placeholder }) => {
     const inputRef = useRef(null);
@@ -79,21 +80,19 @@ export default function PaymentFormModal({
                         <div className="space-y-6">
                             <div className="space-y-2">
                                 <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Chọn Dự án / Hợp đồng <span className="text-rose-500">*</span></label>
-                                <select 
-                                    value={form.projectId}
-                                    onChange={(e) => handleProjectChange(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all font-bold text-slate-700"
-                                    required
-                                    disabled={isEditing}
-                                >
-                                    <option value="">-- Chọn dự án --</option>
-                                    {projects
+                                <SearchableSelect
+                                    options={projects
                                         .filter(p => activeEntity === 'all' || activeEntity === 'sateco' || (p.acting_entity_key || 'thanglong').toLowerCase() === activeEntity)
-                                        .map(p => (
-                                            <option key={p.id} value={p.id}>{p.internal_code || p.code}</option>
-                                        ))
-                                    }
-                                </select>
+                                        .map(p => ({
+                                            value: p.id,
+                                            label: p.internal_code || p.code
+                                        }))}
+                                    value={form.projectId}
+                                    onChange={handleProjectChange}
+                                    placeholder="-- Chọn dự án --"
+                                    required={true}
+                                    disabled={isEditing}
+                                />
                             </div>
 
                             <div className="space-y-2">

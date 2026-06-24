@@ -117,10 +117,13 @@ export default function ContractDetailedDashboard({ project, onBack, onOpenFulls
     
     // Tổng giá trị CĐT/Thăng Long (Gồm VAT)
     const totalContractValueThangLong = originalValuePostVat + totalAddendasValuePostVat;
+    const totalContractValueThangLongPreVat = originalValue + totalAddendasValue;
+    const satecoVatPercent = Number(project?.internal_vat_percentage ?? 8) / 100;
     
     // Sateco Allocations based on dual ratios
-    const contractValueSateco = totalContractValueThangLong * SATECO_CONTRACT_RATIO; // Doanh thu nội bộ Sateco xuất HĐ
-    const actualValueSateco = totalContractValueThangLong * SATECO_ACTUAL_RATIO; // Chi phí tiền mặt thực tế Sateco được giữ
+    const contractValueSatecoPreVat = totalContractValueThangLongPreVat * SATECO_CONTRACT_RATIO;
+    const contractValueSateco = contractValueSatecoPreVat * (1 + satecoVatPercent); // Doanh thu nội bộ Sateco xuất HĐ (Gồm VAT)
+    const actualValueSateco = totalContractValueThangLongPreVat * SATECO_ACTUAL_RATIO * (1 + satecoVatPercent); // Chi phí tiền mặt thực tế Sateco được giữ (Gồm VAT)
     const satecoInternalPaid = payments?.reduce((s, p) => s + Number(p.internal_paid || 0), 0) || 0;
     const satecoPaidPercentage = contractValueSateco > 0 ? (satecoInternalPaid / contractValueSateco) * 100 : 0;
     const raw_cdtTotalInvoiced = payments?.reduce((s, p) => s + Number(p.invoice_amount || 0), 0) || 0;

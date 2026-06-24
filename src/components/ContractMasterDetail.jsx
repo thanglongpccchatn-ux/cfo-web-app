@@ -149,7 +149,9 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                 satecoContractRatio: p.sateco_contract_ratio || 98,
                 satecoActualRatio: p.sateco_actual_ratio || 95.5,
                 acting_entity_key: p.acting_entity_key || 'thanglong',
-                satecoInternalRevenue: (totalValuePostVat * (p.sateco_contract_ratio || 98) / 100),
+                satecoInternalPreVat: (totalValuePreVat * (p.sateco_contract_ratio || 98) / 100),
+                satecoInternalPostVat: (totalValuePreVat * (p.sateco_contract_ratio || 98) / 100) * (1 + (p.internal_vat_percentage ?? 8) / 100),
+                satecoInternalRevenue: (totalValuePreVat * (p.sateco_contract_ratio || 98) / 100),
                 satecoDueFromGroup: (totalIncome * (p.sateco_contract_ratio || 98) / 100)
             };
         });
@@ -298,14 +300,14 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
             aVal = activeEntity === 'sateco' && a.acting_entity_key !== 'sateco' ? 'Z_SATECO_NB' : (a.partners?.code || a.partners?.short_name || a.client || '');
             bVal = activeEntity === 'sateco' && b.acting_entity_key !== 'sateco' ? 'Z_SATECO_NB' : (b.partners?.code || b.partners?.short_name || b.client || '');
         } else if (sortConfig.key === 'preVat') {
-            aVal = activeEntity === 'sateco' && a.acting_entity_key !== 'sateco' ? a.satecoInternalRevenue / (1 + (a.internal_vat_percentage ?? 8) / 100) : a.totalValuePreVat;
-            bVal = activeEntity === 'sateco' && b.acting_entity_key !== 'sateco' ? b.satecoInternalRevenue / (1 + (b.internal_vat_percentage ?? 8) / 100) : b.totalValuePreVat;
+            aVal = activeEntity === 'sateco' && a.acting_entity_key !== 'sateco' ? a.satecoInternalPreVat : a.totalValuePreVat;
+            bVal = activeEntity === 'sateco' && b.acting_entity_key !== 'sateco' ? b.satecoInternalPreVat : b.totalValuePreVat;
         } else if (sortConfig.key === 'vatPercent') {
             aVal = activeEntity === 'sateco' && a.acting_entity_key !== 'sateco' ? (a.internal_vat_percentage ?? 8) : (a.vat_percentage ?? 8);
             bVal = activeEntity === 'sateco' && b.acting_entity_key !== 'sateco' ? (b.internal_vat_percentage ?? 8) : (b.vat_percentage ?? 8);
         } else if (sortConfig.key === 'postVat') {
-            aVal = activeEntity === 'sateco' && a.acting_entity_key !== 'sateco' ? a.satecoInternalRevenue : a.totalValuePostVat;
-            bVal = activeEntity === 'sateco' && b.acting_entity_key !== 'sateco' ? b.satecoInternalRevenue : b.totalValuePostVat;
+            aVal = activeEntity === 'sateco' && a.acting_entity_key !== 'sateco' ? a.satecoInternalPostVat : a.totalValuePostVat;
+            bVal = activeEntity === 'sateco' && b.acting_entity_key !== 'sateco' ? b.satecoInternalPostVat : b.totalValuePostVat;
         } else if (sortConfig.key === 'code') {
             aVal = a.internal_code || a.code || '';
             bVal = b.internal_code || b.code || '';
@@ -324,7 +326,8 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
 
 
 
-    const totalValueAll = filteredProjects.reduce((s, p) => s + p.totalValuePostVat, 0);
+    const totalPreVatAll = filteredProjects.reduce((s, p) => s + (activeEntity === 'sateco' && p.acting_entity_key !== 'sateco' ? p.satecoInternalPreVat : (p.totalValuePreVat || 0)), 0);
+    const totalValueAll = filteredProjects.reduce((s, p) => s + (activeEntity === 'sateco' && p.acting_entity_key !== 'sateco' ? p.satecoInternalPostVat : p.totalValuePostVat), 0);
     const totalIncomeAll = filteredProjects.reduce((s, p) => s + (p.totalIncome || 0), 0);
     const totalInvoiceAll = filteredProjects.reduce((s, p) => s + (p.totalInvoice || 0), 0);
     const totalRequestedAll = filteredProjects.reduce((s, p) => s + (p.totalRequested || 0), 0);
@@ -605,7 +608,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                             <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl mb-3 border border-slate-100">
                                                 <div>
                                                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Giá trị HĐ (Sau VAT)</p>
-                                                    <p className="text-sm font-black text-blue-700">{fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue : proj.totalValuePostVat)}</p>
+                                                    <p className="text-sm font-black text-blue-700">{fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalPostVat : proj.totalValuePostVat)}</p>
                                                 </div>
                                                 <div>
                                                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Đã Thu</p>
@@ -708,7 +711,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                         </span>
                                                     </td>
                                                     <td className="px-1.5 py-1.5 text-right text-slate-500 border-l border-slate-50">
-                                                        {fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue / (1 + (proj.internal_vat_percentage ?? 8) / 100) : proj.totalValuePreVat)}
+                                                        {fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalPreVat : proj.totalValuePreVat)}
                                                     </td>
                                                     <td className="px-1.5 py-1.5 text-right">
                                                         {activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? (
@@ -727,8 +730,8 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                             )
                                                         )}
                                                     </td>
-                                                    <td className="px-1.5 py-1.5 text-right font-medium text-blue-700 bg-blue-50/10" title={proj.total_approved_variations ? `Gốc: ${fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.totalValuePostVat * (proj.sateco_contract_ratio||98)/100 - ((proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100))*(proj.sateco_contract_ratio||98)/100) : proj.totalValuePostVat - (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)))} + PS: ${fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)) * (proj.sateco_contract_ratio||98)/100 : (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)))}` : ''}>
-                                                        {fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalRevenue : proj.totalValuePostVat)}
+                                                    <td className="px-1.5 py-1.5 text-right font-medium text-blue-700 bg-blue-50/10" title={proj.total_approved_variations ? `Gốc: ${fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalPostVat - ((proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100))*(proj.sateco_contract_ratio||98)/100) : proj.totalValuePostVat - (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)))} + PS: ${fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)) * (proj.sateco_contract_ratio||98)/100 : (proj.total_approved_variations*(1 + (proj.vat_percentage ?? 8) / 100)))}` : ''}>
+                                                        {fmt(activeEntity === 'sateco' && proj.acting_entity_key !== 'sateco' ? proj.satecoInternalPostVat : proj.totalValuePostVat)}
                                                     </td>
                                                     <td className="px-1.5 py-1.5 text-center border-l border-emerald-50 bg-emerald-50/10">
                                                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-black border ${
@@ -815,8 +818,14 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                         </tbody>
                                         <tfoot className="bg-slate-50 border-t-2 border-slate-300 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] relative z-10">
                                             <tr className="divide-x divide-slate-200">
-                                                <td colSpan={3} className="px-2 py-3 text-right pr-4 text-slate-500 uppercase tracking-widest text-[9px] font-black italic bg-slate-100/50">
+                                                <td colSpan={2} className="px-2 py-3 text-right pr-4 text-slate-500 uppercase tracking-widest text-[9px] font-black italic bg-slate-100/50">
                                                     TỔNG HỢP TOÀN BỘ ({filteredProjects.length} DA)
+                                                </td>
+                                                <td className="px-1.5 py-3 text-right text-slate-500 text-[14px] font-black bg-blue-50/10 border-l border-slate-100">
+                                                    {fmt(totalPreVatAll)}
+                                                </td>
+                                                <td className="px-1.5 py-3 text-center text-slate-400 text-[10px] font-black bg-blue-50/10">
+                                                    —
                                                 </td>
                                                 <td className="px-1.5 py-3 text-right text-blue-700 text-[14px] font-black bg-blue-50/30">
                                                     {fmt(totalValueAll)}
@@ -839,8 +848,7 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
                                                 <td className={`px-1.5 py-3 text-right text-[14px] font-black bg-amber-50/20 ${(totalRequestedAll - totalIncomeAll) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
                                                     {fmt(totalRequestedAll - totalIncomeAll)}
                                                 </td>
-                                                <td colSpan={5} className="bg-slate-50"></td>
-
+                                                <td colSpan={4} className="bg-slate-50"></td>
                                             </tr>
                                         </tfoot>
                                     </table>

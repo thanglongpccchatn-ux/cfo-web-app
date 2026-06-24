@@ -109,6 +109,7 @@ const DashboardOverview = () => {
 
                     const approvedVariationsPreVat = parseFloat(p.total_approved_variations) || 0;
 
+                    const totalValuePreVat = baseTotalValuePreVat + approvedVariationsPreVat;
                     const totalValuePostVat = baseTotalValuePostVat + approvedVariationsPreVat * (1 + (p.vat_percentage ?? 8) / 100);
 
                     const totalIncomeFromHistory = projExtHist.reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
@@ -127,7 +128,7 @@ const DashboardOverview = () => {
                         return sum + Math.max(0, reqAmt - incAmt);
                     }, 0);
                     
-                    const satecoInternalRevenue = parseFloat(p.sateco_internal_revenue) || (totalValuePostVat * (parseFloat(p.sateco_contract_ratio || 98) / 100));
+                    const satecoInternalRevenue = parseFloat(p.sateco_internal_revenue) || (totalValuePreVat * (parseFloat(p.sateco_contract_ratio || 98) / 100));
                     const totalExpensesSateco = projIntHist.reduce((sum, h) => sum + (parseFloat(h.amount_spent) || 0), 0);
                     
                     const profit = (totalIncome * (parseFloat(p.sateco_actual_ratio || 95.5) / 100)) - totalExpensesSateco;
