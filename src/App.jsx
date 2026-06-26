@@ -38,6 +38,7 @@ const DocumentTrackingModule = lazy(() => import('./components/DocumentTrackingM
 const PaymentReceiptsModule = lazy(() => import('./components/PaymentReceiptsModule'));
 const WarrantyTracking = lazy(() => import('./components/WarrantyTracking'));
 const PlanningModule = lazy(() => import('./components/PlanningModule'));
+const FinancialAnalyticsHub = lazy(() => import('./components/analytics/FinancialAnalyticsHub'));
 const InventoryManager = lazy(() => import('./components/Inventory/InventoryManager'));
 const Settings = lazy(() => import('./components/Settings'));
 const UserProfile = lazy(() => import('./components/UserProfile'));
@@ -156,6 +157,8 @@ function MainLayout() {
       case 'material_tracking': return { title: 'Theo dõi Vật tư', subtitle: 'Chi phí vật tư hiện trường' };
       case 'supplier_payables': return { title: 'Công nợ NCC Vật tư', subtitle: 'Sổ theo dõi mua hàng & thanh toán nhà cung cấp' };
       case 'expense_tracking': return { title: 'Chi phí Chung', subtitle: 'Quản lý chi phí vận hành & văn phòng' };
+      case 'weekly_expense_plan': return { title: 'Kế hoạch Chi phí', subtitle: 'Theo dõi kế hoạch chi tiêu tuần' };
+      case 'financial-analytics': return { title: 'Phân tích Tài chính', subtitle: 'Báo cáo thông minh' };
       case 'guide': return { title: 'Hướng dẫn sử dụng', subtitle: 'Hướng dẫn chi tiết cho từng vai trò' };
       case 'loans': return { title: 'Quản lý Vay vốn', subtitle: 'Theo dõi khoản vay, lãi suất và trịch sử trả nợ' };
       case 'audit_trail': return { title: 'Nhật ký Hoạt động', subtitle: 'Lịch sử mọi thao tác trong hệ thống' };
@@ -230,6 +233,7 @@ function MainLayout() {
             <Route path="/supplier_payables" element={<ProtectedRoute requiredPerms={['view_materials', 'manage_materials_tracking', 'view_suppliers']} moduleName="Công nợ NCC Vật tư"><SupplierPayables /></ProtectedRoute>} />
             <Route path="/expense_tracking" element={<ProtectedRoute requiredPerms={['view_expenses', 'manage_expenses']}><ExpenseTracking /></ProtectedRoute>} />
             <Route path="/weekly_expense_plan" element={<ProtectedRoute requiredPerms={['view_planning', 'manage_planning']}><WeeklyExpensePlan /></ProtectedRoute>} />
+            <Route path="/financial-analytics" element={<ProtectedRoute requiredPerms={['view_dashboard']}><FinancialAnalyticsHub /></ProtectedRoute>} />
             
             {/* Financial & Inventory Modules */}
             <Route path="/payments" element={<ProtectedRoute requiredPerms={['view_payments']}><PaymentsMaster /></ProtectedRoute>} />
