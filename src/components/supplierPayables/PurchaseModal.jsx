@@ -41,13 +41,31 @@ function ProductAutocomplete({ value, onChange, onSelect, materials, priceMap, i
 
   const LIMIT = 50;
   const matches = useMemo(() => {
-    if (!query || query.length < 1) return materials;
-    const q = removeDiacritics(query.toLowerCase());
-    return materials.filter(m => {
-      const name = removeDiacritics(m.name.toLowerCase());
+    const raw = removeDiacritics(query.trim().toLowerCase());
+    if (!raw) return materials;
+    const tokens = raw.split(/\s+/).filter(Boolean);
+    const scored = [];
+    for (const m of materials) {
+      const name = removeDiacritics((m.name || '').toLowerCase());
       const code = removeDiacritics((m.code || '').toLowerCase());
-      return name.includes(q) || code.includes(q);
-    });
+      const brand = removeDiacritics((m.brand || '').toLowerCase());
+      const model = removeDiacritics((m.model || '').toLowerCase());
+      const hay = `${name} ${code} ${brand} ${model}`;
+      // AND: mọi từ khóa đều phải xuất hiện đâu đó trong tên/mã/hãng/model
+      if (!tokens.every(t => hay.includes(t))) continue;
+      // Xếp hạng: khớp nguyên cụm > đầu tên > vị trí sớm > tên ngắn gọn
+      let score = 0;
+      if (name.startsWith(raw)) score += 100;
+      else if (name.includes(raw)) score += 60;
+      else if (code.includes(raw)) score += 40;
+      const pos = name.indexOf(tokens[0]);
+      if (pos >= 0) score += Math.max(0, 25 - pos);
+      score += tokens.filter(t => name.includes(t)).length * 5; // ưu tiên trùng ở TÊN hơn mã/hãng
+      score -= name.length * 0.02;                              // tên gọn = sát hơn
+      scored.push({ m, score });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map(s => s.m);
   }, [query, materials]);
   const filtered = matches.slice(0, LIMIT);
   const hasExact = useMemo(() => {

@@ -233,12 +233,23 @@ export default function MaterialsMaster() {
     // Tìm kiếm bỏ dấu, đa trường + lọc nhóm
     const filteredList = useMemo(() => {
         const q = normVN(searchQuery).trim();
-        return materials.filter(m => {
-            if (catFilter && m.category_code !== catFilter) return false;
-            if (!q) return true;
-            return normVN(m.name).includes(q) || normVN(m.code).includes(q) ||
-                normVN(m.category_code).includes(q) || normVN(m.brand).includes(q) || normVN(m.model).includes(q);
-        });
+        const tokens = q.split(/\s+/).filter(Boolean);
+        const pool = catFilter ? materials.filter(m => m.category_code === catFilter) : materials;
+        if (!tokens.length) return pool;
+        const scored = [];
+        for (const m of pool) {
+            const name = normVN(m.name);
+            const hay = `${name} ${normVN(m.code)} ${normVN(m.category_code)} ${normVN(m.brand)} ${normVN(m.model)}`;
+            if (!tokens.every(t => hay.includes(t))) continue; // AND: mọi từ khóa đều phải có
+            let score = name.startsWith(q) ? 100 : name.includes(q) ? 60 : 0;
+            const pos = name.indexOf(tokens[0]);
+            if (pos >= 0) score += Math.max(0, 25 - pos);
+            score += tokens.filter(t => name.includes(t)).length * 5;
+            score -= name.length * 0.02;
+            scored.push({ m, score });
+        }
+        scored.sort((a, b) => b.score - a.score);
+        return scored.map(s => s.m);
     }, [materials, searchQuery, catFilter]);
 
     // Phân trang: chọn số dòng hiển thị + "Xem thêm"
