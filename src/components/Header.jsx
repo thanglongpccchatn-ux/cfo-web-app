@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import NotificationBell from './NotificationBell';
 import GlobalSearch from './GlobalSearch';
+import Icon from './common/Icon';
 
 export default function Header({ title, subtitle, onAction, isSidebarOpen, setIsSidebarOpen }) {
     const { profile, logout } = useAuth();
@@ -17,7 +18,7 @@ export default function Header({ title, subtitle, onAction, isSidebarOpen, setIs
                   aria-label={isSidebarOpen ? 'Đóng menu' : 'Mở menu'}
                   aria-expanded={isSidebarOpen}
                 >
-                    <span className="material-symbols-outlined notranslate" translate="no">menu</span>
+                    <Icon name="menu" size={24} />
                 </button>
                 <div>
                     <h2 className="text-base md:text-lg font-bold text-slate-900 dark:text-white truncate max-w-[150px] sm:max-w-none">{title}</h2>
@@ -31,7 +32,7 @@ export default function Header({ title, subtitle, onAction, isSidebarOpen, setIs
                         </button>
                         {title !== 'Tổng quan Dòng tiền' && (
                             <>
-                                <span className="material-symbols-outlined notranslate text-[10px] text-slate-300" translate="no">chevron_right</span>
+                                <Icon name="chevron_right" size={12} className="text-slate-300" />
                                 <span className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 truncate max-w-[120px] sm:max-w-none font-medium">{subtitle}</span>
                             </>
                         )}
@@ -50,7 +51,7 @@ export default function Header({ title, subtitle, onAction, isSidebarOpen, setIs
                         aria-label="Tạo hợp đồng mới"
                         className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-4 py-1.5 md:py-2 bg-primary hover:bg-blue-600 text-white rounded-full text-xs md:text-sm font-semibold shadow-md shadow-blue-500/20 transition-all"
                     >
-                        <span className="material-symbols-outlined notranslate text-[16px] md:text-[18px]" translate="no">add</span>
+                        <Icon name="add" size={18} />
                         <span className="hidden sm:inline">Tạo hợp đồng</span>
                         <span className="sm:hidden">Tạo Mới</span>
                     </button>
@@ -70,7 +71,7 @@ export default function Header({ title, subtitle, onAction, isSidebarOpen, setIs
                             {profile?.avatar_url ? (
                                 <img src={profile.avatar_url} alt={profile?.full_name || 'Avatar'} className="w-full h-full object-cover" />
                             ) : (
-                                <span className="material-symbols-outlined notranslate text-[18px] md:text-[24px]" translate="no">person</span>
+                                <Icon name="person" size={22} />
                             )}
                         </div>
                     </button>
@@ -80,7 +81,7 @@ export default function Header({ title, subtitle, onAction, isSidebarOpen, setIs
                         aria-label="Đăng xuất khỏi hệ thống"
                         className="hidden md:flex w-9 h-9 items-center justify-center rounded-full hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors ml-1"
                     >
-                        <span className="material-symbols-outlined notranslate text-[20px]" translate="no">logout</span>
+                        <Icon name="logout" size={20} />
                     </button>
                 </div>
             </div>

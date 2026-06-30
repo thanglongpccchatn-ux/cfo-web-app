@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
 import { smartToast } from '../utils/globalToast';
 import { fmt } from '../utils/formatters';
+
+// Chuẩn hóa bỏ dấu tiếng Việt cho tìm kiếm
+const normVN = (s) => (s ?? '').toString().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
 
 const EMPTY_MATERIAL = {
     code: '',
@@ -81,9 +84,19 @@ export default function MaterialsMaster() {
     const { data: materials = [], isLoading: loading } = useQuery({
         queryKey: ['materialsMasterData'],
         queryFn: async () => {
-            const { data, error } = await supabase.from('materials').select('*').order('name', { ascending: true });
-            if (error) { console.error('Lỗi tải vật tư:', error); return []; }
-            return data || [];
+            // Tải theo từng trang 1000 rồi ghép → vượt giới hạn "Max rows" của Supabase
+            const CHUNK = 1000;
+            const all = [];
+            for (let from = 0; ; from += CHUNK) {
+                const { data, error } = await supabase
+                    .from('materials').select('*')
+                    .order('name', { ascending: true })
+                    .range(from, from + CHUNK - 1);
+                if (error) { console.error('Lỗi tải vật tư:', error); break; }
+                all.push(...(data || []));
+                if (!data || data.length < CHUNK) break;   // hết dữ liệu
+            }
+            return all;
         },
         staleTime: 2 * 60 * 1000,
     });
@@ -204,10 +217,35 @@ export default function MaterialsMaster() {
         }
     };
 
-    const filteredList = materials.filter(m => 
-        (m.name && m.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (m.code && m.code.toLowerCase().includes(searchQuery.toLowerCase()))
+    // Lọc theo nhóm: danh sách nhóm có trong dữ liệu (label theo material_categories)
+    const [catFilter, setCatFilter] = useState('');
+    const catNameByCode = useMemo(
+        () => Object.fromEntries((optionsData?.categories || []).map(c => [c.code, c.name])),
+        [optionsData]
     );
+    const categoryOptions = useMemo(() => {
+        const codes = [...new Set(materials.map(m => m.category_code).filter(Boolean))];
+        return codes
+            .map(code => ({ code, name: catNameByCode[code] || code }))
+            .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+    }, [materials, catNameByCode]);
+
+    // Tìm kiếm bỏ dấu, đa trường + lọc nhóm
+    const filteredList = useMemo(() => {
+        const q = normVN(searchQuery).trim();
+        return materials.filter(m => {
+            if (catFilter && m.category_code !== catFilter) return false;
+            if (!q) return true;
+            return normVN(m.name).includes(q) || normVN(m.code).includes(q) ||
+                normVN(m.category_code).includes(q) || normVN(m.brand).includes(q) || normVN(m.model).includes(q);
+        });
+    }, [materials, searchQuery, catFilter]);
+
+    // Phân trang: chọn số dòng hiển thị + "Xem thêm"
+    const PAGE_OPTIONS = [50, 100, 200, 500, 1000];
+    const [perPage, setPerPage] = useState(100);
+    useEffect(() => { setPerPage(100); }, [searchQuery, catFilter]);
+    const visibleList = filteredList.slice(0, perPage);
 
     const toggleSelect = (id) => {
         const newSet = new Set(selectedIds);
@@ -323,20 +361,42 @@ export default function MaterialsMaster() {
 
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex flex-col md:flex-row md:justify-between items-center gap-4 bg-slate-50/50 dark:bg-slate-800/50">
-                    <h3 className="font-bold text-slate-700 dark:text-slate-300">Danh sách Vật tư ({materials.length})</h3>
-                    <div className="relative w-full md:w-80">
-                        <span className="material-symbols-outlined notranslate absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]" translate="no">search</span>
-                        <input
-                            type="text"
-                            placeholder="Tìm mã hoặc tên Vật tư..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 pr-4 py-2 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-all shadow-sm outline-none"
-                        />
+                    <h3 className="font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">Danh sách Vật tư ({(searchQuery || catFilter) ? `${filteredList.length}/${materials.length}` : materials.length})</h3>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+                        {/* Lọc theo nhóm */}
+                        <select
+                            value={catFilter}
+                            onChange={(e) => setCatFilter(e.target.value)}
+                            className="py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none focus:ring-2 focus:ring-primary max-w-[220px]"
+                            title="Lọc theo nhóm vật tư"
+                        >
+                            <option value="">Tất cả nhóm ({categoryOptions.length})</option>
+                            {categoryOptions.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                        </select>
+                        {/* Tìm kiếm */}
+                        <div className="relative w-full sm:w-72">
+                            <span className="material-symbols-outlined notranslate absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]" translate="no">search</span>
+                            <input
+                                type="text"
+                                placeholder="Tìm tên / mã / hãng / model..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9 pr-4 py-2 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-all shadow-sm outline-none"
+                            />
+                        </div>
+                        {/* Số dòng hiển thị */}
+                        <select
+                            value={perPage}
+                            onChange={(e) => setPerPage(Number(e.target.value))}
+                            className="py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none focus:ring-2 focus:ring-primary"
+                            title="Số dòng hiển thị mỗi trang"
+                        >
+                            {PAGE_OPTIONS.map(n => <option key={n} value={n}>{n}/trang</option>)}
+                        </select>
                     </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="overflow-auto max-h-[68vh]">
                     {filteredList.length === 0 ? (
                         <div className="text-center py-20 text-slate-400">
                             <span className="material-symbols-outlined notranslate text-6xl block mb-4 opacity-20" translate="no">inventory</span>
@@ -345,7 +405,7 @@ export default function MaterialsMaster() {
                         </div>
                     ) : (
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase tracking-wider text-[11px] font-bold border-b border-slate-100 dark:border-slate-700 whitespace-nowrap">
+                            <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-900 text-slate-500 uppercase tracking-wider text-[11px] font-bold border-b border-slate-200 dark:border-slate-700 whitespace-nowrap shadow-sm">
                                 <tr>
                                     <th className="px-4 py-4 text-center w-12">
                                         <input 
@@ -366,7 +426,7 @@ export default function MaterialsMaster() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                {filteredList.map((m) => {
+                                {visibleList.map((m) => {
                                     const isExpanded = expandedMaterialId === m.id;
                                     return (
                                     <React.Fragment key={m.id}>
@@ -520,6 +580,16 @@ export default function MaterialsMaster() {
                                 })}
                             </tbody>
                         </table>
+                    )}
+                    {filteredList.length > perPage && (
+                        <div className="p-4 flex justify-center border-t border-slate-100 dark:border-slate-700">
+                            <button
+                                onClick={() => setPerPage(c => c + 200)}
+                                className="px-5 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                            >
+                                Xem thêm ({filteredList.length - perPage} vật tư còn lại)
+                            </button>
+                        </div>
                     )}
                 </div>
             </div>

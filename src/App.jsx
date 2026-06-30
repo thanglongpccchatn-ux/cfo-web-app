@@ -10,6 +10,7 @@ import { NotificationProvider } from './context/NotificationContext';
 import Login from './components/Login';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import ModuleErrorBoundary from './components/common/ModuleErrorBoundary';
+import CommandPalette from './components/common/CommandPalette';
 import { applyBrandTheme, currentTheme } from './config/brand';
 import { supabase } from './lib/supabase';
 import { EventBus } from './lib/eventBus';
@@ -194,6 +195,7 @@ function MainLayout() {
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden font-sans relative">
+      <CommandPalette />
       <a href="#main-content" className="skip-to-content">Bỏ qua đến nội dung chính</a>
       {isSidebarOpen && (
         <div 

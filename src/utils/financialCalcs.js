@@ -42,12 +42,19 @@ export function computeProjectFinancials(project, payments = [], extHistory = []
 
     // ── Debts (Công nợ) ──
     const debtInvoice = totalInvoice - totalIncome;       // Đã xuất HĐ - Thực thu
-    const debtRequested = totalRequested - totalIncome;    // Đề nghị - Thực thu
+    // Công nợ đề nghị: kẹp âm theo TỪNG đợt thanh toán (không bù trừ đợt thu vượt sang đợt khác)
+    // — đồng bộ với DashboardOverview (nguồn live), chính xác hơn cách gộp (totalRequested - totalIncome).
+    const debtRequested = payments.reduce((s, pm) =>
+        s + Math.max(0, (parseFloat(pm.payment_request_amount) || 0) - (parseFloat(pm.external_income) || 0)), 0);
 
     // ── Sateco Revenue Sharing ──
+    // Khoán nội bộ Sateco áp tỷ lệ trên giá trị PRE-VAT (gốc + phát sinh đã duyệt),
+    // KHÔNG phải post-VAT — đồng bộ với DashboardOverview, ContractMasterDetail và
+    // commit "apply ratio on Pre-VAT instead of Post-VAT".
     const contractRatio = parseFloat(p.sateco_contract_ratio || 98) / 100;
     const actualRatio = parseFloat(p.sateco_actual_ratio || 95.5) / 100;
-    const satecoInternalRevenue = parseFloat(p.sateco_internal_revenue) || (totalValuePostVat * contractRatio);
+    const totalValuePreVat = originalValue + approvedVariations;
+    const satecoInternalRevenue = parseFloat(p.sateco_internal_revenue) || (totalValuePreVat * contractRatio);
 
     // ── Expenses (Chi phí Sateco) ──
     const totalExpenses = intHistory.reduce((s, h) => s + (parseFloat(h.amount_spent) || 0), 0);

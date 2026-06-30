@@ -12,11 +12,16 @@ export function calculateVAT(preVatValue: number | string, vatPercentage: number
     };
 }
 
-export function calculateSatecoRevenue(postVatValue: number | string, contractRatio: number | string = 98, customRevenue: number | string | null = null): number {
+/**
+ * Doanh thu khoán nội bộ Sateco = giá trị PRE-VAT × tỷ lệ khoán.
+ * LƯU Ý: truyền vào giá trị PRE-VAT (gốc + phát sinh), KHÔNG phải post-VAT
+ * (theo commit "apply ratio on Pre-VAT instead of Post-VAT").
+ */
+export function calculateSatecoRevenue(preVatValue: number | string, contractRatio: number | string = 98, customRevenue: number | string | null = null): number {
     if (customRevenue != null && parseFloat(customRevenue as string) > 0) {
         return parseFloat(customRevenue as string);
     }
-    return (parseFloat(postVatValue as string) || 0) * (parseFloat(contractRatio as string) / 100);
+    return (parseFloat(preVatValue as string) || 0) * (parseFloat(contractRatio as string) / 100);
 }
 
 export function calculateGrossProfit(totalIncome: number | string, actualRatio: number | string = 95.5, totalExpenses: number | string = 0): number {

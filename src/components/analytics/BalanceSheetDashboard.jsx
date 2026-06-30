@@ -147,7 +147,7 @@ function BSCard({ title, value, subtitle, color }) {
 
 function AccountRow({ code, name, amount, isHeader, indent = 0 }) {
     return (
-        <div className={`flex justify-between items-center py-1.5 ${isHeader ? 'mt-2' : ''}`} style={{ paddingLeft: `${indent * 1rem}px` }}>
+        <div className={`flex justify-between items-center py-1.5 ${isHeader ? 'mt-2' : ''}`} style={{ paddingLeft: `${indent}rem` }}>
             <div className="flex items-center gap-2">
                 <span className={`text-xs ${isHeader ? 'font-black text-slate-800' : 'font-bold text-slate-400 w-8'}`}>{code}</span>
                 <span className={`text-sm ${isHeader ? 'font-black text-slate-800' : 'font-medium text-slate-600'}`}>{name}</span>
