@@ -16,11 +16,11 @@ const emptyLine = () => ({ product_name: '', material_group: '', unit: 'cái', q
 /* ── Autocomplete Input (có điều hướng bàn phím ↑/↓/Enter/Esc) ── */
 function ProductAutocomplete({ value, onChange, onSelect, materials, priceMap, inputId, onPicked, onCreateNew }) {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState(value || '');
   const [active, setActive] = useState(0);
   const [rect, setRect] = useState(null);   // vị trí dropdown (portal, tránh bị cắt)
   const ref = useRef(null);
   const listRef = useRef(null);
+  const query = value || '';   // fully controlled: parent (line.product_name) là nguồn duy nhất
 
   const openList = () => {
     const r = ref.current?.getBoundingClientRect();
@@ -28,7 +28,6 @@ function ProductAutocomplete({ value, onChange, onSelect, materials, priceMap, i
     setOpen(true);
   };
 
-  useEffect(() => { setQuery(value || ''); }, [value]);
   useEffect(() => {
     const handler = (e) => {
       const inBox = ref.current?.contains(e.target);
@@ -74,7 +73,7 @@ function ProductAutocomplete({ value, onChange, onSelect, materials, priceMap, i
   }, [materials, query]);
   const canCreate = onCreateNew && query.trim().length > 0 && !hasExact;
 
-  const choose = (m) => { onSelect(m); setOpen(false); setQuery(m.name); onPicked?.(); };
+  const choose = (m) => { onSelect(m); setOpen(false); onPicked?.(); };  // onSelect cập nhật product_name (=value)
 
   const onKeyDown = (e) => {
     if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { setOpen(true); return; }
@@ -93,7 +92,7 @@ function ProductAutocomplete({ value, onChange, onSelect, materials, priceMap, i
   return (
     <div className="relative" ref={ref}>
       <input type="text" value={query} id={inputId}
-        onChange={e => { setQuery(e.target.value); onChange(e.target.value); openList(); setActive(0); }}
+        onChange={e => { onChange(e.target.value); openList(); setActive(0); }}
         onFocus={openList}
         onKeyDown={onKeyDown}
         placeholder="Gõ tên vật tư... (↑↓ chọn, Enter)"

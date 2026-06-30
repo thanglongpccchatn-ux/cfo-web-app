@@ -492,9 +492,11 @@ export default function MaterialsMaster() {
                                               <button onClick={() => handleEditManual(m)} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors">
                                                   <span className="material-symbols-outlined notranslate text-[18px]" translate="no">edit</span>
                                               </button>
-                                              <button onClick={() => handleDelete(m.id, m.name)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors">
-                                                  <span className="material-symbols-outlined notranslate text-[18px]" translate="no">delete</span>
-                                              </button>
+                                              {canDelete && (
+                                                <button onClick={() => handleDelete(m.id, m.name)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors">
+                                                    <span className="material-symbols-outlined notranslate text-[18px]" translate="no">delete</span>
+                                                </button>
+                                              )}
                                             </div>
                                         </td>
                                     </tr>
