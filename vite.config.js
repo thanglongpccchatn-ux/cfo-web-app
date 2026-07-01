@@ -6,7 +6,12 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',   // SW mới tự kích hoạt + reload sau mỗi deploy (không kẹt bản cache cũ)
+      workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
+      },
       includeAssets: ['logo.png', 'favicon.svg'],
       manifest: {
         name: 'SATECO CFO Dashboard',
