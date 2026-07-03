@@ -142,7 +142,7 @@ function MainLayout() {
       case 'contracts': return { title: 'Quản lý Hợp đồng', subtitle: 'Danh sách và chi tiết dự án' };
       case 'doc_tracking': return { title: 'Hồ sơ & Thanh toán', subtitle: `${currentTheme.company_name}` };
       case 'payment_receipts': return { title: 'Lịch sử thu tiền', subtitle: `${currentTheme.company_name}` };
-      case 'suppliers': return { title: 'Nhà cung cấp & Vật tư', subtitle: 'Theo dõi đối tác và nhật ký nhập vật tư' };
+      case 'suppliers': return { title: 'Nhà cung cấp', subtitle: 'Danh mục & theo dõi nhà cung cấp vật tư' };
       case 'subcontractors': return { title: 'Nhà thầu phụ / Tổ đội', subtitle: 'Bảng theo dõi công nợ thầu phụ' };
       case 'materials': return { title: 'Danh mục Vật tư', subtitle: 'Quản lý danh pháp vật tư chung' };
       case 'planning_hub': return { title: 'Kế hoạch & Báo cáo', subtitle: 'Kế hoạch dòng tiền tạm tính' };
@@ -156,7 +156,7 @@ function MainLayout() {
       case 'bidding': return { title: 'Theo dõi Báo giá / Đấu thầu', subtitle: 'Quản lý vòng đời đấu thầu và phiên bản báo giá' };
       case 'labor_tracking': return { title: 'Theo dõi Nhân công', subtitle: 'Chi phí thầu phụ và nhân công' };
       case 'material_tracking': return { title: 'Theo dõi Vật tư', subtitle: 'Chi phí vật tư hiện trường' };
-      case 'supplier_payables': return { title: 'Công nợ NCC Vật tư', subtitle: 'Sổ theo dõi mua hàng & thanh toán nhà cung cấp' };
+      case 'supplier_payables': return { title: 'Mua hàng & Công nợ NCC', subtitle: 'Sổ theo dõi mua hàng & thanh toán nhà cung cấp' };
       case 'expense_tracking': return { title: 'Chi phí Chung', subtitle: 'Quản lý chi phí vận hành & văn phòng' };
       case 'weekly_expense_plan': return { title: 'Kế hoạch Chi phí', subtitle: 'Theo dõi kế hoạch chi tiêu tuần' };
       case 'financial-analytics': return { title: 'Phân tích Tài chính', subtitle: 'Báo cáo thông minh' };
@@ -239,10 +239,10 @@ function MainLayout() {
             
             {/* Financial & Inventory Modules */}
             <Route path="/payments" element={<ProtectedRoute requiredPerms={['view_payments']}><PaymentsMaster /></ProtectedRoute>} />
-            <Route path="/suppliers" element={<ProtectedRoute requiredPerms={['view_suppliers', 'view_payments']}><SuppliersMaster /></ProtectedRoute>} />
+            <Route path="/suppliers" element={<ProtectedRoute requiredPerms={['view_materials', 'view_suppliers', 'manage_partners']}><SuppliersMaster /></ProtectedRoute>} />
             <Route path="/subcontractors" element={<Navigate to="/labor_subcontractors?tab=master" replace />} />
-            <Route path="/materials" element={<ProtectedRoute requiredPerms={['view_materials', 'view_payments']}><MaterialsMaster /></ProtectedRoute>} />
-            <Route path="/inventory" element={<ProtectedRoute requiredPerms={['view_materials']}><InventoryManager /></ProtectedRoute>} />
+            <Route path="/materials" element={<ProtectedRoute requiredPerms={['view_materials', 'manage_materials', 'edit_materials_master']}><MaterialsMaster /></ProtectedRoute>} />
+            <Route path="/inventory" element={<ProtectedRoute requiredPerms={['view_materials', 'import_inventory', 'export_inventory', 'manage_materials']}><InventoryManager /></ProtectedRoute>} />
             
             {/* Other Modules */}
             <Route path="/planning_hub" element={<ProtectedRoute requiredPerms={['view_planning', 'manage_planning']}><PlanningModule /></ProtectedRoute>} />

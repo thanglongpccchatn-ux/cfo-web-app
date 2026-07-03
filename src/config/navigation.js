@@ -57,23 +57,30 @@ export const NAV_GROUPS = [
         key: 'operations', label: 'Vận hành', icon: 'construction',
         items: [
             { id: 'labor_subcontractors', icon: 'engineering', label: 'Tổ đội & Thầu phụ', perms: ['view_labor', 'manage_labor', 'view_subcontractors'] },
-            { id: 'suppliers', icon: 'local_shipping', label: 'Nhà cung cấp', perms: ['view_partners', 'manage_partners', 'view_materials', 'manage_materials_tracking'] },
-            { id: 'supplier_payables', icon: 'request_quote', label: 'Công nợ NCC', perms: ['view_materials', 'manage_materials_tracking', 'view_suppliers'] },
-            { id: 'inventory', icon: 'warehouse', label: 'Kho vật tư', perms: ['view_inventory', 'import_inventory', 'export_inventory', 'manage_materials'] },
             { id: 'task_management', icon: 'task_alt', label: 'Quản lý Công việc', perms: ['*'] },
-            { id: 'site_diary', icon: 'edit_calendar', label: 'Nhật ký', perms: ['view_construction', 'manage_construction'] },
+            { id: 'site_diary', icon: 'edit_calendar', label: 'Nhật ký thi công', perms: ['view_construction', 'manage_construction'] },
             { id: 'construction', icon: 'build', label: 'Thi công', perms: ['view_construction', 'manage_construction'] },
+        ],
+    },
+    {
+        // Khu VẬT TƯ riêng cho bộ phận vật tư: danh mục NCC + danh mục vật tư + mua hàng + kho.
+        // Gate chung bằng view_materials (chỉ người được phân quyền vật tư mới vào); admin luôn thấy.
+        key: 'materials_group', label: 'Vật tư', icon: 'inventory_2',
+        items: [
+            { id: 'suppliers', icon: 'local_shipping', label: 'Nhà cung cấp', perms: ['view_materials', 'view_suppliers', 'manage_partners'] },
+            { id: 'materials', icon: 'category', label: 'Danh mục Vật tư', perms: ['view_materials', 'manage_materials', 'edit_materials_master'] },
+            { id: 'supplier_payables', icon: 'request_quote', label: 'Mua hàng & Công nợ NCC', perms: ['view_materials', 'manage_materials_tracking', 'view_suppliers'] },
+            { id: 'inventory', icon: 'warehouse', label: 'Kho vật tư', perms: ['view_materials', 'import_inventory', 'export_inventory', 'manage_materials'] },
         ],
     },
 ];
 
 export const SYSTEM_TABS = [
     { id: 'partners', icon: 'handshake', label: 'Danh mục Dự án / Khác', perms: ['manage_users'] },
-    { id: 'materials', icon: 'inventory_2', label: 'Danh mục Vật tư', perms: ['manage_materials', 'view_inventory'] },
     { id: 'settings', icon: 'settings', label: 'Cài đặt', perms: ['manage_users', 'manage_settings'] },
     { id: 'permissions', icon: 'admin_panel_settings', label: 'Phân quyền', perms: ['manage_users'] },
     { id: 'users', icon: 'person', label: 'Người dùng', perms: ['manage_users'] },
-    { id: 'audit_trail', icon: 'history', label: 'Nhật ký', perms: ['manage_users'] },
+    { id: 'audit_trail', icon: 'history', label: 'Nhật ký hệ thống', perms: ['manage_users'] },
     { id: 'guide', icon: 'help_center', label: 'Hướng dẫn', perms: ['*'] },
 ];
 
