@@ -145,10 +145,13 @@ export default function UserManagement() {
                 if (error) throw error;
                 if (data && data.success === false) throw new Error(data.error || 'Lỗi tạo người dùng.');
 
-                // After creating, also insert additional roles if more than 1
-                if (data?.user_id && form.role_codes.length > 1) {
-                    const extraRoles = form.role_codes.slice(1).map(rc => ({ user_id: data.user_id, role_code: rc }));
-                    await supabase.from('user_roles').insert(extraRoles);
+                // Đồng bộ TẤT CẢ vai trò vào user_roles — get_user_permissions đọc bảng này,
+                // KHÔNG đọc profiles.role_code. upsert idempotent phòng khi admin_create_user đã tự thêm vai trò chính.
+                if (data?.user_id && form.role_codes.length > 0) {
+                    const inserts = form.role_codes.map(rc => ({ user_id: data.user_id, role_code: rc }));
+                    const { error: rolesErr } = await supabase.from('user_roles')
+                        .upsert(inserts, { onConflict: 'user_id,role_code', ignoreDuplicates: true });
+                    if (rolesErr) throw rolesErr;
                 }
                 smartToast('Thêm tài khoản mới thành công!');
             }
@@ -250,10 +253,11 @@ export default function UserManagement() {
                 if (error) throw error;
                 if (data?.success === false) throw new Error(data.error);
 
-                // Insert additional roles
-                if (data?.user_id && row.role_codes.length > 1) {
-                    const extraRoles = row.role_codes.slice(1).map(rc => ({ user_id: data.user_id, role_code: rc }));
-                    await supabase.from('user_roles').insert(extraRoles);
+                // Đồng bộ TẤT CẢ vai trò vào user_roles (kể cả vai trò chính) — idempotent
+                if (data?.user_id && row.role_codes.length > 0) {
+                    const inserts = row.role_codes.map(rc => ({ user_id: data.user_id, role_code: rc }));
+                    await supabase.from('user_roles')
+                        .upsert(inserts, { onConflict: 'user_id,role_code', ignoreDuplicates: true });
                 }
 
                 importData[i].status = 'success';
@@ -343,7 +347,7 @@ export default function UserManagement() {
     };
 
     // Rút khỏi dự án — no confirm dialog, direct action
-    const handleRemoveProject = async (assignmentId, projectCode) => {
+    const handleRemoveProject = async (assignmentId) => {
         setIsTransferring(true);
         try {
             const { error: rmErr } = await supabase.from('staff_assignments')
