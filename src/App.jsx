@@ -264,7 +264,7 @@ function MainLayout() {
             <Route path="/cashflow_plan" element={<ProtectedRoute requiredPerms={['view_cashflow_plan', 'manage_cashflow_plan']}><CashFlowPlan /></ProtectedRoute>} />
             <Route path="/material_plan" element={<ProtectedRoute requiredPerms={['manage_materials_tracking']}><MaterialPlan /></ProtectedRoute>} />
             <Route path="/construction" element={<ProtectedRoute requiredPerms={['view_construction']}><ConstructionModule /></ProtectedRoute>} />
-            <Route path="/task_management" element={<ProtectedRoute requiredPerms={['view_dashboard']}><TaskManagement /></ProtectedRoute>} />
+            <Route path="/task_management" element={<ProtectedRoute requiredPerms={[]}><TaskManagement /></ProtectedRoute>} />
             <Route path="/chat" element={<ProtectedRoute moduleName="Tin nhắn nội bộ"><ChatModule /></ProtectedRoute>} />
             <Route path="/partners" element={<ProtectedRoute requiredPerms={['manage_partners']}><PartnerManagement /></ProtectedRoute>} />
             <Route path="/permissions" element={<ProtectedRoute requiredPerms={['manage_users']}><RoleManagement /></ProtectedRoute>} />
