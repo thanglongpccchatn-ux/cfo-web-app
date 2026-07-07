@@ -34,7 +34,7 @@ export const NAV_GROUPS = [
     {
         key: 'finance', label: 'Tài chính', icon: 'account_balance',
         items: [
-            { id: 'cashflow_plan', icon: 'savings', label: 'Kế hoạch Dòng tiền', perms: ['view_cashflow_plan', 'manage_cashflow_plan', 'edit_payments', 'manage_loans', 'manage_materials_tracking', 'manage_labor', 'manage_expenses'] },
+            { id: 'cashflow_plan', icon: 'savings', label: 'Kế hoạch Dòng tiền', perms: ['view_cashflow_plan', 'manage_cashflow_plan'] },
             { id: 'weekly_expense_plan', icon: 'view_week', label: 'Kế hoạch Chi Tuần', perms: ['view_expenses', 'view_planning'] },
             { id: 'expense_tracking', icon: 'receipt_long', label: 'Chi phí Chung', perms: ['view_expenses', 'manage_expenses'] },
             { id: 'loans', icon: 'account_balance_wallet', label: 'Vay vốn', perms: ['view_loans', 'manage_loans'] },
@@ -68,6 +68,7 @@ export const NAV_GROUPS = [
         // Gate chung bằng view_materials (chỉ người được phân quyền vật tư mới vào); admin luôn thấy.
         key: 'materials_group', label: 'Vật tư', icon: 'inventory_2',
         items: [
+            { id: 'material_plan', icon: 'savings', label: 'Kế hoạch Vật liệu', perms: ['manage_materials_tracking'] },
             { id: 'suppliers', icon: 'local_shipping', label: 'Nhà cung cấp', perms: ['view_materials', 'view_suppliers', 'manage_partners'] },
             { id: 'materials', icon: 'category', label: 'Danh mục Vật tư', perms: ['view_materials', 'manage_materials', 'edit_materials_master'] },
             { id: 'supplier_payables', icon: 'request_quote', label: 'Mua hàng & Công nợ NCC', perms: ['view_materials', 'manage_materials_tracking', 'view_suppliers'] },

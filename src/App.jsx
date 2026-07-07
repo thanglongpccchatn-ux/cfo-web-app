@@ -40,6 +40,7 @@ const PaymentReceiptsModule = lazy(() => import('./components/PaymentReceiptsMod
 const WarrantyTracking = lazy(() => import('./components/WarrantyTracking'));
 const PlanningModule = lazy(() => import('./components/PlanningModule'));
 const CashFlowPlan = lazy(() => import('./components/CashFlowPlan'));
+const MaterialPlan = lazy(() => import('./components/MaterialPlan'));
 const FinancialAnalyticsHub = lazy(() => import('./components/analytics/FinancialAnalyticsHub'));
 const InventoryManager = lazy(() => import('./components/Inventory/InventoryManager'));
 const Settings = lazy(() => import('./components/Settings'));
@@ -66,7 +67,18 @@ const EInvoiceManagement = lazy(() => import('./components/accounting/EInvoiceMa
 const BudgetManagement = lazy(() => import('./components/accounting/BudgetManagement'));
 const RecurringTemplates = lazy(() => import('./components/accounting/RecurringTemplates'));
 
-const queryClient = new QueryClient();
+// Mặc định: dữ liệu "tươi" trong 2 phút → chuyển trang không refetch (nhanh, đỡ tải Supabase).
+// Mutation vẫn invalidate như cũ nên số liệu vẫn cập nhật khi sửa. Tắt refetch khi focus lại tab.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 2 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 // Premium Coming Soon Component
 function ComingSoon({ title = 'Module' }) {
@@ -148,6 +160,7 @@ function MainLayout() {
       case 'materials': return { title: 'Danh mục Vật tư', subtitle: 'Quản lý danh pháp vật tư chung' };
       case 'planning_hub': return { title: 'Kế hoạch & Báo cáo', subtitle: 'Kế hoạch dòng tiền tạm tính' };
       case 'cashflow_plan': return { title: 'Kế hoạch Dòng tiền', subtitle: 'Thu - chi theo tháng/quý/năm (kế hoạch vs thực tế)' };
+      case 'material_plan': return { title: 'Kế hoạch Vật liệu', subtitle: 'Bộ phận vật tư lập kế hoạch chi vật liệu theo dự án' };
       case 'inventory': return { title: 'Kho vật tư', subtitle: 'Quản lý kho vật tư công trình' };
       case 'settings': return { title: 'Cài đặt hệ thống', subtitle: 'Cấu hình giao diện và thông số chung' };
       case 'permissions': return { title: 'Phân quyền rủi ro', subtitle: 'Cấu hình quyền hệ thống' };
@@ -248,7 +261,8 @@ function MainLayout() {
             
             {/* Other Modules */}
             <Route path="/planning_hub" element={<ProtectedRoute requiredPerms={['view_planning', 'manage_planning']}><PlanningModule /></ProtectedRoute>} />
-            <Route path="/cashflow_plan" element={<ProtectedRoute requiredPerms={['view_cashflow_plan', 'manage_cashflow_plan', 'edit_payments', 'manage_loans', 'manage_materials_tracking', 'manage_labor', 'manage_expenses']}><CashFlowPlan /></ProtectedRoute>} />
+            <Route path="/cashflow_plan" element={<ProtectedRoute requiredPerms={['view_cashflow_plan', 'manage_cashflow_plan']}><CashFlowPlan /></ProtectedRoute>} />
+            <Route path="/material_plan" element={<ProtectedRoute requiredPerms={['manage_materials_tracking']}><MaterialPlan /></ProtectedRoute>} />
             <Route path="/construction" element={<ProtectedRoute requiredPerms={['view_construction']}><ConstructionModule /></ProtectedRoute>} />
             <Route path="/task_management" element={<ProtectedRoute requiredPerms={['view_dashboard']}><TaskManagement /></ProtectedRoute>} />
             <Route path="/chat" element={<ProtectedRoute moduleName="Tin nhắn nội bộ"><ChatModule /></ProtectedRoute>} />
