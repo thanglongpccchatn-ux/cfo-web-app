@@ -111,20 +111,20 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                                 
                                 const pendingPhases = (detailModal.type === 'invoice' || detailModal.type === 'requested') ? 
                                     (p.projPmts || []).filter(pm => {
-                                        const phaseReq = detailModal.type === 'invoice' ? (parseFloat(pm.invoice_amount)||0) : (parseFloat(pm.payment_request_amount)||0);
+                                        const phaseReq = detailModal.type === 'invoice' ? (pm.invoice_date ? (parseFloat(pm.invoice_amount)||0) : 0) : (parseFloat(pm.payment_request_amount)||0);
                                         const phaseInc = parseFloat(pm.external_income)||0;
                                         // Show phases that have debt OR have income (advance payments)
                                         return (phaseReq - phaseInc > 0) || (phaseInc > 0);
                                     }) : [];
 
                                 const totalPhaseDebt = pendingPhases.reduce((s, pm) => {
-                                    const req = detailModal.type === 'invoice' ? (parseFloat(pm.invoice_amount)||0) : (parseFloat(pm.payment_request_amount)||0);
+                                    const req = detailModal.type === 'invoice' ? (pm.invoice_date ? (parseFloat(pm.invoice_amount)||0) : 0) : (parseFloat(pm.payment_request_amount)||0);
                                     const inc = parseFloat(pm.external_income)||0;
                                     return s + Math.max(0, req - inc);
                                 }, 0);
 
                                 const totalAdvance = pendingPhases.reduce((s, pm) => {
-                                    const req = detailModal.type === 'invoice' ? (parseFloat(pm.invoice_amount)||0) : (parseFloat(pm.payment_request_amount)||0);
+                                    const req = detailModal.type === 'invoice' ? (pm.invoice_date ? (parseFloat(pm.invoice_amount)||0) : 0) : (parseFloat(pm.payment_request_amount)||0);
                                     const inc = parseFloat(pm.external_income)||0;
                                     return s + Math.max(0, inc - req);
                                 }, 0);
@@ -185,7 +185,7 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                                                                         </thead>
                                                                         <tbody className="divide-y divide-slate-100">
                                                                             {pendingPhases.map(pm => {
-                                                                                const phaseReq = detailModal.type === 'invoice' ? (parseFloat(pm.invoice_amount)||0) : (parseFloat(pm.payment_request_amount)||0);
+                                                                                const phaseReq = detailModal.type === 'invoice' ? (pm.invoice_date ? (parseFloat(pm.invoice_amount)||0) : 0) : (parseFloat(pm.payment_request_amount)||0);
                                                                                 const phaseInc = parseFloat(pm.external_income)||0;
                                                                                 const phaseDebt = phaseReq - phaseInc;
                                                                                 const isAdvance = phaseDebt <= 0 && phaseInc > 0;

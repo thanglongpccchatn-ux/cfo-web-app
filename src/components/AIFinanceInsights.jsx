@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { fmt, fmtB } from '../utils/formatters';
+import { fmtB } from '../utils/formatters';
 
 /**
  * AIFinanceInsights - Automated financial analysis engine.
@@ -52,7 +52,7 @@ export default function AIFinanceInsights({ financials, performance, planData, d
         }
 
         // 2. Reconciliation: Debt vs Invoice Recovery
-        const totalDebt = financials?.totalDebtInvoiceAll || 0;
+        const totalDebt = financials?.totalDebtInvoiceCumulative ?? (financials?.totalDebtInvoiceAll || 0);
         const recoveryRate = financials?.recoveryRate || 0;
         
         if (recoveryRate < 80 && recoveryRate > 0) {

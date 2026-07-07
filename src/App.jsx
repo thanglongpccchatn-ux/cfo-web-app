@@ -39,6 +39,7 @@ const DocumentTrackingModule = lazy(() => import('./components/DocumentTrackingM
 const PaymentReceiptsModule = lazy(() => import('./components/PaymentReceiptsModule'));
 const WarrantyTracking = lazy(() => import('./components/WarrantyTracking'));
 const PlanningModule = lazy(() => import('./components/PlanningModule'));
+const CashFlowPlan = lazy(() => import('./components/CashFlowPlan'));
 const FinancialAnalyticsHub = lazy(() => import('./components/analytics/FinancialAnalyticsHub'));
 const InventoryManager = lazy(() => import('./components/Inventory/InventoryManager'));
 const Settings = lazy(() => import('./components/Settings'));
@@ -146,6 +147,7 @@ function MainLayout() {
       case 'subcontractors': return { title: 'Nhà thầu phụ / Tổ đội', subtitle: 'Bảng theo dõi công nợ thầu phụ' };
       case 'materials': return { title: 'Danh mục Vật tư', subtitle: 'Quản lý danh pháp vật tư chung' };
       case 'planning_hub': return { title: 'Kế hoạch & Báo cáo', subtitle: 'Kế hoạch dòng tiền tạm tính' };
+      case 'cashflow_plan': return { title: 'Kế hoạch Dòng tiền', subtitle: 'Thu - chi theo tháng/quý/năm (kế hoạch vs thực tế)' };
       case 'inventory': return { title: 'Kho vật tư', subtitle: 'Quản lý kho vật tư công trình' };
       case 'settings': return { title: 'Cài đặt hệ thống', subtitle: 'Cấu hình giao diện và thông số chung' };
       case 'permissions': return { title: 'Phân quyền rủi ro', subtitle: 'Cấu hình quyền hệ thống' };
@@ -246,6 +248,7 @@ function MainLayout() {
             
             {/* Other Modules */}
             <Route path="/planning_hub" element={<ProtectedRoute requiredPerms={['view_planning', 'manage_planning']}><PlanningModule /></ProtectedRoute>} />
+            <Route path="/cashflow_plan" element={<ProtectedRoute requiredPerms={['view_cashflow_plan', 'manage_cashflow_plan', 'edit_payments', 'manage_loans', 'manage_materials_tracking', 'manage_labor', 'manage_expenses']}><CashFlowPlan /></ProtectedRoute>} />
             <Route path="/construction" element={<ProtectedRoute requiredPerms={['view_construction']}><ConstructionModule /></ProtectedRoute>} />
             <Route path="/task_management" element={<ProtectedRoute requiredPerms={['view_dashboard']}><TaskManagement /></ProtectedRoute>} />
             <Route path="/chat" element={<ProtectedRoute moduleName="Tin nhắn nội bộ"><ChatModule /></ProtectedRoute>} />

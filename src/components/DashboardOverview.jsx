@@ -6,11 +6,11 @@ import AIFinanceInsights from './AIFinanceInsights';
 import LiquidityGauge from './LiquidityGauge';
 import DashboardDetailModal from './dashboard/DashboardDetailModal';
 import SkeletonLoader from './common/SkeletonLoader';
-import { formatVND, formatBillion, formatBillionParts, parseFormattedNumber, formatInputNumber } from '../utils/formatters';
+import { formatBillion, formatBillionParts, parseFormattedNumber, formatInputNumber } from '../utils/formatters';
 import { smartToast } from '../utils/globalToast';
 
 const DashboardOverview = () => {
-    const [selectedYear, setSelectedYear] = useState('all');
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const queryClient = useQueryClient();
     const invalidateDashboard = () => queryClient.invalidateQueries({ queryKey: ['dashboard-overview-data', selectedYear] });
 
@@ -51,26 +51,14 @@ const DashboardOverview = () => {
 
             if (currentYear !== 'all') {
                 const y = parseInt(currentYear);
-                projs = projs.filter(p => {
-                    const d = p.start_date || p.created_at;
-                    return d && new Date(d).getFullYear() === y;
-                });
-                pmts = pmts.filter(pm => {
-                    const d = pm.invoice_date || pm.created_at;
-                    return d && new Date(d).getFullYear() === y;
-                });
-                extHist = extHist.filter(h => {
-                    const d = h.payment_date || h.created_at;
-                    return d && new Date(d).getFullYear() === y;
-                });
-                intHist = intHist.filter(h => {
-                    const d = h.payment_date || h.created_at;
-                    return d && new Date(d).getFullYear() === y;
-                });
-                loansData = loansData.filter(l => {
-                    const d = l.created_at;
-                    return d && new Date(d).getFullYear() === y;
-                });
+                const inYear = (d) => d && new Date(d).getFullYear() === y;
+                // Hàng thẻ dưới = HỢP ĐỒNG KÝ trong năm (lọc theo sign_date) → Tổng giá trị HĐ, Số HĐ theo năm ký.
+                // Riêng CÔNG NỢ là số dư nên tính cộng dồn all-time (xem totalDebt*Cumulative bên dưới).
+                projs = projs.filter(p => inYear(p.sign_date || p.start_date || p.created_at));
+                pmts = pmts.filter(pm => inYear(pm.invoice_date || pm.created_at));
+                extHist = extHist.filter(h => inYear(h.payment_date || h.created_at));
+                intHist = intHist.filter(h => inYear(h.payment_date || h.created_at));
+                loansData = loansData.filter(l => inYear(l.created_at));
             }
 
             // Calculate Total Debt from Loans
@@ -92,7 +80,40 @@ const DashboardOverview = () => {
                 approvedPayments: approvedCount
             };
             
-            let financials = { totalValueAll: 0, totalIncomeAll: 0, totalDebtInvoiceAll: 0, totalRequestedAll: 0, totalInvoiceAll: 0, recoveryRate: 0 };
+            // CÔNG NỢ & TỶ LỆ THU HỒI = SỐ DƯ LŨY KẾ TỪ ĐẦU — tính từ TOÀN BỘ payments (KHÔNG lọc năm),
+            // độc lập bộ lọc năm & kể cả khi năm được chọn không có HĐ nào ký.
+            const allPmts = pmtRes.data || [];
+            // CÔNG NỢ HÓA ĐƠN = (đã xuất hóa đơn) − (thực thu, KỂ CẢ tạm ứng).
+            // - Đã xuất HĐ: chỉ tính payment ĐÃ CÓ NGÀY XUẤT (invoice_date).
+            // - Thực thu: tính TOÀN BỘ tiền nhận của dự án (gồm cả thu tạm ứng chưa xuất HĐ).
+            const cumInvoice = allPmts.reduce((s, pm) => s + (pm.invoice_date ? (parseFloat(pm.invoice_amount) || 0) : 0), 0);
+            const cumIncome = allPmts.reduce((s, pm) => s + (parseFloat(pm.external_income) || 0), 0);
+            const totalDebtInvoiceCumulative = cumInvoice - cumIncome;
+            const totalDebtRequestedCumulative = allPmts.reduce((s, pm) => {
+                const req = parseFloat(pm.payment_request_amount) || 0;
+                const inc = parseFloat(pm.external_income) || 0;
+                return s + Math.max(0, req - inc);
+            }, 0);
+            const recoveryCumulative = cumInvoice > 0 ? (cumIncome / cumInvoice) * 100 : 0;
+
+            // Chi tiết CÔNG NỢ LŨY KẾ theo từng dự án (khớp tổng ở thẻ) — cấp cho modal chi tiết.
+            const pmtByProj = {};
+            allPmts.forEach(pm => {
+                const k = pm.project_id;
+                if (!k) return;
+                const b = pmtByProj[k] || (pmtByProj[k] = { inv: 0, inc: 0, reqDebt: 0, list: [] });
+                const inc = parseFloat(pm.external_income) || 0;
+                if (pm.invoice_date) b.inv += parseFloat(pm.invoice_amount) || 0; // đã xuất HĐ: chỉ dòng có ngày xuất
+                b.inc += inc;                                                     // thực thu: KỂ CẢ tạm ứng
+                b.reqDebt += Math.max(0, (parseFloat(pm.payment_request_amount) || 0) - inc);
+                b.list.push(pm);                                                  // giữ danh sách đợt cho modal chi tiết
+            });
+            const debtBreakdown = (projRes.data || []).map(p => {
+                const b = pmtByProj[p.id] || { inv: 0, inc: 0, reqDebt: 0, list: [] };
+                return { ...p, totalInvoice: b.inv, totalIncome: b.inc, debtInvoice: b.inv - b.inc, debtRequested: b.reqDebt, projPmts: b.list };
+            });
+
+            let financials = { totalValueAll: 0, totalIncomeAll: 0, totalDebtInvoiceAll: 0, totalRequestedAll: 0, totalInvoiceAll: 0, recoveryRate: 0, totalIncomeThisYear: 0, totalInvoiceThisYear: 0, totalDebtAll, totalDebtInvoiceCumulative, totalDebtRequestedCumulative, recoveryCumulative };
             let performance = { avg_lng_dt: 0, avg_sl_cp: 0, avg_spi: 1, avg_dt_sl: 0, avg_thu_dt: 0, avg_thu_chi: 0 };
             let chartData = { trend: { labels: [], values: [] }, portfolio: { labels: [], values: [] }, aging: { labels: [], invoiceValues: [], incomeValues: [] }, topProfit: { labels: [], values: [] } };
             let processed = [];
@@ -153,7 +174,7 @@ const DashboardOverview = () => {
                 const totalInvoiceThisYear = (pmts || [])
                     .reduce((sum, pm) => sum + (parseFloat(pm.invoice_amount) || 0), 0);
 
-                financials = { totalValueAll, totalIncomeAll, totalDebtInvoiceAll, totalDebtRequestedAll, totalRequestedAll, totalInvoiceAll, recoveryRate, totalIncomeThisYear, totalInvoiceThisYear, totalDebtAll };
+                financials = { totalValueAll, totalIncomeAll, totalDebtInvoiceAll, totalDebtRequestedAll, totalRequestedAll, totalInvoiceAll, recoveryRate, totalIncomeThisYear, totalInvoiceThisYear, totalDebtAll, totalDebtInvoiceCumulative, totalDebtRequestedCumulative, recoveryCumulative };
 
                 // 3. Chart Data Processing
                 // Trend Chart (Last 6 Months Income)
@@ -240,17 +261,17 @@ const DashboardOverview = () => {
                 performance = { avg_lng_dt, avg_sl_cp, avg_spi, avg_dt_sl, avg_thu_dt, avg_thu_chi };
             }
 
-            return { planData, stats, financials, chartData, performance, projectDetails: processed, unsignedProjects, unsettledProjects, pendingPaymentsList };
+            return { planData, stats, financials, chartData, performance, projectDetails: processed, debtBreakdown, unsignedProjects, unsettledProjects, pendingPaymentsList };
         }
     });
 
-    const { planData, stats, financials, chartData, performance, projectDetails, unsignedProjects, unsettledProjects, pendingPaymentsList } = dashboardData || {
+    const { planData, stats, financials, chartData, performance, projectDetails, debtBreakdown, unsignedProjects, unsettledProjects, pendingPaymentsList } = dashboardData || {
         planData: { target_revenue: 0, year: new Date().getFullYear() },
         stats: { totalProjects: 0, pendingPayments: 0, approvedPayments: 0, unsignedContracts: 0, unsettledContracts: 0 },
         financials: { totalValueAll: 0, totalIncomeAll: 0, totalDebtInvoiceAll: 0, totalDebtRequestedAll: 0, totalRequestedAll: 0, totalInvoiceAll: 0, recoveryRate: 0, totalIncomeThisYear: 0, totalDebtAll: 0 },
         performance: { avg_lng_dt: 0, avg_sl_cp: 0, avg_spi: 1, avg_dt_sl: 0, avg_thu_dt: 0, avg_thu_chi: 0 },
         chartData: { trend: { labels: [], values: [] }, portfolio: { labels: [], values: [] }, aging: { labels: [], invoiceValues: [], incomeValues: [] }, topProfit: { labels: [], values: [] } },
-        projectDetails: [], unsignedProjects: [], unsettledProjects: [], pendingPaymentsList: []
+        projectDetails: [], debtBreakdown: [], unsignedProjects: [], unsettledProjects: [], pendingPaymentsList: []
     };
 
     const [targetModal, setTargetModal] = useState({ isOpen: false, target: 0, isSaving: false });
@@ -305,10 +326,12 @@ const DashboardOverview = () => {
     const handleOpenDetail = (type) => {
         let data = [];
         if (type === 'invoice' || type === 'requested') {
-            if (!projectDetails || projectDetails.length === 0) return;
-            data = projectDetails.filter(p => {
+            // Dùng debtBreakdown (LŨY KẾ toàn bộ dự án) để khớp đúng tổng ở thẻ công nợ.
+            const src = debtBreakdown && debtBreakdown.length ? debtBreakdown : projectDetails;
+            if (!src || src.length === 0) return;
+            data = src.filter(p => {
                 const debt = type === 'invoice' ? p.debtInvoice : p.debtRequested;
-                return Math.abs(debt) > 1; // Include both positive (owed) and negative (overpaid) debts, ignore tiny float errors
+                return Math.abs(debt) > 1; // Gồm cả nợ dương (phải thu) và âm (thu dư), bỏ sai số float
             }).sort((a,b) => (type === 'invoice' ? b.debtInvoice - a.debtInvoice : b.debtRequested - a.debtRequested));
         } else if (type === 'unsigned') {
             data = unsignedProjects || [];
@@ -319,7 +342,6 @@ const DashboardOverview = () => {
         }
 
         setDetailModal({ isOpen: true, type, data });
-        setExpandedProject(null);
     };
 
     if (loading) {
@@ -480,12 +502,12 @@ const DashboardOverview = () => {
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3 md:gap-4">
                 {[
                     { label: 'TỔNG GIÁ TRỊ HĐ', subLabel: '(SAU VAT, GỒM PHÁT SINH)', value: financials.totalValueAll, icon: 'payments', color: 'blue' },
-                    { label: 'THỰC THU (CASH-IN)', value: financials.totalIncomeAll, icon: 'account_balance_wallet', color: 'emerald' },
-                    { label: 'CÔNG NỢ HÓA ĐƠN', subLabel: '(ĐÃ XUẤT HĐ - THỰC THU)', value: financials.totalDebtInvoiceAll, icon: 'assignment_turned_in', color: 'rose', type: 'invoice' },
-                    { label: 'CÔNG NỢ ĐỀ NGHỊ', subLabel: '(ĐỀ NGHỊ - THỰC THU)', value: financials.totalDebtRequestedAll || 0, icon: 'pending_actions', color: 'amber', type: 'requested' },
+                    { label: 'THỰC THU (CASH-IN)', subLabel: '(TIỀN NHẬN TRONG NĂM)', value: financials.totalIncomeThisYear, icon: 'account_balance_wallet', color: 'emerald' },
+                    { label: 'CÔNG NỢ HÓA ĐƠN', subLabel: '(ĐÃ XUẤT HĐ - THỰC THU · LŨY KẾ)', value: financials.totalDebtInvoiceCumulative ?? financials.totalDebtInvoiceAll, icon: 'assignment_turned_in', color: 'rose', type: 'invoice' },
+                    { label: 'CÔNG NỢ ĐỀ NGHỊ', subLabel: '(ĐỀ NGHỊ - THỰC THU · LŨY KẾ)', value: financials.totalDebtRequestedCumulative ?? (financials.totalDebtRequestedAll || 0), icon: 'pending_actions', color: 'amber', type: 'requested' },
                     { label: 'TỔNG DƯ NỢ VAY', subLabel: '(CẬP NHẬT TỪ HỆ THỐNG)', value: financials.totalDebtAll || 0, icon: 'credit_card', color: 'rose', route: '/loans' },
-                    { label: 'TỔNG XUẤT HÓA ĐƠN', value: financials.totalInvoiceAll, icon: 'description', color: 'slate' },
-                    { label: 'TỶ LỆ THU HỒI DÒNG TIỀN', value: financials.recoveryRate, icon: 'analytics', color: 'indigo', isPercent: true }
+                    { label: 'TỔNG XUẤT HÓA ĐƠN', subLabel: '(XUẤT TRONG NĂM)', value: financials.totalInvoiceThisYear, icon: 'description', color: 'slate' },
+                    { label: 'TỶ LỆ THU HỒI DÒNG TIỀN', subLabel: '(ĐÃ THU / ĐÃ XUẤT · LŨY KẾ)', value: financials.recoveryCumulative ?? financials.recoveryRate, icon: 'analytics', color: 'indigo', isPercent: true }
                 ].map((kpi, idx) => (
                     <div 
                         key={idx} 

@@ -34,6 +34,7 @@ export const NAV_GROUPS = [
     {
         key: 'finance', label: 'Tài chính', icon: 'account_balance',
         items: [
+            { id: 'cashflow_plan', icon: 'savings', label: 'Kế hoạch Dòng tiền', perms: ['view_cashflow_plan', 'manage_cashflow_plan', 'edit_payments', 'manage_loans', 'manage_materials_tracking', 'manage_labor', 'manage_expenses'] },
             { id: 'weekly_expense_plan', icon: 'view_week', label: 'Kế hoạch Chi Tuần', perms: ['view_expenses', 'view_planning'] },
             { id: 'expense_tracking', icon: 'receipt_long', label: 'Chi phí Chung', perms: ['view_expenses', 'manage_expenses'] },
             { id: 'loans', icon: 'account_balance_wallet', label: 'Vay vốn', perms: ['view_loans', 'manage_loans'] },
