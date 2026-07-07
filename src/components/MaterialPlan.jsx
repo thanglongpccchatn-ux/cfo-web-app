@@ -49,12 +49,13 @@ export default function MaterialPlan() {
     const { data, isLoading } = useQuery({
         queryKey: ['material-plan', year],
         queryFn: async () => {
-            const [projects, categories, planRows] = await Promise.all([
+            const [projects, categories, materials, planRows] = await Promise.all([
                 fetchAll('projects', 'id, internal_code, code, name, status', 'name'),
                 fetchAll('material_categories', 'code, name', 'name'),
+                fetchAll('materials', 'category_code'),
                 fetchAll('cash_flow_plan', 'project_id, year, month, category, sub_category, planned_amount'),
             ]);
-            return { projects, categories, planRows };
+            return { projects, categories, materials, planRows };
         },
     });
 
@@ -73,6 +74,15 @@ export default function MaterialPlan() {
         return m;
     }, [data?.categories]);
 
+    // Nhóm lấy từ DANH MỤC VẬT TƯ: chỉ các nhóm thực sự có vật tư (distinct category_code
+    // trong bảng materials), gắn tên qua material_categories — giống filter màn Danh mục Vật tư.
+    const catalogGroups = useMemo(() => {
+        const codes = [...new Set((data?.materials || []).map(m => m.category_code).filter(Boolean))];
+        return codes
+            .map(code => ({ id: code, label: catName[code] || code }))
+            .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+    }, [data?.materials, catName]);
+
     // KH vật liệu hiện có của dự án đang chọn, tách theo nhóm: { groupCode: number[12] }
     const existing = useMemo(
         () => (projectId ? materialPlanByGroup(data?.planRows, { year, projectId }) : {}),
@@ -85,13 +95,11 @@ export default function MaterialPlan() {
         return [...set].sort((a, b) => (catName[a] || a).localeCompare(catName[b] || b, 'vi'));
     }, [existing, addedGroups, catName]);
 
-    // Nhóm chưa dùng (cho ô "+ Thêm nhóm")
+    // Nhóm chưa dùng (cho ô "+ Thêm nhóm") — chỉ từ danh mục vật tư đang có
     const addableGroups = useMemo(() => {
         const used = new Set(groupRows);
-        return (data?.categories || [])
-            .filter(c => !used.has(c.code))
-            .map(c => ({ id: c.code, label: c.name }));
-    }, [data?.categories, groupRows]);
+        return catalogGroups.filter(g => !used.has(g.id));
+    }, [catalogGroups, groupRows]);
 
     const val = (g, m) => { const k = `${g}:${m}`; return k in edit ? edit[k] : (existing[g]?.[m] || 0); };
     const onEdit = (g, m, valM) => setEdit(prev => ({ ...prev, [`${g}:${m}`]: (Number(valM) || 0) * 1e6 }));
