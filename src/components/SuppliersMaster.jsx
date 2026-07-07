@@ -4,7 +4,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
 import { useToast } from '../context/ToastContext';
-import MaterialTracking from './MaterialTracking';
 import { smartToast } from '../utils/globalToast';
 import { fmt, formatBillion } from '../utils/formatters';
 import ReceiveGoodsModal from './supplier/ReceiveGoodsModal';
@@ -18,10 +17,7 @@ export default function SuppliersMaster() {
     const { hasPermission, profile } = useAuth();
     const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
     const canCreate = isAdmin || hasPermission('create_suppliers');
-    const canEdit = isAdmin || hasPermission('edit_suppliers');
-    const canDelete = isAdmin || hasPermission('delete_suppliers');
 
-    const [activeSubTab, setActiveSubTab] = useState('suppliers');
     // loading and suppliersData managed by React Query below
     const [searchQuery, setSearchQuery] = useState('');
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -324,9 +320,8 @@ export default function SuppliersMaster() {
                         <span className="material-symbols-outlined notranslate text-orange-500 text-[28px]" translate="no">local_shipping</span>
                         Nhà Cung Cấp & Vật Tư
                     </h2>
-                    <p className="text-slate-500 text-sm mt-1 uppercase font-semibold tracking-wider">Quản lý đối tác và nhật ký nhập vật tư hiện trường</p>
+                    <p className="text-slate-500 text-sm mt-1 uppercase font-semibold tracking-wider">Quản lý đối tác & công nợ nhà cung cấp vật tư</p>
                 </div>
-                {activeSubTab === 'suppliers' && (
                     <div className="flex gap-3">
                         {canCreate && (
                         <button 
@@ -350,33 +345,7 @@ export default function SuppliersMaster() {
                             <span className="material-symbols-outlined notranslate" translate="no">refresh</span>
                         </button>
                     </div>
-                )}
             </div>
-
-            {/* Sub-tabs Navigation */}
-            <div className="flex space-x-1 border-b border-slate-200 dark:border-slate-700 mb-6">
-                <button
-                    onClick={() => setActiveSubTab('suppliers')}
-                    className={`px-5 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeSubTab === 'suppliers' ? 'border-orange-500 text-orange-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}
-                >
-                    <span className="material-symbols-outlined notranslate text-[18px]" translate="no">local_shipping</span>
-                    Sổ cái Công nợ NCC
-                </button>
-                <button
-                    onClick={() => setActiveSubTab('materials')}
-                    className={`px-5 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeSubTab === 'materials' ? 'border-orange-500 text-orange-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}
-                >
-                    <span className="material-symbols-outlined notranslate text-[18px]" translate="no">inventory_2</span>
-                    Nhật ký Nhập Vật tư
-                </button>
-            </div>
-
-            {activeSubTab === 'materials' ? (
-                <div className="h-[calc(100vh-220px)] relative">
-                    <MaterialTracking embedded={true} />
-                </div>
-            ) : (
-                <>
 
             {/* Global KPIs */}
             <div className="flex flex-col lg:flex-row gap-6 mb-8">
@@ -598,10 +567,8 @@ export default function SuppliersMaster() {
                     )}
                 </div>
             </div>
-            </>
-            )}
 
-            <ExcelImportModal 
+            <ExcelImportModal
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 title="Nhập Dữ Liệu Nhà Cung Cấp"
