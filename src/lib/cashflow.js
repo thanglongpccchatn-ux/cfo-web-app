@@ -120,6 +120,27 @@ export function planToBuckets(planRows, { year, projectId = null }) {
     return collapse(planByProject(planRows, { year }), projectId);
 }
 
+// Nhóm chưa gán (dòng material cũ không có sub_category).
+export const NO_GROUP = '__nogroup';
+
+/**
+ * KẾ HOẠCH VẬT LIỆU của 1 dự án, tách theo nhóm vật tư (sub_category):
+ * trả { groupCode: number[12] }. Dùng cho màn Kế hoạch Vật liệu.
+ */
+export function materialPlanByGroup(planRows, { year, projectId }) {
+    const res = {};
+    const wantPid = projectId || null;
+    for (const r of planRows || []) {
+        if (r.category !== 'material' || r.year !== year) continue;
+        if ((r.project_id || null) !== wantPid) continue;
+        const m = (r.month | 0) - 1;
+        if (m < 0 || m > 11) continue;
+        const g = r.sub_category || NO_GROUP;
+        (res[g] || (res[g] = zeros()))[m] += num(r.planned_amount);
+    }
+    return res;
+}
+
 export const rowTotal = (arr) => (arr || []).reduce((s, v) => s + v, 0);
 
 export function sumRows(bucketObj, keys) {

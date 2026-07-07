@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     aggregateActuals, aggregateActualsByProject, planToBuckets, planByProject,
     toPeriods, rollingBalance, sumRows, rowTotal, emptyBuckets, ALL_KEYS, OVERHEAD, CF_PERM,
+    materialPlanByGroup, NO_GROUP,
 } from '../lib/cashflow';
 
 const YEAR = 2026;
@@ -104,6 +105,31 @@ describe('planToBuckets / planByProject', () => {
         const bp = planByProject(rows, { year: 2026 });
         expect(bp.material.A[2]).toBe(200);
         expect(bp.material[OVERHEAD][0]).toBe(100);
+    });
+});
+
+describe('materialPlanByGroup — KH vật liệu theo nhóm/dự án', () => {
+    const rows = [
+        { year: 2026, month: 1, category: 'material', sub_category: 'ONG_THEP', planned_amount: 100, project_id: 'A' },
+        { year: 2026, month: 3, category: 'material', sub_category: 'ONG_THEP', planned_amount: 200, project_id: 'A' },
+        { year: 2026, month: 2, category: 'material', sub_category: 'VAN', planned_amount: 50, project_id: 'A' },
+        { year: 2026, month: 1, category: 'material', sub_category: 'ONG_THEP', planned_amount: 999, project_id: 'B' }, // dự án khác
+        { year: 2026, month: 1, category: 'material', planned_amount: 7, project_id: 'A' }, // không nhóm
+        { year: 2025, month: 1, category: 'material', sub_category: 'ONG_THEP', planned_amount: 888, project_id: 'A' }, // năm khác
+        { year: 2026, month: 1, category: 'labor', sub_category: 'ONG_THEP', planned_amount: 5, project_id: 'A' }, // khác hạng mục
+    ];
+    it('tách theo nhóm, đúng dự án + năm', () => {
+        const g = materialPlanByGroup(rows, { year: 2026, projectId: 'A' });
+        expect(g.ONG_THEP[0]).toBe(100);
+        expect(g.ONG_THEP[2]).toBe(200);
+        expect(g.VAN[1]).toBe(50);
+        expect(g[NO_GROUP][0]).toBe(7);
+        expect(g.ONG_THEP).toHaveLength(12);
+    });
+    it('không lẫn dự án khác / năm khác / hạng mục khác', () => {
+        const g = materialPlanByGroup(rows, { year: 2026, projectId: 'A' });
+        expect(rowTotal(g.ONG_THEP)).toBe(300); // 100+200, không có 999/888
+        expect(g.labor).toBeUndefined();
     });
 });
 

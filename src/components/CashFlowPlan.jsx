@@ -191,7 +191,8 @@ export default function CashFlowPlan() {
 
     // Sửa được khi: chế độ Kế hoạch + Tháng + đã chọn 1 dự án hoặc Chi phí chung (không phải Toàn công ty)
     const baseEditable = mode === 'plan' && period === 'month' && projectId != null;
-    const catEditable = (cat) => baseEditable && (canManageAll || hasPermission(CF_PERM[cat]));
+    // Vật liệu (material) nhập chi tiết theo nhóm ở màn "Kế hoạch Vật liệu" -> ở đây chỉ đọc.
+    const catEditable = (cat) => cat !== 'material' && baseEditable && (canManageAll || hasPermission(CF_PERM[cat]));
     const expandable = projectId == null; // chỉ bung theo dự án ở chế độ Toàn công ty
     const onEdit = (cat, m, valM) => setEdit(prev => ({ ...prev, [`${cat}:${m}`]: valM * 1e6 }));
 
@@ -206,13 +207,15 @@ export default function CashFlowPlan() {
         setSaving(true);
         try {
             const saveProj = projectId === OVERHEAD ? null : projectId;
-            let del = supabase.from('cash_flow_plan').delete().eq('year', year);
+            // Không đụng dòng material (quản riêng ở màn Kế hoạch Vật liệu, có chi tiết theo nhóm).
+            let del = supabase.from('cash_flow_plan').delete().eq('year', year).neq('category', 'material');
             del = saveProj ? del.eq('project_id', saveProj) : del.is('project_id', null);
             const { error: delErr } = await del;
             if (delErr) throw delErr;
             const rows = [];
             for (const [dir, keys] of [['in', IN_KEYS], ['out', OUT_KEYS]]) {
                 for (const cat of keys) {
+                    if (cat === 'material') continue; // vật liệu nhập ở màn riêng
                     for (let m = 0; m < 12; m++) {
                         const amt = planVal(cat, m);
                         if (amt > 0) rows.push({ project_id: saveProj, year, month: m + 1, direction: dir, category: cat, planned_amount: amt });

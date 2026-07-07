@@ -13,12 +13,16 @@ create table if not exists public.cash_flow_plan (
     month          int  not null check (month between 1 and 12),
     direction      text not null check (direction in ('in','out')),
     category       text not null,        -- mã hạng mục: project/loan/other_in | material/labor/operation/command/acceptance/machinery/debt/other_out
+    sub_category   text,                 -- nhóm chi tiết (dùng cho material = mã material_categories.code); null = không phân nhóm
     planned_amount numeric not null default 0,
     note           text,
     created_at     timestamptz default now()
 );
 create index if not exists idx_cash_flow_plan_scope
     on public.cash_flow_plan (year, project_id, entity_key);
+
+-- Nếu bảng đã tồn tại từ trước (chưa có sub_category) thì thêm cột:
+alter table public.cash_flow_plan add column if not exists sub_category text;
 
 -- 2) Số dư đầu kỳ (tùy chọn override; nếu không có dòng nào → app tự lấy tổng current_balance của Sổ quỹ)
 create table if not exists public.cash_flow_opening (
