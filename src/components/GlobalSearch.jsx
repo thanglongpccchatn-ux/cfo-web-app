@@ -76,8 +76,12 @@ export default function GlobalSearch() {
         searchTimer.current = setTimeout(async () => {
             setLoading(true);
             try {
-                const searchTerm = `%${q.trim()}%`;
-                
+                // Loại ký tự đặc biệt của cú pháp filter PostgREST (.or) + wildcard LIKE
+                // để tránh filter-injection (chèn dấu phẩy/ngoặc thêm điều kiện OR tuỳ ý).
+                const safe = q.trim().replace(/[%_,()*\\]/g, ' ').replace(/\s+/g, ' ').trim();
+                if (!safe) { setResults([]); setLoading(false); return; }
+                const searchTerm = `%${safe}%`;
+
                 // Search projects
                 const { data: projects } = await supabase
                     .from('projects')

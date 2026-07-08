@@ -48,6 +48,7 @@ export default function MaterialPlan() {
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
     const lineSeq = useRef(1);
+    const loadedKeyRef = useRef(null); // 'projectId:year' đã nạp -> phân biệt đổi dự án vs refetch ngầm
     const mkLine = (patch = {}) => ({ id: lineSeq.current++, group: '', month: '', amount: 0, ...patch });
 
     const { data, isLoading } = useQuery({
@@ -78,9 +79,13 @@ export default function MaterialPlan() {
         return m;
     }, [data?.planRows, year]);
 
-    // Nạp dòng từ KH đã lưu mỗi khi đổi dự án/năm (hoặc sau khi lưu -> refetch).
+    // Nạp dòng từ KH đã lưu khi đổi dự án/năm, hoặc khi refetch xong mà KHÔNG có sửa dở.
+    // Guard `dirty`: refetch ngầm (rớt mạng/sau khi lưu dự án khác) không được đè dữ liệu đang gõ.
     useEffect(() => {
-        if (!projectId) { setLines([]); setDirty(false); return; }
+        if (!projectId) { setLines([]); setDirty(false); loadedKeyRef.current = null; return; }
+        const key = `${projectId}:${year}`;
+        const projectChanged = loadedKeyRef.current !== key;
+        if (!projectChanged && dirty) return; // đang nhập dở, chỉ là refetch ngầm -> giữ nguyên
         const ex = materialPlanByGroup(data?.planRows, { year, projectId });
         const arr = [];
         for (const g of Object.keys(ex)) ex[g].forEach((amt, m) => { if (amt) arr.push(mkLine({ group: g, month: m, amount: amt })); });
@@ -88,7 +93,8 @@ export default function MaterialPlan() {
         if (!arr.length) arr.push(mkLine());
         setLines(arr);
         setDirty(false);
-    }, [projectId, year, data?.planRows]); // eslint-disable-line react-hooks/exhaustive-deps
+        loadedKeyRef.current = key;
+    }, [projectId, year, data?.planRows, dirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const listProjects = useMemo(() => {
         const kw = q.trim().toLowerCase();

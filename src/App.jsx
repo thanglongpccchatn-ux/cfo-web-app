@@ -241,7 +241,7 @@ function MainLayout() {
             <Route path="/variations" element={<ProtectedRoute requiredPerms={['view_variations', 'manage_variations']}><VariationsManagement /></ProtectedRoute>} />
             <Route path="/doc_tracking" element={<ProtectedRoute requiredPerms={['view_payments']}><DocumentTrackingModule /></ProtectedRoute>} />
             <Route path="/payment_receipts" element={<ProtectedRoute requiredPerms={['view_payments']}><PaymentReceiptsModule /></ProtectedRoute>} />
-            <Route path="/site_diary" element={<ProtectedRoute><SiteDiary /></ProtectedRoute>} />
+            <Route path="/site_diary" element={<ProtectedRoute requiredPerms={['view_construction', 'manage_construction']}><SiteDiary /></ProtectedRoute>} />
             <Route path="/warranty_tracking" element={<ProtectedRoute requiredPerms={['view_warranty', 'manage_warranty']}><WarrantyTracking /></ProtectedRoute>} />
             <Route path="/settlement" element={<ProtectedRoute requiredPerms={['view_settlement', 'manage_settlement']}><SettlementManagement /></ProtectedRoute>} />
             <Route path="/labor_subcontractors" element={<ProtectedRoute requiredPerms={['view_labor', 'manage_labor', 'view_subcontractors']}><LaborSubcontractorHub /></ProtectedRoute>} />
