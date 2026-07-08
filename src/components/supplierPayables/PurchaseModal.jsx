@@ -7,6 +7,7 @@ import NumberInput from '../common/NumberInput';
 import SearchableSelect from '../common/SearchableSelect';
 import QuickAddMaterialModal from './QuickAddMaterialModal';
 import { searchMaterials } from '../../lib/materialSearch';
+import { smartToast } from '../../utils/globalToast';
 
 /* ── Remove Vietnamese diacritics for fuzzy search ── */
 const removeDiacritics = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
@@ -241,28 +242,52 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
 
   const canSave = header.project_id && header.supplier_id && validLines.length > 0;
 
+  // Viết tắt tên công ty NCC: ưu tiên mã NCC; nếu không có, lấy chữ cái đầu các từ chính.
+  const CORP_WORDS = new Set(['CONG', 'TY', 'TNHH', 'CP', 'CO', 'PHAN', 'CHI', 'NHANH', 'MTV', 'DOANH', 'NGHIEP', 'VIET', 'NAM', 'VN']);
+  const supplierAbbr = (s) => {
+    if (!s) return '';
+    if (s.code?.trim()) return removeDiacritics(s.code).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const words = removeDiacritics(s.name || '').toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+    const sig = words.filter(w => !CORP_WORDS.has(w));
+    return (sig.length ? sig : words).slice(0, 2).join('');
+  };
+
+  // Số hóa đơn tự sinh = MÃ DỰ ÁN + VIẾT TẮT NCC + DDMMYYYY (khi người dùng để trống).
+  const buildReference = () => {
+    const proj = projects.find(p => p.id === header.project_id);
+    const supp = suppliers.find(s => s.id === header.supplier_id);
+    const projCode = (proj?.internal_code || proj?.code || '').trim().toUpperCase().replace(/\s+/g, '');
+    const abbr = supplierAbbr(supp);
+    const [y, m, d] = (header.purchase_date || '').split('-');
+    const dmy = (y && m && d) ? `${d}${m}${y}` : '';
+    return [projCode, abbr, dmy].filter(Boolean).join('-');
+  };
+
   const handleSave = async () => {
     if (!canSave) return;
     setSaving(true);
     try {
+      const refNo = header.reference_no?.trim() || buildReference();
       if (editData?.id) {
         const l = validLines[0];
-        await supabase.from('supplier_purchases').update({
+        const { error } = await supabase.from('supplier_purchases').update({
           project_id: header.project_id, supplier_id: header.supplier_id,
           material_group: l.material_group || 'Khác', purchase_date: header.purchase_date,
           product_name: l.product_name, unit: l.unit, quantity: Number(l.quantity) || 0,
           unit_price: Number(l.unit_price) || 0, vat_rate: Number.isFinite(Number(l.vat_rate)) ? Number(l.vat_rate) : 8,
-          notes: l.notes, material_id: l.material_id || null, reference_no: header.reference_no || null,
+          notes: l.notes, material_id: l.material_id || null, reference_no: refNo || null,
         }).eq('id', editData.id);
+        if (error) throw error;
       } else {
         const batch = validLines.map(l => ({
           project_id: header.project_id, supplier_id: header.supplier_id,
           material_group: l.material_group || 'Khác', purchase_date: header.purchase_date,
           product_name: l.product_name, unit: l.unit, quantity: Number(l.quantity) || 0,
           unit_price: Number(l.unit_price) || 0, vat_rate: Number.isFinite(Number(l.vat_rate)) ? Number(l.vat_rate) : 8,
-          notes: l.notes, material_id: l.material_id || null, created_by: user?.id, reference_no: header.reference_no || null,
+          notes: l.notes, material_id: l.material_id || null, created_by: user?.id, reference_no: refNo || null,
         }));
-        const { data: inserted } = await supabase.from('supplier_purchases').insert(batch).select('id, product_name, unit_price, supplier_id');
+        const { data: inserted, error } = await supabase.from('supplier_purchases').insert(batch).select('id, product_name, unit_price, supplier_id');
+        if (error) throw error;
         if (inserted) {
           const priceChanges = [];
           for (const row of inserted) {
@@ -276,7 +301,10 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
       }
       onSaved?.();
       onClose();
-    } catch (err) { console.error('Error saving purchase:', err); } finally { setSaving(false); }
+    } catch (err) {
+      console.error('Error saving purchase:', err);
+      smartToast('Lỗi lưu đơn mua hàng: ' + (err.message || 'không rõ nguyên nhân'));
+    } finally { setSaving(false); }
   };
 
   if (!open) return null;
@@ -332,8 +360,9 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
             <div>
               <label className="block text-[11px] font-bold text-slate-500 mb-1">SỐ HÓA ĐƠN / REF</label>
               <input type="text" value={header.reference_no} onChange={e => setHeader(h => ({ ...h, reference_no: e.target.value }))}
-                placeholder="VD: HD-001..."
+                placeholder={buildReference() || 'Tự sinh: MÃDA-NCC-DDMMYYYY'}
                 className="w-full text-sm border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 outline-none" />
+              <p className="text-[10.5px] text-slate-400 mt-1">Để trống sẽ tự sinh theo mã dự án + viết tắt NCC + ngày.</p>
             </div>
           </div>
         </div>
