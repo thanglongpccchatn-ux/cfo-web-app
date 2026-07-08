@@ -93,7 +93,6 @@ export async function createAutoJournalEntry(params) {
     referenceNumber,
     sourceModule,
     sourceId,
-    projectId,
     lines = [],
   } = params;
 
@@ -157,6 +156,11 @@ export async function createAutoJournalEntry(params) {
       .single();
 
     if (entryErr) {
+      // 23505 = unique_violation: 2 lần gọi gần nhau (double-click/retry) va vào unique index
+      // (source_module, source_id) -> coi như đã tồn tại, KHÔNG tạo bút toán trùng.
+      if (entryErr.code === '23505') {
+        return { success: true, skipped: true };
+      }
       console.error('[AccountingService] Entry insert error:', entryErr);
       return { success: false, error: entryErr.message };
     }

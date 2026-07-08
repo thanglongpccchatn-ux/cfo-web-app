@@ -207,22 +207,20 @@ export default function CashFlowPlan() {
         setSaving(true);
         try {
             const saveProj = projectId === OVERHEAD ? null : projectId;
-            // Không đụng dòng material (quản riêng ở màn Kế hoạch Vật liệu, có chi tiết theo nhóm).
-            let del = supabase.from('cash_flow_plan').delete().eq('year', year).neq('category', 'material');
-            del = saveProj ? del.eq('project_id', saveProj) : del.is('project_id', null);
-            const { error: delErr } = await del;
-            if (delErr) throw delErr;
+            // Lưu ATOMIC qua RPC (delete+insert 1 transaction). Không đụng dòng material
+            // (quản riêng ở màn Kế hoạch Vật liệu, có chi tiết theo nhóm).
             const rows = [];
             for (const [dir, keys] of [['in', IN_KEYS], ['out', OUT_KEYS]]) {
                 for (const cat of keys) {
                     if (cat === 'material') continue; // vật liệu nhập ở màn riêng
                     for (let m = 0; m < 12; m++) {
                         const amt = planVal(cat, m);
-                        if (amt > 0) rows.push({ project_id: saveProj, year, month: m + 1, direction: dir, category: cat, planned_amount: amt });
+                        if (amt > 0) rows.push({ month: m + 1, direction: dir, category: cat, planned_amount: amt });
                     }
                 }
             }
-            if (rows.length) { const { error } = await supabase.from('cash_flow_plan').insert(rows); if (error) throw error; }
+            const { error } = await supabase.rpc('save_cash_flow_plan', { p_project_id: saveProj, p_year: year, p_rows: rows });
+            if (error) throw error;
             setEdit({});
             queryClient.invalidateQueries({ queryKey: ['cashflow-data', year] });
             smartToast('Đã lưu kế hoạch dòng tiền!');

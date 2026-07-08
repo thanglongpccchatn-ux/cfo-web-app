@@ -136,23 +136,21 @@ export default function MaterialPlan() {
         if (!projectId) return;
         setSaving(true);
         try {
-            // Gộp trùng (nhóm, tháng) rồi ghi. Chỉ đụng dòng material của đúng dự án + năm.
+            // Gộp trùng (nhóm, tháng) rồi lưu ATOMIC qua RPC (delete+insert trong 1 transaction).
             const map = {};
             for (const l of validLines) { const k = `${l.group}:${l.month}`; map[k] = (map[k] || 0) + (Number(l.amount) || 0); }
-            const { error: delErr } = await supabase.from('cash_flow_plan')
-                .delete().eq('project_id', projectId).eq('year', year).eq('category', 'material');
-            if (delErr) throw delErr;
             const rows = Object.entries(map).map(([k, amt]) => {
-                const [g, m] = k.split(':');
-                return { project_id: projectId, year, month: Number(m) + 1, direction: 'out', category: 'material', sub_category: g === NO_GROUP ? null : g, planned_amount: amt };
+                const i = k.lastIndexOf(':'); const g = k.slice(0, i); const m = k.slice(i + 1);
+                return { month: Number(m) + 1, sub_category: g === NO_GROUP ? null : g, planned_amount: amt };
             });
-            if (rows.length) { const { error } = await supabase.from('cash_flow_plan').insert(rows); if (error) throw error; }
+            const { error } = await supabase.rpc('save_material_plan', { p_project_id: projectId, p_year: year, p_rows: rows });
+            if (error) throw error;
             queryClient.invalidateQueries({ queryKey: ['material-plan', year] });
             queryClient.invalidateQueries({ queryKey: ['cashflow-data', year] });
             smartToast('Đã lưu kế hoạch vật liệu!');
             setDirty(false);
         } catch (err) {
-            smartToast('Lỗi lưu: ' + (err.message || 'thiếu cột sub_category? chạy SQL alter table.'));
+            smartToast('Lỗi lưu: ' + (err.message || 'thiếu RPC save_material_plan? chạy db/cash_flow_plan_rpc.sql.'));
         } finally { setSaving(false); }
     };
 
