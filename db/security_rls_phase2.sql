@@ -124,7 +124,8 @@ select public._apply_rls('staff_assignments','manage_users','manage_staff_assign
 create or replace function public.get_user_permissions(p_user_id uuid)
 returns table (permission_code text) language plpgsql security definer set search_path = public as $$
 begin
-    if p_user_id <> auth.uid() and not public.current_user_has_perm('manage_users') then
+    -- is distinct from: xử lý NULL (anon) đúng -> chặn; = uid mình thì cho qua.
+    if p_user_id is distinct from auth.uid() and not public.current_user_has_perm('manage_users') then
         raise exception 'forbidden';
     end if;
     return query
@@ -132,6 +133,7 @@ begin
         from public.user_roles ur join public.role_permissions rp on ur.role_code = rp.role_code
         where ur.user_id = p_user_id;
 end $$;
+revoke execute on function public.get_user_permissions(uuid) from public;
 grant execute on function public.get_user_permissions(uuid) to authenticated;
 
 -- 4) Bỏ CỬA HẬU bootstrap trong admin_create_user + dùng chung current_user_has_perm
