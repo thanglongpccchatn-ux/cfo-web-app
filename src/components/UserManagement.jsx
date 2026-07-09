@@ -179,21 +179,24 @@ export default function UserManagement() {
         if (!window.confirm(confirmText)) return;
 
         try {
-            // 1. Delete user_roles
-            await supabase.from('user_roles').delete().eq('user_id', user.id);
-            // 2. Delete staff_assignments
-            await supabase.from('staff_assignments').delete().eq('user_id', user.id);
-            // 3. Delete profile
-            await supabase.from('profiles').delete().eq('id', user.id);
-            // 4. Delete auth user via admin RPC
+            // Check lỗi TỪNG bước -> không báo "đã xóa" khi thực tế còn sót (vd auth user còn lại
+            // -> tài khoản mồ côi login được nhưng thiếu profile/role).
+            const { error: rErr } = await supabase.from('user_roles').delete().eq('user_id', user.id);
+            if (rErr) throw rErr;
+            const { error: sErr } = await supabase.from('staff_assignments').delete().eq('user_id', user.id);
+            if (sErr) throw sErr;
+            const { error: pErr } = await supabase.from('profiles').delete().eq('id', user.id);
+            if (pErr) throw pErr;
+            // Xóa auth user via admin RPC — lỗi ở đây là NGHIÊM TRỌNG (không được báo thành công)
             const { error } = await supabase.rpc('admin_delete_user', { p_user_id: user.id });
-            if (error) console.warn('Auth user deletion:', error.message);
+            if (error) throw new Error('Xóa tài khoản đăng nhập thất bại: ' + error.message);
 
             logAudit('profiles', user.id, 'DELETE', { email: user.email, full_name: user.full_name });
             smartToast(`Đã xóa "${user.full_name || user.email}"`);
             invalidateUsers();
         } catch (err) {
             smartToast('Lỗi xóa: ' + err.message);
+            invalidateUsers(); // đồng bộ lại UI vì có thể đã xóa 1 phần
         }
     };
 

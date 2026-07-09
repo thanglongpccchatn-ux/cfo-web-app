@@ -146,6 +146,7 @@ export const InventoryProvider = ({ children }) => {
     };
 
     const processTransactionSideEffects = async (receipt, items) => {
+        const syncErrors = []; // gom lỗi side-effect để CẢNH BÁO thay vì nuốt im lặng
         // 3. If linked to a PO, update PO line quantities and status
         if (receipt.po_id && receipt.type === 'IN') {
             for (const item of items) {
@@ -155,33 +156,35 @@ export const InventoryProvider = ({ children }) => {
                     .select('*')
                     .eq('po_id', receipt.po_id)
                     .eq('material_id', item.material_id);
-                
+
                 if (poLines && poLines.length > 0) {
                     const poLine = poLines[0];
                     const newReceived = Number(poLine.received_qty || 0) + Number(item.quantity);
-                    await supabase
+                    const { error } = await supabase
                         .from('purchase_order_lines')
                         .update({ received_qty: newReceived })
                         .eq('id', poLine.id);
+                    if (error) syncErrors.push(`Cập nhật SL đã nhận PO: ${error.message}`);
                 }
             }
 
             // Update overall PO status
             const { data: updatedLines } = await supabase.from('purchase_order_lines').select('*').eq('po_id', receipt.po_id);
             const allDone = (updatedLines || []).every(l => Number(l.received_qty) >= Number(l.ordered_qty));
-            await supabase.from('purchase_orders').update({ status: allDone ? 'completed' : 'partial' }).eq('id', receipt.po_id);
+            const { error: poErr } = await supabase.from('purchase_orders').update({ status: allDone ? 'completed' : 'partial' }).eq('id', receipt.po_id);
+            if (poErr) syncErrors.push(`Cập nhật trạng thái PO: ${poErr.message}`);
         }
 
         // 4. Integrated Finance Sync: Create expense_materials for Inbound
         if (receipt.type === 'IN' && receipt.partner_id) {
             const { data: partner } = await supabase.from('partners').select('name').eq('id', receipt.partner_id).single();
             const { data: warehouse } = await supabase.from('inventory_warehouses').select('project_id').eq('id', receipt.warehouse_id).single();
-            
+
             for (const item of items) {
                 const mat = materials.find(m => m.id === item.material_id);
                 const lineTotal = Number(item.quantity) * Number(item.price || 0) * (1 + Number(mat?.vat_rate || 8) / 100);
-                
-                await supabase.from('expense_materials').insert([{
+
+                const { error } = await supabase.from('expense_materials').insert([{
                     project_id: warehouse?.project_id || null,
                     supplier_id: receipt.partner_id,
                     supplier_name: partner?.name || '',
@@ -196,7 +199,20 @@ export const InventoryProvider = ({ children }) => {
                     expense_date: receipt.date || new Date().toISOString().split('T')[0],
                     notes: `Nhập kho từ phiếu ${receipt.number}${receipt.po_id ? ' (PO liên kết)' : ''}`
                 }]);
+                if (error) syncErrors.push(`Ghi chi phí vật tư "${mat?.name || item.notes || 'Vật tư'}": ${error.message}`);
             }
+        }
+
+        // Không nuốt lỗi: hàng ĐÃ nhập kho (commit trước), nhưng nếu đồng bộ PO/chi phí lỗi
+        // thì cảnh báo rõ để bổ sung thủ công, tránh lệch sổ âm thầm.
+        if (syncErrors.length > 0) {
+            sendNotification(
+                'view_inventory',
+                'Nhập kho OK nhưng đồng bộ chưa đủ',
+                `Phiếu ${receipt.number || ''}: ${syncErrors.length} bước đồng bộ lỗi (${syncErrors[0]}). Cần kiểm tra/bổ sung thủ công (chi phí vật tư / cập nhật PO).`,
+                'WARNING',
+                '#inventory'
+            );
         }
     };
 

@@ -120,15 +120,25 @@ export default function RoleManagement() {
     const handleSavePermissions = async () => {
         setIsSavingPerms(true);
         try {
-            // 1. Delete all existing exact perms for role
-            await supabase.from('role_permissions').delete().eq('role_code', selectedRoleForPerm.code);
-            // 2. Insert new
-            if (rolePermissions.length > 0) {
-                const inserts = rolePermissions.map(code => ({
-                    role_code: selectedRoleForPerm.code,
-                    permission_code: code
-                }));
-                const { error } = await supabase.from('role_permissions').insert(inserts);
+            const roleCode = selectedRoleForPerm.code;
+            // DIFF thay vì "xoá sạch rồi ghi lại" -> không bao giờ để role TRỐNG QUYỀN nếu
+            // 1 bước lỗi giữa chừng. Lấy quyền hiện tại từ DB (tươi) rồi chỉ thêm/bớt phần chênh.
+            const { data: existing, error: exErr } = await supabase
+                .from('role_permissions').select('permission_code').eq('role_code', roleCode);
+            if (exErr) throw exErr;
+            const orig = new Set((existing || []).map(r => r.permission_code));
+            const target = new Set(rolePermissions);
+            const toAdd = [...target].filter(c => !orig.has(c));
+            const toRemove = [...orig].filter(c => !target.has(c));
+            // Thêm trước (không bao giờ under-permission), xoá sau.
+            if (toAdd.length > 0) {
+                const { error } = await supabase.from('role_permissions')
+                    .insert(toAdd.map(code => ({ role_code: roleCode, permission_code: code })));
+                if (error) throw error;
+            }
+            if (toRemove.length > 0) {
+                const { error } = await supabase.from('role_permissions')
+                    .delete().eq('role_code', roleCode).in('permission_code', toRemove);
                 if (error) throw error;
             }
             setIsPermissionModalOpen(false);

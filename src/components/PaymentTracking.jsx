@@ -166,13 +166,14 @@ export default function PaymentTracking({ project, onBack, embedded }) {
     async function handleAddCdtPayment() {
         if (!cdtForm.date || !cdtForm.amount) return;
         const amount = Number(cdtForm.amount);
-        const { data: insertedData } = await supabase.from('external_payment_history').insert([{ payment_stage_id: cdtModal.id, payment_date: cdtForm.date, amount, description: cdtForm.notes }]).select().single();
-        // Fetch-before-write: lấy giá trị mới nhất từ DB để tránh race condition
-        const { data: freshStage } = await supabase.from('payments').select('external_income').eq('id', cdtModal.id).single();
-        const currentIncome = Number(freshStage?.external_income || 0);
-        const newIncome = currentIncome + amount;
-        await supabase.from('payments').update({ external_income: newIncome, status: newIncome > 0 ? 'CĐT Đã thanh toán' : 'Chưa thanh toán' }).eq('id', cdtModal.id);
-        
+        const { data: insertedData, error: insErr } = await supabase.from('external_payment_history').insert([{ payment_stage_id: cdtModal.id, payment_date: cdtForm.date, amount, description: cdtForm.notes }]).select().single();
+        if (insErr) { smartToast('Lỗi ghi nhận thu tiền CĐT: ' + insErr.message); return; } // KHÔNG cộng tổng nếu insert lỗi
+        // Tính lại tổng từ SUM lịch sử (không cộng dồn) -> khớp thực tế, tránh lệch khi lỗi/đua race
+        const { data: histRows } = await supabase.from('external_payment_history').select('amount').eq('payment_stage_id', cdtModal.id);
+        const newIncome = (histRows || []).reduce((s, r) => s + Number(r.amount || 0), 0);
+        const { error: updErr } = await supabase.from('payments').update({ external_income: newIncome, status: newIncome > 0 ? 'CĐT Đã thanh toán' : 'Chưa thanh toán' }).eq('id', cdtModal.id);
+        if (updErr) smartToast('Đã lưu giao dịch nhưng cập nhật tổng lỗi: ' + updErr.message);
+
         await logAudit({
             action: 'CREATE',
             tableName: 'external_payment_history',
@@ -227,13 +228,14 @@ export default function PaymentTracking({ project, onBack, embedded }) {
     async function handleAddTlSatecoPayment() {
         if (!tlSatecoForm.date || !tlSatecoForm.amount) return;
         const amount = Number(tlSatecoForm.amount);
-        const { data: insertedData } = await supabase.from('internal_payment_history').insert([{ payment_stage_id: tlSatecoModal.id, payment_date: tlSatecoForm.date, amount, description: tlSatecoForm.notes }]).select().single();
-        // Fetch-before-write: lấy giá trị mới nhất từ DB để tránh race condition
-        const { data: freshStage } = await supabase.from('payments').select('internal_paid').eq('id', tlSatecoModal.id).single();
-        const currentPaid = Number(freshStage?.internal_paid || 0);
-        const newPaid = currentPaid + amount;
-        await supabase.from('payments').update({ internal_paid: newPaid }).eq('id', tlSatecoModal.id);
-        
+        const { data: insertedData, error: insErr } = await supabase.from('internal_payment_history').insert([{ payment_stage_id: tlSatecoModal.id, payment_date: tlSatecoForm.date, amount, description: tlSatecoForm.notes }]).select().single();
+        if (insErr) { smartToast('Lỗi ghi nhận thanh toán nội bộ: ' + insErr.message); return; } // KHÔNG cộng tổng nếu insert lỗi
+        // Tính lại tổng từ SUM lịch sử (không cộng dồn)
+        const { data: histRows } = await supabase.from('internal_payment_history').select('amount').eq('payment_stage_id', tlSatecoModal.id);
+        const newPaid = (histRows || []).reduce((s, r) => s + Number(r.amount || 0), 0);
+        const { error: updErr } = await supabase.from('payments').update({ internal_paid: newPaid }).eq('id', tlSatecoModal.id);
+        if (updErr) smartToast('Đã lưu giao dịch nhưng cập nhật tổng lỗi: ' + updErr.message);
+
         await logAudit({
             action: 'CREATE',
             tableName: 'internal_payment_history',
