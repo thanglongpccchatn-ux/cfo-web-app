@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrency, PAYMENT_METHODS, groupBySupplier, projectOption } from './payablesUtils';
+import { smartToast } from '../../utils/globalToast';
 
 export default function SupplierPaymentForm({ projects = [], suppliers = [], purchases = [], payments = [], materialGroups = [], onSaved }) {
   const { user } = useAuth();
@@ -22,6 +23,21 @@ export default function SupplierPaymentForm({ projects = [], suppliers = [], pur
 
   const balance = supplierInfo ? (supplierInfo.totalPurchased - supplierInfo.totalPaid) : 0;
 
+  // Danh sách NCC ĐANG CÒN NỢ (để bấm trả nhanh, khỏi nhập tay)
+  const debtors = useMemo(() => (
+    groupBySupplier(purchases, payments)
+      .map(g => ({ ...g, balance: g.totalPurchased - g.totalPaid }))
+      .filter(g => g.balance > 0)
+      .sort((a, b) => b.balance - a.balance)
+  ), [purchases, payments]);
+
+  const selectDebtor = (g) => {
+    // Nếu NCC chỉ mua cho 1 công trình -> tự chọn luôn công trình đó
+    const projIds = [...new Set(purchases.filter(p => p.supplier_id === g.supplier_id && p.project_id).map(p => p.project_id))];
+    setForm(f => ({ ...f, supplier_id: g.supplier_id, amount: String(g.balance), project_id: projIds.length === 1 ? projIds[0] : f.project_id }));
+    document.getElementById('sp-payment-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const handleSave = async () => {
     if (!form.project_id || !form.supplier_id || !form.amount || Number(form.amount) <= 0) return;
     setSaving(true);
@@ -37,12 +53,15 @@ export default function SupplierPaymentForm({ projects = [], suppliers = [], pur
         notes: form.notes,
         created_by: user?.id,
       };
-      const { data } = await supabase.from('supplier_payments').insert(payload).select('*, partners:supplier_id(name), projects:project_id(name, code, internal_code)').single();
+      const { data, error } = await supabase.from('supplier_payments').insert(payload).select('*, partners:supplier_id(name), projects:project_id(name, code, internal_code)').single();
+      if (error) throw error;
       if (data) setRecentPayments(prev => [data, ...prev].slice(0, 10));
       setForm(f => ({ ...f, amount: '', reference_no: '', notes: '' }));
+      smartToast('Đã ghi nhận thanh toán!');
       onSaved?.();
     } catch (err) {
       console.error('Error saving payment:', err);
+      smartToast('Lỗi ghi nhận thanh toán: ' + (err.message || 'không rõ nguyên nhân'));
     } finally {
       setSaving(false);
     }
@@ -57,8 +76,37 @@ export default function SupplierPaymentForm({ projects = [], suppliers = [], pur
 
   return (
     <div className="space-y-6">
+      {/* Danh sách NCC còn nợ — bấm để trả nhanh */}
+      {debtors.length > 0 && (
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
+          <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-3 text-sm">
+            <span className="material-symbols-outlined text-rose-500 text-[20px]">account_balance_wallet</span>
+            Đang còn nợ ({debtors.length} NCC) <span className="text-[11px] font-medium text-slate-400">— bấm để trả</span>
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-[300px] overflow-auto">
+            {debtors.map(g => {
+              const active = form.supplier_id === g.supplier_id;
+              return (
+                <button key={g.supplier_id} onClick={() => selectDebtor(g)}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all ${active ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 ring-1 ring-emerald-300' : 'border-slate-200 dark:border-slate-700 hover:border-emerald-300 hover:bg-emerald-50/40 dark:hover:bg-slate-700/40'}`}>
+                  <span className="flex-1 min-w-0">
+                    <span className="block font-bold text-[13px] text-slate-800 dark:text-white truncate">{g.supplier_code || g.supplier_name}</span>
+                    {g.supplier_code && <span className="block text-[11px] text-slate-400 truncate">{g.supplier_name}</span>}
+                  </span>
+                  <span className="text-right shrink-0">
+                    <span className="block text-[10px] text-slate-400 font-bold uppercase">Còn nợ</span>
+                    <span className="font-mono font-black text-rose-600 text-[13px]">{formatCurrency(g.balance)}</span>
+                  </span>
+                  <span className="material-symbols-outlined text-emerald-600 text-[20px] shrink-0">payments</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Payment Form */}
-      <div className="bg-gradient-to-br from-emerald-50/50 to-white dark:from-emerald-900/10 dark:to-slate-800/50 rounded-2xl border border-emerald-200 dark:border-emerald-800/30 p-5">
+      <div id="sp-payment-form" className="bg-gradient-to-br from-emerald-50/50 to-white dark:from-emerald-900/10 dark:to-slate-800/50 rounded-2xl border border-emerald-200 dark:border-emerald-800/30 p-5">
         <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-4">
           <span className="material-symbols-outlined text-emerald-600">payments</span>
           Ghi nhận thanh toán cho NCC
@@ -78,7 +126,7 @@ export default function SupplierPaymentForm({ projects = [], suppliers = [], pur
             <select value={form.supplier_id} onChange={e => setForm(f => ({ ...f, supplier_id: e.target.value }))}
               className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-700 text-slate-800 dark:text-white">
               <option value="">Chọn NCC...</option>
-              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {suppliers.map(s => <option key={s.id} value={s.id}>{s.code ? `${s.code} — ${s.name}` : s.name}</option>)}
             </select>
           </div>
           <div>
