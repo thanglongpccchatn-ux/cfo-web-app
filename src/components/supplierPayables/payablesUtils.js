@@ -144,6 +144,7 @@ export function groupBySupplier(purchases = [], payments = []) {
       map[sid] = {
         supplier_id: sid,
         supplier_name: p.partners?.name || p.supplier_name || 'Không rõ',
+        supplier_code: p.partners?.code || '',
         groups: {},
         totalPurchased: 0,
         totalPaid: 0,
@@ -164,6 +165,7 @@ export function groupBySupplier(purchases = [], payments = []) {
       map[sid] = {
         supplier_id: sid,
         supplier_name: p.partners?.name || p.supplier_name || 'Không rõ',
+        supplier_code: p.partners?.code || '',
         groups: {},
         totalPurchased: 0,
         totalPaid: 0,

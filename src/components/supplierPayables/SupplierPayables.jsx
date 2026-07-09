@@ -35,8 +35,8 @@ export default function SupplierPayables() {
     setLoading(true);
     try {
       const [purchRes, payRes, projRes, suppRes] = await Promise.all([
-        supabase.from('supplier_purchases').select('*, partners:supplier_id(name), projects:project_id(name, code, internal_code)').order('purchase_date', { ascending: false }),
-        supabase.from('supplier_payments').select('*, partners:supplier_id(name), projects:project_id(name, code, internal_code)').order('payment_date', { ascending: false }),
+        supabase.from('supplier_purchases').select('*, partners:supplier_id(name, code), projects:project_id(name, code, internal_code)').order('purchase_date', { ascending: false }),
+        supabase.from('supplier_payments').select('*, partners:supplier_id(name, code), projects:project_id(name, code, internal_code)').order('payment_date', { ascending: false }),
         supabase.from('projects').select('id, name, code, internal_code').order('name'),
         supabase.from('partners').select('id, name, code').eq('type', 'Supplier').order('name'),
       ]);
