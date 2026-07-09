@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { Project } from '../types/database';
 import { fmt } from './documentTracking/dtkHelpers';
+import { getWarrantyAmount } from '../utils/financialCalcs';
 
 interface WarrantyProject extends Project {
     partners?: { name: string; short_name: string; code: string };
@@ -65,7 +66,7 @@ export default function WarrantyTracking() {
             today.setHours(0, 0, 0, 0);
 
             const processed: WarrantyProject[] = (data || []).map((p: any) => {
-                const amount = (Number(p.total_value_post_vat) || 0) * ((Number(p.warranty_percentage) || 0) / 100);
+                const amount = getWarrantyAmount(p); // dùng chung -> khớp Dashboard/ContractMasterDetail
                 
                 let endDate = null;
                 let daysRem = 9999;

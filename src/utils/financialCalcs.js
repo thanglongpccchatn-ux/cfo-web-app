@@ -15,6 +15,28 @@
  * @param {Array} intHistory - Internal payment history records (expenses)
  * @returns {Object} Computed financial metrics
  */
+/**
+ * Tổng giá trị hợp đồng post-VAT ĐÃ GỒM phát sinh đã duyệt — NGUỒN DUY NHẤT.
+ * Dùng chung cho Dashboard, ContractMasterDetail, PartnerDetailModal... để không lệch số.
+ */
+export function getEffectiveTotalValuePostVat(project) {
+    const p = project || {};
+    const originalValue = parseFloat(p.original_value) || 0;
+    const vatPercent = p.vat_percentage ?? 8;
+    const vatAmount = p.vat_amount || Math.round(originalValue * vatPercent / 100);
+    const postVatValue = p.total_value_post_vat || (originalValue + vatAmount);
+    const approvedVariations = parseFloat(p.total_approved_variations) || 0;
+    return postVatValue + approvedVariations * (1 + vatPercent / 100);
+}
+
+/** Tiền bảo hành — NGUỒN DUY NHẤT (tỷ lệ trên giá trị gốc pre-VAT, theo cách tính canonical hiện có). */
+export function getWarrantyAmount(project) {
+    const p = project || {};
+    const originalValue = parseFloat(p.original_value) || 0;
+    const warrantyRatio = parseFloat(p.warranty_percentage || p.warranty_ratio || 5) / 100;
+    return Math.round(originalValue * warrantyRatio);
+}
+
 export function computeProjectFinancials(project, payments = [], extHistory = [], intHistory = []) {
     const p = project;
 
@@ -26,7 +48,7 @@ export function computeProjectFinancials(project, payments = [], extHistory = []
 
     // Approved variations (phát sinh đã duyệt)
     const approvedVariations = parseFloat(p.total_approved_variations) || 0;
-    const totalValuePostVat = postVatValue + approvedVariations * (1 + vatPercent / 100);
+    const totalValuePostVat = getEffectiveTotalValuePostVat(p);
 
     // ── Income (Thực thu) ──
     // Prefer external_payment_history if available, fallback to payments.external_income
@@ -66,9 +88,8 @@ export function computeProjectFinancials(project, payments = [], extHistory = []
     // ── Recovery Rate ──
     const recoveryRate = totalValuePostVat > 0 ? (totalIncome / totalValuePostVat) * 100 : 0;
 
-    // ── Warranty ──
-    const warrantyRatio = parseFloat(p.warranty_percentage || p.warranty_ratio || 5) / 100;
-    const warrantyAmount = Math.round(originalValue * warrantyRatio);
+    // ── Warranty ── (dùng chung getWarrantyAmount để mọi màn khớp nhau)
+    const warrantyAmount = getWarrantyAmount(p);
 
     return {
         // Contract values

@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatBillion } from '../../utils/formatters';
+import { getEffectiveTotalValuePostVat } from '../../utils/financialCalcs';
 
 export default function PartnerDetailModal({ partner, onClose }) {
     if (!partner) return null;
@@ -27,9 +28,9 @@ export default function PartnerDetailModal({ partner, onClose }) {
                 <div className="grid grid-cols-4 gap-3 px-6 py-4 bg-slate-50 border-b border-slate-100">
                     {[
                         { label: 'Số HĐ', value: partner.projects.length, color: 'blue', icon: 'description' },
-                        { label: 'Tổng giá trị HĐ', value: formatBillion(partner.projects.reduce((s, p) => s + (p.total_value_post_vat || 0), 0)), color: 'indigo', icon: 'payments' },
+                        { label: 'Tổng giá trị HĐ', value: formatBillion(partner.projects.reduce((s, p) => s + getEffectiveTotalValuePostVat(p), 0)), color: 'indigo', icon: 'payments' },
                         { label: 'Tổng đã thu', value: formatBillion(partner.projects.reduce((s, p) => s + (p.computedTotalIncome || 0), 0)), color: 'emerald', icon: 'account_balance' },
-                        { label: 'Tổng công nợ', value: formatBillion(partner.projects.reduce((s, p) => s + Math.max(0, (p.total_value_post_vat || 0) - (p.computedTotalIncome || 0)), 0)), color: 'rose', icon: 'money_off' },
+                        { label: 'Tổng công nợ', value: formatBillion(partner.projects.reduce((s, p) => s + Math.max(0, getEffectiveTotalValuePostVat(p) - (p.computedTotalIncome || 0)), 0)), color: 'rose', icon: 'money_off' },
                     ].map((k, i) => (
                         <div key={i} className="bg-white rounded-xl p-3 border border-slate-100 shadow-sm">
                             <div className="flex items-center gap-2 mb-1">
@@ -57,14 +58,14 @@ export default function PartnerDetailModal({ partner, onClose }) {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {partner.projects.map(p => {
-                                const debt = Math.max(0, (p.total_value_post_vat || 0) - (p.computedTotalIncome || 0));
+                                const debt = Math.max(0, getEffectiveTotalValuePostVat(p) - (p.computedTotalIncome || 0));
                                 return (
                                     <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-4 py-3">
                                             <span className="font-mono text-xs font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">{p.internal_code || p.code}</span>
                                         </td>
                                         <td className="px-4 py-3 text-xs font-medium text-slate-700 max-w-[200px] truncate">{p.name}</td>
-                                        <td className="px-4 py-3 text-right text-xs font-bold text-slate-600 tabular-nums">{formatBillion(p.total_value_post_vat || 0)}</td>
+                                        <td className="px-4 py-3 text-right text-xs font-bold text-slate-600 tabular-nums">{formatBillion(getEffectiveTotalValuePostVat(p))}</td>
                                         <td className="px-4 py-3 text-right text-xs font-bold text-slate-500 tabular-nums">{formatBillion(p.computedTotalInvoice || 0)}</td>
                                         <td className="px-4 py-3 text-right text-xs font-black text-emerald-600 tabular-nums">{formatBillion(p.computedTotalIncome || 0)}</td>
                                         <td className="px-4 py-3 text-right">
@@ -85,10 +86,10 @@ export default function PartnerDetailModal({ partner, onClose }) {
                         <tfoot className="bg-slate-50 border-t-2 border-slate-200">
                             <tr className="text-xs font-black">
                                 <td className="px-4 py-3 text-slate-500 uppercase" colSpan={2}>TỔNG</td>
-                                <td className="px-4 py-3 text-right text-slate-700 tabular-nums">{formatBillion(partner.projects.reduce((s, p) => s + (p.total_value_post_vat || 0), 0))}</td>
+                                <td className="px-4 py-3 text-right text-slate-700 tabular-nums">{formatBillion(partner.projects.reduce((s, p) => s + getEffectiveTotalValuePostVat(p), 0))}</td>
                                 <td className="px-4 py-3 text-right text-slate-700 tabular-nums">{formatBillion(partner.projects.reduce((s, p) => s + (p.computedTotalInvoice || 0), 0))}</td>
                                 <td className="px-4 py-3 text-right text-emerald-700 tabular-nums">{formatBillion(partner.projects.reduce((s, p) => s + (p.computedTotalIncome || 0), 0))}</td>
-                                <td className="px-4 py-3 text-right text-rose-700 tabular-nums">{formatBillion(partner.projects.reduce((s, p) => s + Math.max(0, (p.total_value_post_vat || 0) - (p.computedTotalIncome || 0)), 0))}</td>
+                                <td className="px-4 py-3 text-right text-rose-700 tabular-nums">{formatBillion(partner.projects.reduce((s, p) => s + Math.max(0, getEffectiveTotalValuePostVat(p) - (p.computedTotalIncome || 0)), 0))}</td>
                                 <td></td>
                             </tr>
                         </tfoot>
