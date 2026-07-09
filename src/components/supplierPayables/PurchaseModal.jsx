@@ -372,11 +372,17 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
                 className="w-full text-sm border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
             <div>
-              <label className="block text-[11px] font-bold text-slate-500 mb-1">SỐ HÓA ĐƠN / REF</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-bold text-slate-500">SỐ HÓA ĐƠN / REF</label>
+                <button type="button" onClick={() => setHeader(h => ({ ...h, reference_no: buildReference() }))}
+                  className="text-[10.5px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-0.5" title="Tạo lại theo mã dự án + mã NCC + ngày">
+                  <span className="material-symbols-outlined text-[13px]">autorenew</span>Tạo lại theo mã
+                </button>
+              </div>
               <input type="text" value={header.reference_no} onChange={e => setHeader(h => ({ ...h, reference_no: e.target.value }))}
-                placeholder={buildReference() || 'Tự sinh: MÃDA-NCC-DDMMYYYY'}
+                placeholder={buildReference() || 'Tự sinh: MÃDA-MÃNCC-DDMMYYYY'}
                 className="w-full text-sm border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 outline-none" />
-              <p className="text-[10.5px] text-slate-400 mt-1">Để trống sẽ tự sinh theo mã dự án + viết tắt NCC + ngày.</p>
+              <p className="text-[10.5px] text-slate-400 mt-1">Để trống sẽ tự sinh theo mã dự án + <b>mã NCC</b> + ngày. NCC chưa có mã sẽ dùng viết tắt tên — hãy điền mã ở danh mục Nhà cung cấp.</p>
             </div>
           </div>
         </div>
