@@ -13,7 +13,7 @@ import { smartToast } from '../../utils/globalToast';
 const removeDiacritics = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
 
 /* ── Default empty line ── */
-const emptyLine = () => ({ product_name: '', material_group: '', unit: 'cái', quantity: 0, unit_price: 0, vat_rate: 8, notes: '', material_id: null });
+const emptyLine = () => ({ id: null, product_name: '', material_group: '', unit: 'cái', quantity: 0, unit_price: 0, vat_rate: 8, notes: '', material_id: null });
 
 /* ── Autocomplete Input (có điều hướng bàn phím ↑/↓/Enter/Esc) ── */
 function ProductAutocomplete({ value, onChange, onSelect, materials, priceMap, inputId, onPicked, onCreateNew }) {
@@ -186,19 +186,25 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
     return () => { cancelled = true; };
   }, []);
 
+  // editData có thể là 1 dòng (cũ) hoặc MẢNG dòng cùng 1 đơn (sửa theo đơn).
+  const editRows = Array.isArray(editData) ? editData : (editData ? [editData] : []);
+  const editing = editRows.length > 0;
+
   // Init form when editData changes
   useEffect(() => {
-    if (editData) {
-      setHeader({ project_id: editData.project_id || '', supplier_id: editData.supplier_id || '', purchase_date: editData.purchase_date || '', reference_no: editData.reference_no || '' });
-      setLines([{
-        product_name: editData.product_name || '', material_group: editData.material_group || '',
-        unit: editData.unit || 'cái', quantity: editData.quantity || 0, unit_price: editData.unit_price || 0,
-        vat_rate: editData.vat_rate ?? 8, notes: editData.notes || '', material_id: editData.material_id || null,
-      }]);
+    if (editing) {
+      const h = editRows[0];
+      setHeader({ project_id: h.project_id || '', supplier_id: h.supplier_id || '', purchase_date: h.purchase_date || '', reference_no: h.reference_no || '' });
+      setLines(editRows.map(r => ({
+        id: r.id || null, product_name: r.product_name || '', material_group: r.material_group || '',
+        unit: r.unit || 'cái', quantity: r.quantity || 0, unit_price: r.unit_price || 0,
+        vat_rate: r.vat_rate ?? 8, notes: r.notes || '', material_id: r.material_id || null,
+      })));
     } else {
       setHeader({ project_id: '', supplier_id: '', purchase_date: new Date().toISOString().slice(0, 10), reference_no: '' });
       setLines([emptyLine()]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editData, open]);
 
   // Build price map when supplier changes
@@ -231,7 +237,7 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
   const handleQtyKey = (e, idx) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
-    if (!editData?.id && idx >= lines.length - 1) addLine();
+    if (idx >= lines.length - 1) addLine();
     else focusEl(`pm-prod-${idx + 1}`);
   };
 
@@ -268,24 +274,32 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
     setSaving(true);
     try {
       const refNo = header.reference_no?.trim() || buildReference();
-      if (editData?.id) {
-        const l = validLines[0];
-        const { error } = await supabase.from('supplier_purchases').update({
-          project_id: header.project_id, supplier_id: header.supplier_id,
-          material_group: l.material_group || 'Khác', purchase_date: header.purchase_date,
-          product_name: l.product_name, unit: l.unit, quantity: Number(l.quantity) || 0,
-          unit_price: Number(l.unit_price) || 0, vat_rate: Number.isFinite(Number(l.vat_rate)) ? Number(l.vat_rate) : 8,
-          notes: l.notes, material_id: l.material_id || null, reference_no: refNo || null,
-        }).eq('id', editData.id);
-        if (error) throw error;
+      const rowPayload = (l) => ({
+        project_id: header.project_id, supplier_id: header.supplier_id,
+        material_group: l.material_group || 'Khác', purchase_date: header.purchase_date,
+        product_name: l.product_name, unit: l.unit, quantity: Number(l.quantity) || 0,
+        unit_price: Number(l.unit_price) || 0, vat_rate: Number.isFinite(Number(l.vat_rate)) ? Number(l.vat_rate) : 8,
+        notes: l.notes, material_id: l.material_id || null, reference_no: refNo || null,
+      });
+      if (editing) {
+        // SỬA THEO ĐƠN: cập nhật dòng có id, thêm dòng mới, xoá dòng đã bỏ (áp header cho cả đơn)
+        const keptIds = new Set(validLines.filter(l => l.id).map(l => l.id));
+        for (const l of validLines) {
+          if (l.id) {
+            const { error } = await supabase.from('supplier_purchases').update(rowPayload(l)).eq('id', l.id);
+            if (error) throw error;
+          } else {
+            const { error } = await supabase.from('supplier_purchases').insert([{ ...rowPayload(l), created_by: user?.id }]);
+            if (error) throw error;
+          }
+        }
+        const toDelete = editRows.map(r => r.id).filter(id => id && !keptIds.has(id));
+        if (toDelete.length > 0) {
+          const { error } = await supabase.from('supplier_purchases').delete().in('id', toDelete);
+          if (error) throw error;
+        }
       } else {
-        const batch = validLines.map(l => ({
-          project_id: header.project_id, supplier_id: header.supplier_id,
-          material_group: l.material_group || 'Khác', purchase_date: header.purchase_date,
-          product_name: l.product_name, unit: l.unit, quantity: Number(l.quantity) || 0,
-          unit_price: Number(l.unit_price) || 0, vat_rate: Number.isFinite(Number(l.vat_rate)) ? Number(l.vat_rate) : 8,
-          notes: l.notes, material_id: l.material_id || null, created_by: user?.id, reference_no: refNo || null,
-        }));
+        const batch = validLines.map(l => ({ ...rowPayload(l), created_by: user?.id }));
         const { data: inserted, error } = await supabase.from('supplier_purchases').insert(batch).select('id, product_name, unit_price, supplier_id');
         if (error) throw error;
         if (inserted) {

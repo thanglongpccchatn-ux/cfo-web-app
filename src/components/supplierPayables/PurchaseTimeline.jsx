@@ -19,8 +19,12 @@ export default function PurchaseTimeline({ purchases = [], payments = [], projec
     return items.sort((a, b) => new Date(b._date) - new Date(a._date));
   }, [purchases, payments]);
 
+  // Khoá gom "1 đơn": cùng NCC + dự án + ngày + số hóa đơn
+  const orderKey = (p) => `${p.supplier_id || ''}|${p.project_id || ''}|${p.purchase_date || ''}|${p.reference_no || ''}`;
   const handleEdit = (item) => {
-    setEditData(item);
+    // Mở CẢ ĐƠN: gom mọi dòng mua cùng đơn để sửa/thêm/xoá rồi lưu 1 lần
+    const orderLines = purchases.filter(p => orderKey(p) === orderKey(item));
+    setEditData(orderLines.length ? orderLines : [item]);
     setShowModal(true);
   };
 
@@ -80,7 +84,7 @@ function TimelineTable({ timeline, onEdit, onDelete }) {
     if (!search) return timeline;
     const q = removeDiacritics(search.toLowerCase());
     return timeline.filter(item => {
-      const texts = [item.partners?.name, item.product_name, item.material_group, item.notes, item.reference_no].filter(Boolean).join(' ');
+      const texts = [item.partners?.code, item.partners?.name, item.product_name, item.material_group, item.notes, item.reference_no].filter(Boolean).join(' ');
       return removeDiacritics(texts.toLowerCase()).includes(q);
     });
   }, [timeline, search]);
@@ -156,7 +160,7 @@ function TimelineTable({ timeline, onEdit, onDelete }) {
                       {isPurchase ? 'Mua' : 'TT'}
                     </span>
                   </td>
-                  <td className="py-2.5 px-3 font-medium text-slate-800 dark:text-white">{item.partners?.name || '—'}</td>
+                  <td className="py-2.5 px-3 font-medium text-slate-800 dark:text-white whitespace-nowrap" title={item.partners?.name || ''}>{item.partners?.code || item.partners?.name || '—'}</td>
                   <td className="py-2.5 px-3 text-slate-500">{item.material_group || '—'}</td>
                   <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300 max-w-[200px] truncate">{isPurchase ? item.product_name : (item.notes || 'Thanh toán')}</td>
                   <td className="py-2.5 px-3 text-right font-mono text-slate-600">{isPurchase ? `${formatCurrency(item.quantity)} ${item.unit || ''}` : '—'}</td>
