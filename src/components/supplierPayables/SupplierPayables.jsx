@@ -38,7 +38,9 @@ export default function SupplierPayables() {
         supabase.from('supplier_purchases').select('*, partners:supplier_id(name, code), projects:project_id(name, code, internal_code)').order('purchase_date', { ascending: false }),
         supabase.from('supplier_payments').select('*, partners:supplier_id(name, code), projects:project_id(name, code, internal_code)').order('payment_date', { ascending: false }),
         supabase.from('projects').select('id, name, code, internal_code').order('name'),
-        supabase.from('partners').select('id, name, code').eq('type', 'Supplier').order('name'),
+        // NCC lấy từ bảng `suppliers` (danh mục Nhà cung cấp, CÓ mã) — cũng là bảng mà
+        // supplier_purchases.supplier_id tham chiếu (split_partners_and_materials.sql).
+        supabase.from('suppliers').select('id, name, code').order('name'),
       ]);
 
       setPurchases(purchRes.data || []);
