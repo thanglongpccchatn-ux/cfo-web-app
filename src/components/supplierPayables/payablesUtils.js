@@ -183,6 +183,39 @@ export function groupBySupplier(purchases = [], payments = []) {
   return Object.values(map).sort((a, b) => b.totalPurchased - a.totalPurchased);
 }
 
+/** Khoá gom "1 đơn hàng": cùng NCC + dự án + ngày + số hóa đơn. */
+export function orderKeyOf(p) {
+  return `${p.supplier_id || ''}|${p.project_id || ''}|${p.purchase_date || ''}|${p.reference_no || ''}`;
+}
+
+/**
+ * Gom mua hàng theo TỪNG ĐƠN + tính đã trả/còn nợ theo đơn.
+ * Khoản trả khớp đơn qua supplier_payments.purchase_ref = orderKeyOf(đơn).
+ */
+export function groupByOrder(purchases = [], payments = []) {
+  const map = {};
+  for (const p of purchases) {
+    const k = orderKeyOf(p);
+    if (!map[k]) {
+      map[k] = {
+        key: k, supplier_id: p.supplier_id,
+        supplier_name: p.partners?.name || 'Không rõ', supplier_code: p.partners?.code || '',
+        project_id: p.project_id, projects: p.projects,
+        purchase_date: p.purchase_date, reference_no: p.reference_no || '',
+        total: 0, paid: 0, lineCount: 0,
+      };
+    }
+    map[k].total += Number(p.total_amount || 0);
+    map[k].lineCount += 1;
+  }
+  for (const pay of payments) {
+    if (pay.purchase_ref && map[pay.purchase_ref]) map[pay.purchase_ref].paid += Number(pay.amount || 0);
+  }
+  return Object.values(map)
+    .map(o => ({ ...o, remaining: o.total - o.paid }))
+    .sort((a, b) => new Date(b.purchase_date) - new Date(a.purchase_date));
+}
+
 // ─────────────────────────────────────────
 // Excel Import Parser (v2 — 2 sheet format)
 // ─────────────────────────────────────────
