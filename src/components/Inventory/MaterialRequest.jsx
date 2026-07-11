@@ -25,11 +25,14 @@ async function fetchAll(table, select, order) {
 }
 
 export default function MaterialRequest({ onIssue }) {
-  const { user } = useAuth();
+  const { user, profile, hasPermission } = useAuth();
   const queryClient = useQueryClient();
+  const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
+  const viewAll = isAdmin || hasPermission('view_all_inventory');
+  const myProject = profile?.current_project_id || '';
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [header, setHeader] = useState({ project_id: '', subcontractor: null, request_date: today(), notes: '' });
+  const [header, setHeader] = useState({ project_id: viewAll ? '' : myProject, subcontractor: null, request_date: today(), notes: '' });
   const [lines, setLines] = useState([emptyLine()]);
 
   const { data } = useQuery({
@@ -110,7 +113,7 @@ export default function MaterialRequest({ onIssue }) {
     } finally { setSaving(false); }
   };
 
-  const requests = (data?.requests || []);
+  const requests = (data?.requests || []).filter(r => viewAll || r.project_id === myProject);
 
   return (
     <div className="space-y-4">
@@ -131,7 +134,11 @@ export default function MaterialRequest({ onIssue }) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <label className="block text-[11px] font-bold text-slate-500 mb-1">CÔNG TRÌNH *</label>
-              <SearchableSelect options={projectOptions} value={header.project_id} onChange={id => { setHeader(h => ({ ...h, project_id: id })); setLines([emptyLine()]); }} placeholder="Chọn công trình..." />
+              {viewAll ? (
+                <SearchableSelect options={projectOptions} value={header.project_id} onChange={id => { setHeader(h => ({ ...h, project_id: id })); setLines([emptyLine()]); }} placeholder="Chọn công trình..." />
+              ) : (
+                <div className="text-sm font-bold px-3 py-2.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px] text-slate-400">apartment</span>{projMap[myProject] || 'Chưa phân công công trình'}</div>
+              )}
             </div>
             <div>
               <label className="block text-[11px] font-bold text-slate-500 mb-1">NHÀ THẦU / TỔ ĐỘI *</label>

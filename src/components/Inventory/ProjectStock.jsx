@@ -7,6 +7,7 @@ import { fmt } from '../../utils/formatters';
 
 // KHO VẬT TƯ = Nhập (tự động từ supplier_purchases) − Xuất (material_issues) − Tồn, theo dự án.
 // Khớp vật tư theo TÊN chuẩn hoá (hàng import thường thiếu material_id).
+// Phân quyền: view_material_price (không có -> ẩn giá); view_all_inventory (không có -> khoá công trình được phân công).
 
 const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim().replace(/\s+/g, ' ');
 const today = () => new Date().toISOString().slice(0, 10);
@@ -25,7 +26,7 @@ async function fetchAll(table, select) {
 }
 
 /* ── Modal xuất kho (module-level: tránh mất focus) ── */
-function IssueModal({ row, onClose, onSaved, userId }) {
+function IssueModal({ row, onClose, onSaved, userId, showPrice }) {
   const [qty, setQty] = useState('');
   const [date, setDate] = useState(today());
   const [notes, setNotes] = useState('');
@@ -61,7 +62,7 @@ function IssueModal({ row, onClose, onSaved, userId }) {
         <div className="p-5 space-y-3">
           <div className="text-sm">
             <div className="font-bold text-slate-800 dark:text-white">{row.product_name}</div>
-            <div className="text-[12px] text-slate-500">{row.projectLabel} · Tồn hiện tại: <b className="text-blue-600">{qtyFmt(row.ton)} {row.unit}</b> · Đơn giá BQ {money(row.avgPrice)}đ</div>
+            <div className="text-[12px] text-slate-500">{row.projectLabel} · Tồn hiện tại: <b className="text-blue-600">{qtyFmt(row.ton)} {row.unit}</b>{showPrice ? ` · Đơn giá BQ ${money(row.avgPrice)}đ` : ''}</div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -80,7 +81,7 @@ function IssueModal({ row, onClose, onSaved, userId }) {
             <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="VD: xuất cho tổ thi công..."
               className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700" />
           </div>
-          {amt > 0 && <div className="text-[12px] text-slate-500">Giá trị xuất ước tính: <b className="font-mono">{money(amt * row.avgPrice)}đ</b></div>}
+          {showPrice && amt > 0 && <div className="text-[12px] text-slate-500">Giá trị xuất ước tính: <b className="font-mono">{money(amt * row.avgPrice)}đ</b></div>}
         </div>
         <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-100 dark:border-slate-700">
           <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">Hủy</button>
@@ -94,11 +95,16 @@ function IssueModal({ row, onClose, onSaved, userId }) {
 export default function ProjectStock() {
   const { user, hasPermission, profile } = useAuth();
   const queryClient = useQueryClient();
-  const canIssue = profile?.role_code === 'ROLE01' || hasPermission('export_inventory') || hasPermission('manage_materials') || hasPermission('manage_materials_tracking');
+  const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
+  const canIssue = isAdmin || hasPermission('export_inventory') || hasPermission('manage_materials') || hasPermission('manage_materials_tracking');
+  const showPrice = isAdmin || hasPermission('view_material_price');
+  const viewAll = isAdmin || hasPermission('view_all_inventory');
+  const myProject = profile?.current_project_id || '';
 
-  const [projectId, setProjectId] = useState('');
+  const [projectId, setProjectId] = useState(viewAll ? '' : myProject);
   const [q, setQ] = useState('');
   const [issueRow, setIssueRow] = useState(null);
+  const effectiveProject = viewAll ? projectId : myProject;
 
   const { data, isLoading } = useQuery({
     queryKey: ['project-stock'],
@@ -122,7 +128,6 @@ export default function ProjectStock() {
     return ids.map(id => ({ id, label: projMap[id] || id })).sort((a, b) => a.label.localeCompare(b.label, 'vi'));
   }, [data?.purchases, projMap]);
 
-  // Gom Nhập theo (dự án, vật tư) + trừ Xuất -> Tồn
   const rows = useMemo(() => {
     const map = {};
     for (const p of (data?.purchases || [])) {
@@ -153,13 +158,12 @@ export default function ProjectStock() {
   const filtered = useMemo(() => {
     const kw = norm(q);
     return rows
-      .filter(r => (!projectId || r.project_id === projectId))
+      .filter(r => (!effectiveProject || r.project_id === effectiveProject))
       .filter(r => !kw || norm(r.product_name).includes(kw))
       .sort((a, b) => b.tonValue - a.tonValue);
-  }, [rows, projectId, q]);
+  }, [rows, effectiveProject, q]);
 
   const totalTonValue = filtered.reduce((s, r) => s + r.tonValue, 0);
-  const totalNhap = filtered.reduce((s, r) => s + r.nhapValue, 0);
 
   const onSaved = () => { setIssueRow(null); queryClient.invalidateQueries({ queryKey: ['project-stock'] }); };
 
@@ -169,15 +173,25 @@ export default function ProjectStock() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/15 border border-blue-100 dark:border-blue-900/30">
           <span className="material-symbols-outlined text-blue-500 text-[20px]">inventory_2</span>
-          <span className="text-[13px] font-bold text-slate-600 dark:text-slate-300">Giá trị tồn kho</span>
-          <span className="font-mono font-black text-blue-700 dark:text-blue-400 text-[16px]">{money(totalTonValue)}đ</span>
-          <span className="text-[11px] text-slate-400 ml-1">· {filtered.length} vật tư · đã nhập {money(totalNhap)}đ</span>
+          {showPrice ? (
+            <><span className="text-[13px] font-bold text-slate-600 dark:text-slate-300">Giá trị tồn kho</span>
+            <span className="font-mono font-black text-blue-700 dark:text-blue-400 text-[16px]">{money(totalTonValue)}đ</span>
+            <span className="text-[11px] text-slate-400 ml-1">· {filtered.length} vật tư</span></>
+          ) : (
+            <span className="text-[13px] font-bold text-slate-600 dark:text-slate-300">Tồn kho · {filtered.length} vật tư</span>
+          )}
         </div>
-        <select value={projectId} onChange={e => setProjectId(e.target.value)}
-          className="text-sm font-bold border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700">
-          <option value="">Tất cả công trình</option>
-          {projectOptions.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-        </select>
+        {viewAll ? (
+          <select value={projectId} onChange={e => setProjectId(e.target.value)}
+            className="text-sm font-bold border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700">
+            <option value="">Tất cả công trình</option>
+            {projectOptions.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
+        ) : (
+          <span className="text-sm font-bold px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[16px] text-slate-400">apartment</span>{projMap[myProject] || 'Chưa phân công công trình'}
+          </span>
+        )}
         <div className="relative flex-1 min-w-[200px] max-w-[300px]">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[16px] text-slate-400">search</span>
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Tìm vật tư..."
@@ -197,7 +211,7 @@ export default function ProjectStock() {
         ) : filtered.length === 0 ? (
           <div className="p-10 text-center text-slate-400">
             <span className="material-symbols-outlined text-4xl mb-2 block">inventory_2</span>
-            {q || projectId ? 'Không có vật tư khớp lọc.' : 'Chưa có dữ liệu nhập kho (từ mua hàng).'}
+            {q || effectiveProject ? 'Không có vật tư khớp lọc.' : 'Chưa có dữ liệu nhập kho (từ mua hàng).'}
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -209,8 +223,8 @@ export default function ProjectStock() {
                 <th className="text-right py-2.5 px-3">Đã nhập</th>
                 <th className="text-right py-2.5 px-3">Đã xuất</th>
                 <th className="text-right py-2.5 px-3">Tồn</th>
-                <th className="text-right py-2.5 px-3">Đơn giá BQ</th>
-                <th className="text-right py-2.5 px-3">Giá trị tồn</th>
+                {showPrice && <th className="text-right py-2.5 px-3">Đơn giá BQ</th>}
+                {showPrice && <th className="text-right py-2.5 px-3">Giá trị tồn</th>}
                 {canIssue && <th className="py-2.5 px-3 w-[90px]"></th>}
               </tr>
             </thead>
@@ -223,8 +237,8 @@ export default function ProjectStock() {
                   <td className="py-2 px-3 text-right tabular-nums text-slate-600 dark:text-slate-300">{qtyFmt(r.nhapQty)}</td>
                   <td className="py-2 px-3 text-right tabular-nums text-rose-500">{qtyFmt(r.xuatQty)}</td>
                   <td className="py-2 px-3 text-right tabular-nums font-bold text-blue-700 dark:text-blue-400">{qtyFmt(r.ton)}</td>
-                  <td className="py-2 px-3 text-right tabular-nums text-slate-500">{money(r.avgPrice)}</td>
-                  <td className="py-2 px-3 text-right tabular-nums font-black text-slate-800 dark:text-white">{money(r.tonValue)}</td>
+                  {showPrice && <td className="py-2 px-3 text-right tabular-nums text-slate-500">{money(r.avgPrice)}</td>}
+                  {showPrice && <td className="py-2 px-3 text-right tabular-nums font-black text-slate-800 dark:text-white">{money(r.tonValue)}</td>}
                   {canIssue && (
                     <td className="py-2 px-3 text-center">
                       <button onClick={() => setIssueRow(r)} disabled={r.ton <= 0}
@@ -234,13 +248,15 @@ export default function ProjectStock() {
                 </tr>
               ))}
             </tbody>
-            <tfoot className="sticky bottom-0 bg-slate-50 dark:bg-slate-900/60">
-              <tr className="border-t-2 border-slate-200 dark:border-slate-700">
-                <td className="py-3 px-3 font-black text-slate-700 dark:text-white uppercase text-[11px]" colSpan={7}>Tổng giá trị tồn</td>
-                <td className="py-3 px-3 text-right font-mono font-black text-blue-700 dark:text-blue-400">{money(totalTonValue)}</td>
-                {canIssue && <td></td>}
-              </tr>
-            </tfoot>
+            {showPrice && (
+              <tfoot className="sticky bottom-0 bg-slate-50 dark:bg-slate-900/60">
+                <tr className="border-t-2 border-slate-200 dark:border-slate-700">
+                  <td className="py-3 px-3 font-black text-slate-700 dark:text-white uppercase text-[11px]" colSpan={7}>Tổng giá trị tồn</td>
+                  <td className="py-3 px-3 text-right font-mono font-black text-blue-700 dark:text-blue-400">{money(totalTonValue)}</td>
+                  {canIssue && <td></td>}
+                </tr>
+              </tfoot>
+            )}
           </table>
         )}
       </div>
@@ -249,7 +265,7 @@ export default function ProjectStock() {
         Nhập kho tự động từ <b>Mua hàng & Công nợ NCC</b> (mỗi lần mua = nhập kho dự án). Xuất kho ghi tại đây. Tồn = Nhập − Xuất; khớp vật tư theo tên.
       </p>
 
-      <IssueModal row={issueRow} onClose={() => setIssueRow(null)} onSaved={onSaved} userId={user?.id} />
+      <IssueModal row={issueRow} onClose={() => setIssueRow(null)} onSaved={onSaved} userId={user?.id} showPrice={showPrice} />
     </div>
   );
 }

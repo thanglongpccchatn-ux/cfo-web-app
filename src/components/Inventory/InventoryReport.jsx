@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { fmt } from '../../utils/formatters';
+import { useAuth } from '../../context/AuthContext';
 import { exportToExcel } from '../../utils/exportExcel';
 
 const money = (v) => fmt(Math.round(Number(v) || 0));
@@ -22,10 +23,16 @@ async function fetchAll(table, select) {
 }
 
 export default function InventoryReport() {
+  const { profile, hasPermission } = useAuth();
+  const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
+  const showPrice = isAdmin || hasPermission('view_material_price');
+  const viewAll = isAdmin || hasPermission('view_all_inventory');
+  const myProject = profile?.current_project_id || '';
   const [from, setFrom] = useState(yearStart());
   const [to, setTo] = useState(today());
-  const [projectId, setProjectId] = useState('');
+  const [projectId, setProjectId] = useState(viewAll ? '' : myProject);
   const [q, setQ] = useState('');
+  const effectiveProject = viewAll ? projectId : myProject;
 
   const { data, isLoading } = useQuery({
     queryKey: ['inv-report'],
@@ -81,10 +88,10 @@ export default function InventoryReport() {
   const filtered = useMemo(() => {
     const kw = norm(q);
     return rows
-      .filter(r => !projectId || r.project_id === projectId)
+      .filter(r => !effectiveProject || r.project_id === effectiveProject)
       .filter(r => !kw || norm(r.product_name).includes(kw))
       .sort((a, b) => b.tonCuoiVal - a.tonCuoiVal);
-  }, [rows, projectId, q]);
+  }, [rows, effectiveProject, q]);
 
   const totals = useMemo(() => filtered.reduce((t, r) => ({
     nhap: t.nhap + r.nhapInVal, xuat: t.xuat + r.xuatInVal, ton: t.ton + r.tonCuoiVal,
@@ -95,12 +102,12 @@ export default function InventoryReport() {
       { key: 'Công trình', label: 'Công trình' }, { key: 'Vật tư', label: 'Vật tư' }, { key: 'ĐVT', label: 'ĐVT' },
       { key: 'Tồn đầu', label: 'Tồn đầu', format: 'number' }, { key: 'Nhập', label: 'Nhập', format: 'number' },
       { key: 'Xuất', label: 'Xuất', format: 'number' }, { key: 'Tồn cuối', label: 'Tồn cuối', format: 'number' },
-      { key: 'Đơn giá BQ', label: 'Đơn giá BQ', format: 'number' }, { key: 'Giá trị tồn cuối', label: 'Giá trị tồn cuối', format: 'number' },
+      ...(showPrice ? [{ key: 'Đơn giá BQ', label: 'Đơn giá BQ', format: 'number' }, { key: 'Giá trị tồn cuối', label: 'Giá trị tồn cuối', format: 'number' }] : []),
     ];
     const rowsX = filtered.map(r => ({
       'Công trình': r.projectLabel, 'Vật tư': r.product_name, 'ĐVT': r.unit,
       'Tồn đầu': r.tonDau, 'Nhập': r.nhapInQty, 'Xuất': r.xuatInQty, 'Tồn cuối': r.tonCuoi,
-      'Đơn giá BQ': Math.round(r.avg), 'Giá trị tồn cuối': Math.round(r.tonCuoiVal),
+      ...(showPrice ? { 'Đơn giá BQ': Math.round(r.avg), 'Giá trị tồn cuối': Math.round(r.tonCuoiVal) } : {}),
     }));
     exportToExcel(rowsX, columns, `BaoCao_NXT_${from}_${to}`, 'NXT');
   };
@@ -114,10 +121,14 @@ export default function InventoryReport() {
           <span className="text-[11px] font-bold text-slate-500">ĐẾN</span>
           <input type="date" value={to} onChange={e => setTo(e.target.value)} className="text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700" />
         </div>
-        <select value={projectId} onChange={e => setProjectId(e.target.value)} className="text-sm font-bold border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700">
-          <option value="">Tất cả công trình</option>
-          {projectOptions.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-        </select>
+        {viewAll ? (
+          <select value={projectId} onChange={e => setProjectId(e.target.value)} className="text-sm font-bold border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700">
+            <option value="">Tất cả công trình</option>
+            {projectOptions.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
+        ) : (
+          <span className="text-sm font-bold px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px] text-slate-400">apartment</span>{projMap[myProject] || 'Chưa phân công'}</span>
+        )}
         <div className="relative flex-1 min-w-[160px] max-w-[240px]">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[16px] text-slate-400">search</span>
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Tìm vật tư..." className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg pl-9 pr-3 py-2 bg-white dark:bg-slate-700" />
@@ -128,11 +139,13 @@ export default function InventoryReport() {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-3 text-[13px]">
-        <span className="px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/15 font-bold text-blue-700">Nhập kỳ: {money(totals.nhap)}đ</span>
-        <span className="px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-900/15 font-bold text-rose-700">Xuất kỳ: {money(totals.xuat)}đ</span>
-        <span className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">Giá trị tồn cuối: {money(totals.ton)}đ</span>
-      </div>
+      {showPrice && (
+        <div className="flex flex-wrap gap-3 text-[13px]">
+          <span className="px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/15 font-bold text-blue-700">Nhập kỳ: {money(totals.nhap)}đ</span>
+          <span className="px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-900/15 font-bold text-rose-700">Xuất kỳ: {money(totals.xuat)}đ</span>
+          <span className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200">Giá trị tồn cuối: {money(totals.ton)}đ</span>
+        </div>
+      )}
 
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-auto max-h-[66vh]">
         {isLoading ? (
@@ -150,8 +163,8 @@ export default function InventoryReport() {
                 <th className="text-right py-2.5 px-2">Nhập</th>
                 <th className="text-right py-2.5 px-2">Xuất</th>
                 <th className="text-right py-2.5 px-2">Tồn cuối</th>
-                <th className="text-right py-2.5 px-2">Đơn giá BQ</th>
-                <th className="text-right py-2.5 px-3">Giá trị tồn cuối</th>
+                {showPrice && <th className="text-right py-2.5 px-2">Đơn giá BQ</th>}
+                {showPrice && <th className="text-right py-2.5 px-3">Giá trị tồn cuối</th>}
               </tr>
             </thead>
             <tbody>
@@ -164,17 +177,19 @@ export default function InventoryReport() {
                   <td className="py-2 px-2 text-right tabular-nums text-blue-600">{qtyFmt(r.nhapInQty)}</td>
                   <td className="py-2 px-2 text-right tabular-nums text-rose-500">{qtyFmt(r.xuatInQty)}</td>
                   <td className="py-2 px-2 text-right tabular-nums font-bold text-slate-800 dark:text-white">{qtyFmt(r.tonCuoi)}</td>
-                  <td className="py-2 px-2 text-right tabular-nums text-slate-500">{money(r.avg)}</td>
-                  <td className="py-2 px-3 text-right tabular-nums font-black">{money(r.tonCuoiVal)}</td>
+                  {showPrice && <td className="py-2 px-2 text-right tabular-nums text-slate-500">{money(r.avg)}</td>}
+                  {showPrice && <td className="py-2 px-3 text-right tabular-nums font-black">{money(r.tonCuoiVal)}</td>}
                 </tr>
               ))}
             </tbody>
-            <tfoot className="sticky bottom-0 bg-slate-50 dark:bg-slate-900/60">
-              <tr className="border-t-2 border-slate-200 dark:border-slate-700 font-black">
-                <td className="py-3 px-3 uppercase text-[11px] text-slate-500" colSpan={8}>Tổng giá trị tồn cuối</td>
-                <td className="py-3 px-3 text-right font-mono text-slate-800 dark:text-white">{money(totals.ton)}</td>
-              </tr>
-            </tfoot>
+            {showPrice && (
+              <tfoot className="sticky bottom-0 bg-slate-50 dark:bg-slate-900/60">
+                <tr className="border-t-2 border-slate-200 dark:border-slate-700 font-black">
+                  <td className="py-3 px-3 uppercase text-[11px] text-slate-500" colSpan={8}>Tổng giá trị tồn cuối</td>
+                  <td className="py-3 px-3 text-right font-mono text-slate-800 dark:text-white">{money(totals.ton)}</td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         )}
       </div>
