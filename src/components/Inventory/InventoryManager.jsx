@@ -2,6 +2,7 @@ import React, { useState, lazy, Suspense } from 'react';
 import { useInventory } from '../../context/InventoryContext';
 import { useAuth } from '../../context/AuthContext';
 import InventoryDashboard from './InventoryDashboard';
+import ProjectStock from './ProjectStock';
 import InventoryList from './InventoryList';
 import InventoryInbound from './InventoryInbound';
 import InventoryOutbound from './InventoryOutbound';
@@ -45,12 +46,13 @@ class InventoryErrorBoundary extends React.Component {
 }
 
 export default function InventoryManager() {
-    const [subTab, setSubTab] = useState('overview');
+    const [subTab, setSubTab] = useState('project_stock');
     const [poRequestId, setPORequestId] = useState(null);
     const { loading } = useInventory();
     const { hasPermission, profile } = useAuth();
 
     const tabs = [
+        { id: 'project_stock', label: 'Tồn kho dự án', icon: 'inventory', perm: 'view_inventory' },
         { id: 'overview', label: 'Tổng quan', icon: 'dashboard', perm: 'view_inventory' },
         { id: 'requests', label: 'Đề nghị VT', icon: 'assignment', perm: 'view_inventory' },
         { id: 'po', label: 'Đơn đặt hàng', icon: 'shopping_cart', perm: 'view_inventory' },
@@ -76,6 +78,7 @@ export default function InventoryManager() {
 
     const renderSubContent = () => {
         switch (subTab) {
+            case 'project_stock': return <ProjectStock />;
             case 'overview': return <InventoryDashboard onAction={(tab) => setSubTab(tab)} />;
             case 'stock': return <InventoryList onAction={(tab) => setSubTab(tab)} />;
             case 'inbound': return <InventoryInbound onBack={() => setSubTab('stock')} />;

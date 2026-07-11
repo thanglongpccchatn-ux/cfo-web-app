@@ -3,6 +3,8 @@
 **Ngày:** 2026-07-11 · **Phạm vi:** `/inventory` (InventoryManager + InventoryContext + bảng WMS)
 **Mục tiêu:** đưa Kho vật tư từ "chạy được một phần, tồn kho không phản ánh thực" → **WMS khép vòng, tồn kho tự động, định giá & báo cáo, an toàn dữ liệu**.
 
+> **CẬP NHẬT PHẠM VI (user chốt 2026-07-11):** Kho vật tư = **Nhập (tự động từ lịch sử mua hàng `supplier_purchases`) − Xuất − Tồn theo dự án**, và **xem giá trị tồn**. KHÔNG làm WMS đầy đủ (đề nghị/PO/duyệt/điều chuyển). Mỗi lần mua hàng = coi như nhập kho dự án (1 nguồn nhập liệu). → Đã dựng **tab "Tồn kho dự án"** (`ProjectStock.jsx`, mặc định): gom nhập theo dự án×vật tư (khớp theo tên), xuất qua bảng `material_issues`, tính Tồn + Giá trị tồn (đơn giá bình quân). SQL: `db/material_issues.sql`. Các tab WMS cũ (đề nghị/PO/nhập/xuất) giữ nguyên nhưng KHÔNG còn là trọng tâm.
+
 ---
 
 ## 1. Đánh giá hiện trạng (đã khảo sát code)
