@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import InventoryDashboard from './InventoryDashboard';
 import ProjectStock from './ProjectStock';
 import MaterialRequest from './MaterialRequest';
+import MaterialIssue from './MaterialIssue';
 import InventoryList from './InventoryList';
 import InventoryInbound from './InventoryInbound';
 import InventoryOutbound from './InventoryOutbound';
@@ -49,6 +50,7 @@ class InventoryErrorBoundary extends React.Component {
 export default function InventoryManager() {
     const [subTab, setSubTab] = useState('project_stock');
     const [poRequestId, setPORequestId] = useState(null);
+    const [issueRequest, setIssueRequest] = useState(null);
     const { loading } = useInventory();
     const { hasPermission, profile } = useAuth();
 
@@ -84,7 +86,8 @@ export default function InventoryManager() {
             case 'stock': return <InventoryList onAction={(tab) => setSubTab(tab)} />;
             case 'inbound': return <InventoryInbound onBack={() => setSubTab('stock')} />;
             case 'outbound': return <InventoryOutbound onBack={() => setSubTab('stock')} />;
-            case 'requests': return <MaterialRequest />;
+            case 'requests': return <MaterialRequest onIssue={(r) => { setIssueRequest(r); setSubTab('issue'); }} />;
+            case 'issue': return <MaterialIssue request={issueRequest} onBack={() => { setIssueRequest(null); setSubTab('requests'); }} />;
             case 'requests_old': return <InventoryRequestList onCreateNew={() => setSubTab('request_form')} onCreatePO={(reqId) => { setPORequestId(reqId); setSubTab('po_create'); }} />;
             case 'request_form': return <InventoryRequestForm onBack={() => setSubTab('requests')} />;
             case 'po': return <PurchaseOrderList onCreateNew={(reqId) => { setPORequestId(reqId); setSubTab('po_create'); }} onViewTab={(tab) => setSubTab(tab)} />;

@@ -191,7 +191,7 @@ export default function MaterialRequest({ onIssue }) {
                   <div className="text-[12px] text-slate-500 mt-0.5">{projMap[r.project_id] || '—'} · <span className="uppercase">{r.subcontractor_name || '—'}</span> · {r.request_date ? new Date(r.request_date).toLocaleDateString('vi-VN') : ''} · {items.length} vật tư</div>
                 </div>
                 {onIssue && !done && (
-                  <button onClick={() => onIssue(r)} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[12px] font-bold flex items-center gap-1.5"><span className="material-symbols-outlined text-[15px]">logout</span>Xuất kho</button>
+                  <button onClick={() => onIssue({ ...r, projectLabel: projMap[r.project_id] || 'DA' })} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[12px] font-bold flex items-center gap-1.5"><span className="material-symbols-outlined text-[15px]">logout</span>Xuất kho</button>
                 )}
               </div>
               <div className="mt-2 overflow-x-auto">
