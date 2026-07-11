@@ -68,17 +68,20 @@ export default function PurchaseTimeline({ purchases = [], payments = [], projec
           <p className="text-[12px] mt-1">Bấm "Thêm mua hàng" hoặc "Import Excel" để bắt đầu</p>
         </div>
       ) : (
-        <TimelineTable timeline={timeline} onEdit={handleEdit} onDelete={handleDelete} />
+        <TimelineTable timeline={timeline} onEdit={handleEdit} onDelete={handleDelete} suppliers={suppliers} />
       )}
     </div>
   );
 }
 
 /* ── Timeline Table with pagination, search, totals ── */
-function TimelineTable({ timeline, onEdit, onDelete }) {
+function TimelineTable({ timeline, onEdit, onDelete, suppliers = [] }) {
   const PAGE_SIZE = 25;
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
+  // Mã NCC lấy từ danh mục `suppliers` (đã có mã) thay vì join partners (có thể rỗng).
+  const supMap = useMemo(() => Object.fromEntries(suppliers.map(s => [s.id, s])), [suppliers]);
+  const nccCode = (item) => supMap[item.supplier_id]?.code || item.partners?.code || item.partners?.name || '—';
 
   const filtered = useMemo(() => {
     if (!search) return timeline;
@@ -138,7 +141,7 @@ function TimelineTable({ timeline, onEdit, onDelete }) {
             <tr className="border-b-2 border-slate-200 dark:border-slate-600">
               <th className="text-left py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Ngày</th>
               <th className="text-left py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Loại</th>
-              <th className="text-left py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">NCC</th>
+              <th className="text-center py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">NCC</th>
               <th className="text-left py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Nhóm VT</th>
               <th className="text-left py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Sản phẩm</th>
               <th className="text-right py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">SL</th>
@@ -160,7 +163,7 @@ function TimelineTable({ timeline, onEdit, onDelete }) {
                       {isPurchase ? 'Mua' : 'TT'}
                     </span>
                   </td>
-                  <td className="py-2.5 px-3 font-medium text-slate-800 dark:text-white whitespace-nowrap" title={item.partners?.name || ''}>{item.partners?.code || item.partners?.name || '—'}</td>
+                  <td className="py-2.5 px-3 text-center font-bold text-slate-800 dark:text-white whitespace-nowrap" title={item.partners?.name || ''}>{nccCode(item)}</td>
                   <td className="py-2.5 px-3 text-slate-500">{item.material_group || '—'}</td>
                   <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300 max-w-[200px] truncate">{isPurchase ? item.product_name : (item.notes || 'Thanh toán')}</td>
                   <td className="py-2.5 px-3 text-right font-mono text-slate-600">{isPurchase ? `${formatCurrency(item.quantity)} ${item.unit || ''}` : '—'}</td>
