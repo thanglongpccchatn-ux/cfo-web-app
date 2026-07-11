@@ -172,22 +172,22 @@ export default function SupplierPaymentForm({ projects = [], suppliers = [], pur
                               {o.paid > 0 ? ` · đã trả ${formatCurrency(o.paid)}` : ''}
                             </div>
                           </td>
-                          <td className="py-2 px-3 text-right font-mono font-black text-rose-600 whitespace-nowrap">{formatCurrency(o.remaining)}</td>
+                          <td className="py-2 px-3 text-right font-bold text-rose-600 tabular-nums text-[13px] whitespace-nowrap">{formatCurrency(o.remaining)}</td>
                           <td className="py-2 px-2">
                             <NumberInput value={Number(d.amount) || 0} onChange={v => patchDraft(o, { amount: Number(v) || 0 })}
-                              className="w-full text-right font-mono text-[13px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700" />
+                              className="w-full text-right tabular-nums text-[13px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700" />
                           </td>
                           <td className="py-2 px-2">
                             <input type="date" value={d.date} onChange={e => patchDraft(o, { date: e.target.value })}
-                              className="w-full text-[12px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700" />
+                              className="w-full text-[13px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700" />
                           </td>
                           <td className="py-2 px-2">
                             <input type="text" value={d.ref} placeholder="UNC..." onChange={e => patchDraft(o, { ref: e.target.value })}
-                              className="w-full text-[12px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700" />
+                              className="w-full text-[13px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700" />
                           </td>
                           <td className="py-2 px-2">
                             <input type="text" value={d.notes} placeholder="Ghi chú..." onChange={e => patchDraft(o, { notes: e.target.value })}
-                              className="w-full text-[12px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700" />
+                              className="w-full text-[13px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700" />
                           </td>
                           <td className="py-2 px-3 text-center">
                             <button onClick={() => payOne(o)} disabled={busy}

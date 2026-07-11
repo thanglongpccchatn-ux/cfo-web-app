@@ -89,7 +89,7 @@ export const PAYMENT_METHODS = [
 
 export const formatCurrency = (value) => {
   if (value == null || isNaN(value)) return '0';
-  return Number(value).toLocaleString('vi-VN');
+  return Math.round(Number(value)).toLocaleString('vi-VN'); // làm tròn đồng, không hiện số lẻ
 };
 
 /**
