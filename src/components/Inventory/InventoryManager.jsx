@@ -1,45 +1,21 @@
-import React, { useState, lazy, Suspense } from 'react';
-import { useInventory } from '../../context/InventoryContext';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import InventoryDashboard from './InventoryDashboard';
 import ProjectStock from './ProjectStock';
 import MaterialRequest from './MaterialRequest';
 import MaterialIssue from './MaterialIssue';
-import InventoryList from './InventoryList';
-import InventoryInbound from './InventoryInbound';
-import InventoryOutbound from './InventoryOutbound';
-import InventoryRequestForm from './InventoryRequestForm';
-import InventoryRequestList from './InventoryRequestList';
-import PurchaseOrderList from './PurchaseOrderList';
-import PurchaseOrderCreate from './PurchaseOrderCreate';
-const MaterialPriceHistory = lazy(() => import('./MaterialPriceHistory'));
+import IssueSlipList from './IssueSlipList';
+import InventoryReport from './InventoryReport';
 
 class InventoryErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error("ErrorBoundary caught an error", error, errorInfo);
-    this.setState({ errorInfo });
-  }
-
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) { console.error('Inventory error', error, info); }
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: '20px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '8px' }}>
-          <h2>Inventory Module Crashed!</h2>
-          <details style={{ whiteSpace: 'pre-wrap' }}>
-            <summary>Click to show error details</summary>
-            {this.state.error && this.state.error.toString()}
-            <br />
-            {this.state.errorInfo && this.state.errorInfo.componentStack}
-          </details>
+        <div className="p-6 rounded-2xl bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/40">
+          <h3 className="font-black mb-1">Module Kho vật tư gặp lỗi</h3>
+          <p className="text-sm">{this.state.error?.toString()}</p>
         </div>
       );
     }
@@ -48,88 +24,54 @@ class InventoryErrorBoundary extends React.Component {
 }
 
 export default function InventoryManager() {
-    const [subTab, setSubTab] = useState('project_stock');
-    const [poRequestId, setPORequestId] = useState(null);
-    const [issueRequest, setIssueRequest] = useState(null);
-    const { loading } = useInventory();
-    const { hasPermission, profile } = useAuth();
+  const [subTab, setSubTab] = useState('project_stock');
+  const [issueRequest, setIssueRequest] = useState(null);
+  const { hasPermission, profile } = useAuth();
 
-    const tabs = [
-        { id: 'project_stock', label: 'Tồn kho dự án', icon: 'inventory', perm: 'view_inventory' },
-        { id: 'overview', label: 'Tổng quan', icon: 'dashboard', perm: 'view_inventory' },
-        { id: 'requests', label: 'Đề nghị VT', icon: 'assignment', perm: 'view_inventory' },
-        { id: 'po', label: 'Đơn đặt hàng', icon: 'shopping_cart', perm: 'view_inventory' },
-        { id: 'stock', label: 'Kho vật tư', icon: 'inventory_2', perm: 'view_inventory' },
-        { id: 'price_history', label: 'Giá VT', icon: 'trending_up', perm: 'view_inventory' },
-        { id: 'inbound', label: 'Nhập kho', icon: 'login', perm: 'import_inventory' },
-        { id: 'outbound', label: 'Xuất kho', icon: 'logout', perm: 'export_inventory' },
-    ].filter(t => !t.perm || hasPermission(t.perm) || profile?.role_code === 'ROLE01');
+  const tabs = [
+    { id: 'project_stock', label: 'Tồn kho dự án', icon: 'inventory', perm: 'view_inventory' },
+    { id: 'requests', label: 'Đề nghị VT', icon: 'assignment', perm: 'view_inventory' },
+    { id: 'issue_slips', label: 'Phiếu xuất', icon: 'receipt_long', perm: 'view_inventory' },
+    { id: 'report', label: 'Báo cáo NXT', icon: 'assessment', perm: 'view_inventory' },
+  ].filter(t => !t.perm || hasPermission(t.perm) || profile?.role_code === 'ROLE01');
 
-    if (loading) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[400px]">
-                <div className="relative">
-                    <div className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-full animate-pulse"></div>
-                    <div className="relative w-12 h-12 border-[3px] border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                </div>
-                <p className="mt-6 text-slate-500 font-black uppercase text-[10px] tracking-[0.2em] animate-pulse text-center">
-                    Đang đồng bộ dữ liệu kho...
-                </p>
-            </div>
-        );
+  const renderSubContent = () => {
+    switch (subTab) {
+      case 'project_stock': return <ProjectStock />;
+      case 'requests': return <MaterialRequest onIssue={(r) => { setIssueRequest(r); setSubTab('issue'); }} />;
+      case 'issue': return <MaterialIssue request={issueRequest} onBack={() => { setIssueRequest(null); setSubTab('requests'); }} />;
+      case 'issue_slips': return <IssueSlipList />;
+      case 'report': return <InventoryReport />;
+      default: return <ProjectStock />;
     }
+  };
 
-    const renderSubContent = () => {
-        switch (subTab) {
-            case 'project_stock': return <ProjectStock />;
-            case 'overview': return <InventoryDashboard onAction={(tab) => setSubTab(tab)} />;
-            case 'stock': return <InventoryList onAction={(tab) => setSubTab(tab)} />;
-            case 'inbound': return <InventoryInbound onBack={() => setSubTab('stock')} />;
-            case 'outbound': return <InventoryOutbound onBack={() => setSubTab('stock')} />;
-            case 'requests': return <MaterialRequest onIssue={(r) => { setIssueRequest(r); setSubTab('issue'); }} />;
-            case 'issue': return <MaterialIssue request={issueRequest} onBack={() => { setIssueRequest(null); setSubTab('requests'); }} />;
-            case 'requests_old': return <InventoryRequestList onCreateNew={() => setSubTab('request_form')} onCreatePO={(reqId) => { setPORequestId(reqId); setSubTab('po_create'); }} />;
-            case 'request_form': return <InventoryRequestForm onBack={() => setSubTab('requests')} />;
-            case 'po': return <PurchaseOrderList onCreateNew={(reqId) => { setPORequestId(reqId); setSubTab('po_create'); }} onViewTab={(tab) => setSubTab(tab)} />;
-            case 'po_create': return <PurchaseOrderCreate requestId={poRequestId} onBack={() => { setPORequestId(null); setSubTab('po'); }} />;
-            case 'price_history': return <Suspense fallback={<div className="text-center py-10 text-slate-400 animate-pulse">Đang tải...</div>}><MaterialPriceHistory /></Suspense>;
-            default: return <InventoryDashboard onAction={(tab) => setSubTab(tab)} />;
-        }
-    };
-
-    return (
-        <InventoryErrorBoundary>
-        <div className="h-full flex flex-col space-y-6 animate-fade-in">
-            {/* Sub-navigation Premium */}
-            <div className="flex items-center justify-between px-2">
-                <div className="flex gap-1.5 bg-slate-200/50 dark:bg-slate-900/50 p-1.5 rounded-[24px] backdrop-blur-xl border border-white/20 dark:border-slate-800/50 shadow-inner">
-                    {tabs.map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setSubTab(tab.id)}
-                            className={`
-                                px-6 py-2.5 rounded-[18px] text-[10px] font-black uppercase tracking-widest transition-all duration-300 flex items-center gap-2.5
-                                ${subTab === tab.id 
-                                    ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-xl shadow-blue-500/10 scale-100 ring-1 ring-slate-200/50 dark:ring-slate-700/50' 
-                                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-300/30 font-bold'}
-                            `}
-                        >
-                            <span className="material-symbols-outlined text-[18px]">{tab.icon}</span>
-                            <span className="hidden md:inline">{tab.label}</span>
-                        </button>
-                    ))}
-                </div>
-                
-                <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-500 rounded-2xl border border-blue-500/20">
-                    <span className="text-[10px] font-black uppercase tracking-widest">WMS v2.0</span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto no-scrollbar animate-slide-in relative">
-                {renderSubContent()}
-            </div>
+  return (
+    <InventoryErrorBoundary>
+      <div className="h-full flex flex-col space-y-6 animate-fade-in">
+        <div className="flex items-center justify-between px-2">
+          <div className="flex gap-1.5 bg-slate-200/50 dark:bg-slate-900/50 p-1.5 rounded-[24px] backdrop-blur-xl border border-white/20 dark:border-slate-800/50 shadow-inner">
+            {tabs.map(tab => (
+              <button key={tab.id} onClick={() => setSubTab(tab.id)}
+                className={`px-6 py-2.5 rounded-[18px] text-[10px] font-black uppercase tracking-widest transition-all duration-300 flex items-center gap-2.5 ${
+                  (subTab === tab.id || (subTab === 'issue' && tab.id === 'requests'))
+                    ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-xl shadow-blue-500/10 ring-1 ring-slate-200/50 dark:ring-slate-700/50'
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-300/30 font-bold'}`}>
+                <span className="material-symbols-outlined text-[18px]">{tab.icon}</span>
+                <span className="hidden md:inline">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-500 rounded-2xl border border-blue-500/20">
+            <span className="text-[10px] font-black uppercase tracking-widest">Kho dự án</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+          </div>
         </div>
-        </InventoryErrorBoundary>
-    );
+
+        <div className="flex-1 overflow-y-auto no-scrollbar animate-slide-in relative">
+          {renderSubContent()}
+        </div>
+      </div>
+    </InventoryErrorBoundary>
+  );
 }
