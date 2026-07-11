@@ -247,22 +247,22 @@ function MainLayout() {
             <Route path="/labor_subcontractors" element={<ProtectedRoute requiredPerms={['view_labor', 'manage_labor', 'view_subcontractors']}><LaborSubcontractorHub /></ProtectedRoute>} />
             <Route path="/labor_tracking" element={<Navigate to="/labor_subcontractors?tab=labor" replace />} />
             <Route path="/material_tracking" element={<ProtectedRoute requiredPerms={['view_materials', 'manage_materials_tracking', 'manage_materials']}><MaterialTracking /></ProtectedRoute>} />
-            <Route path="/supplier_payables" element={<ProtectedRoute requiredPerms={['view_materials', 'manage_materials_tracking', 'view_suppliers']} moduleName="Công nợ NCC Vật tư"><SupplierPayables /></ProtectedRoute>} />
+            <Route path="/supplier_payables" element={<ProtectedRoute requiredPerms={['view_materials', 'manage_materials_tracking', 'view_suppliers']} moduleName="Công nợ NCC Vật tư"><div className="vt-scope"><SupplierPayables /></div></ProtectedRoute>} />
             <Route path="/expense_tracking" element={<ProtectedRoute requiredPerms={['view_expenses', 'manage_expenses']}><ExpenseTracking /></ProtectedRoute>} />
             <Route path="/weekly_expense_plan" element={<ProtectedRoute requiredPerms={['view_planning', 'manage_planning']}><WeeklyExpensePlan /></ProtectedRoute>} />
             <Route path="/financial-analytics" element={<ProtectedRoute requiredPerms={['view_dashboard']}><FinancialAnalyticsHub /></ProtectedRoute>} />
             
             {/* Financial & Inventory Modules */}
             <Route path="/payments" element={<ProtectedRoute requiredPerms={['view_payments']}><PaymentsMaster /></ProtectedRoute>} />
-            <Route path="/suppliers" element={<ProtectedRoute requiredPerms={['view_materials', 'view_suppliers', 'manage_partners']}><SuppliersMaster /></ProtectedRoute>} />
+            <Route path="/suppliers" element={<ProtectedRoute requiredPerms={['view_materials', 'view_suppliers', 'manage_partners']}><div className="vt-scope"><SuppliersMaster /></div></ProtectedRoute>} />
             <Route path="/subcontractors" element={<Navigate to="/labor_subcontractors?tab=master" replace />} />
-            <Route path="/materials" element={<ProtectedRoute requiredPerms={['view_materials', 'manage_materials', 'edit_materials_master']}><MaterialsMaster /></ProtectedRoute>} />
-            <Route path="/inventory" element={<ProtectedRoute requiredPerms={['view_materials', 'import_inventory', 'export_inventory', 'manage_materials']}><InventoryManager /></ProtectedRoute>} />
+            <Route path="/materials" element={<ProtectedRoute requiredPerms={['view_materials', 'manage_materials', 'edit_materials_master']}><div className="vt-scope"><MaterialsMaster /></div></ProtectedRoute>} />
+            <Route path="/inventory" element={<ProtectedRoute requiredPerms={['view_materials', 'import_inventory', 'export_inventory', 'manage_materials']}><div className="vt-scope"><InventoryManager /></div></ProtectedRoute>} />
             
             {/* Other Modules */}
             <Route path="/planning_hub" element={<ProtectedRoute requiredPerms={['view_planning', 'manage_planning']}><PlanningModule /></ProtectedRoute>} />
             <Route path="/cashflow_plan" element={<ProtectedRoute requiredPerms={['view_cashflow_plan', 'manage_cashflow_plan']}><CashFlowPlan /></ProtectedRoute>} />
-            <Route path="/material_plan" element={<ProtectedRoute requiredPerms={['manage_materials_tracking']}><MaterialPlan /></ProtectedRoute>} />
+            <Route path="/material_plan" element={<ProtectedRoute requiredPerms={['manage_materials_tracking']}><div className="vt-scope"><MaterialPlan /></div></ProtectedRoute>} />
             <Route path="/construction" element={<ProtectedRoute requiredPerms={['view_construction']}><ConstructionModule /></ProtectedRoute>} />
             <Route path="/task_management" element={<ProtectedRoute requiredPerms={[]}><TaskManagement /></ProtectedRoute>} />
             <Route path="/chat" element={<ProtectedRoute moduleName="Tin nhắn nội bộ"><ChatModule /></ProtectedRoute>} />

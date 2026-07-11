@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Mục VẬT TƯ: căn giữa mọi tiêu đề bảng + số dùng font TEXT (bỏ mono, giữ thẳng cột) ── */
+.vt-scope table thead th { text-align: center; }
+.vt-scope .font-mono { font-family: inherit; font-variant-numeric: tabular-nums; }
+
 :root {
   /* Core Variables */
   --bg-primary: #f8fafc;
