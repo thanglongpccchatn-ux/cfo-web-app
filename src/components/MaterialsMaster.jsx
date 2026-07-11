@@ -48,7 +48,8 @@ export default function MaterialsMaster() {
     const [priceHistoryData, setPriceHistoryData] = useState([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
 
-    const togglePriceHistory = async (materialId) => {
+    const togglePriceHistory = async (m) => {
+        const materialId = m.id;
         if (expandedMaterialId === materialId) {
             setExpandedMaterialId(null);
             return;
@@ -56,14 +57,24 @@ export default function MaterialsMaster() {
         setExpandedMaterialId(materialId);
         setLoadingHistory(true);
         setPriceHistoryData([]);
-        const { data } = await supabase
-            .from('expense_materials')
-            .select('unit_price, expense_date, supplier_name, quantity, unit, project_id, projects(name, code)')
-            .eq('material_id', materialId)
-            .gt('unit_price', 0)
-            .order('expense_date', { ascending: false })
-            .limit(10);
-        setPriceHistoryData(data || []);
+        // Lịch sử mua thực tế nằm ở supplier_purchases (module Mua hàng). Ưu tiên khớp material_id;
+        // hàng import thường material_id rỗng -> fallback khớp theo TÊN sản phẩm.
+        const sel = 'unit_price, purchase_date, quantity, unit, project_id, projects:project_id(name, code), partners:supplier_id(name, code)';
+        let { data } = await supabase.from('supplier_purchases').select(sel)
+            .eq('material_id', materialId).gt('unit_price', 0)
+            .order('purchase_date', { ascending: false }).limit(15);
+        if ((!data || data.length === 0) && m.name) {
+            const r = await supabase.from('supplier_purchases').select(sel)
+                .ilike('product_name', m.name).gt('unit_price', 0)
+                .order('purchase_date', { ascending: false }).limit(15);
+            data = r.data;
+        }
+        const rows = (data || []).map(r => ({
+            unit_price: r.unit_price, expense_date: r.purchase_date,
+            supplier_name: r.partners?.code || r.partners?.name || '',
+            quantity: r.quantity, unit: r.unit, project_id: r.project_id, projects: r.projects,
+        }));
+        setPriceHistoryData(rows);
         setLoadingHistory(false);
     };
 
@@ -424,7 +435,7 @@ export default function MaterialsMaster() {
                                     const isExpanded = expandedMaterialId === m.id;
                                     return (
                                     <React.Fragment key={m.id}>
-                                    <tr className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/80 group transition-colors cursor-pointer ${selectedIds.has(m.id) ? 'bg-primary/5 dark:bg-primary/10' : ''} ${isExpanded ? 'bg-amber-50/50' : ''}`} onClick={() => togglePriceHistory(m.id)}>
+                                    <tr className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/80 group transition-colors cursor-pointer ${selectedIds.has(m.id) ? 'bg-primary/5 dark:bg-primary/10' : ''} ${isExpanded ? 'bg-amber-50/50' : ''}`} onClick={() => togglePriceHistory(m)}>
                                         <td className="px-4 py-4 text-center" onClick={e => e.stopPropagation()}>
                                             <input 
                                                 type="checkbox" 
