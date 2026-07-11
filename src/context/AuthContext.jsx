@@ -17,6 +17,7 @@ export const AuthProvider = ({ children }) => {
     const [profile, setProfile] = useState(null);
     const [permissions, setPermissions] = useState([]);
     const [userRoles, setUserRoles] = useState([]);
+    const [assignedProjects, setAssignedProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const isFetchingProfile = useRef(false);
 
@@ -59,6 +60,10 @@ export const AuthProvider = ({ children }) => {
             // Permissions are aggregated from ALL roles via updated RPC
             const { data: permData } = await supabase.rpc('get_user_permissions', { p_user_id: userId });
             setPermissions(permData ? permData.map(p => p.permission_code) : []);
+
+            // Công trình được phân công (điều chuyển đang hiệu lực) — cho phạm vi Kho vật tư
+            const { data: asgData } = await supabase.from('staff_assignments').select('project_id').eq('user_id', userId).is('end_date', null);
+            setAssignedProjects(asgData ? [...new Set(asgData.map(a => a.project_id).filter(Boolean))] : []);
         } catch (error) {
             console.error("Auth init fetch error:", error);
         } finally {
@@ -117,7 +122,7 @@ export const AuthProvider = ({ children }) => {
     const refreshProfile = () => user && fetchUserProfileAndPermissions(user.id);
 
     return (
-        <AuthContext.Provider value={{ user, profile, permissions, userRoles, loading, login, logout, hasPermission, hasRole, refreshProfile }}>
+        <AuthContext.Provider value={{ user, profile, permissions, userRoles, assignedProjects, loading, login, logout, hasPermission, hasRole, refreshProfile }}>
             {children}
         </AuthContext.Provider>
     );

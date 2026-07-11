@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { fmt } from '../../utils/formatters';
-import { useAuth } from '../../context/AuthContext';
+import { useInventoryScope } from './useInventoryScope';
 import { printIssueSlip } from './inventoryPrint';
 
 const money = (v) => fmt(Math.round(Number(v) || 0));
@@ -22,14 +22,10 @@ async function fetchAll(table, select, order) {
 }
 
 export default function IssueSlipList() {
-  const { profile, hasPermission } = useAuth();
-  const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
-  const showPrice = isAdmin || hasPermission('view_material_price');
-  const viewAll = isAdmin || hasPermission('view_all_inventory');
-  const myProject = profile?.current_project_id || '';
+  const { showPrice, viewAll, assignedProjects, defaultProject } = useInventoryScope();
   const [q, setQ] = useState('');
-  const [projectId, setProjectId] = useState(viewAll ? '' : myProject);
-  const effectiveProject = viewAll ? projectId : myProject;
+  const [projectId, setProjectId] = useState(viewAll ? '' : defaultProject);
+  const effectiveProject = viewAll ? projectId : (assignedProjects.includes(projectId) ? projectId : defaultProject);
 
   const { data, isLoading } = useQuery({
     queryKey: ['issue-slips'],
@@ -81,14 +77,10 @@ export default function IssueSlipList() {
           <span className="text-[13px] font-bold text-slate-600 dark:text-slate-300">{filtered.length} phiếu{showPrice ? ' · Tổng xuất' : ''}</span>
           {showPrice && <span className="font-mono font-black text-rose-600 text-[15px]">{money(grandTotal)}đ</span>}
         </div>
-        {viewAll ? (
-          <select value={projectId} onChange={e => setProjectId(e.target.value)} className="text-sm font-bold border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700">
-            <option value="">Tất cả công trình</option>
-            {projectOptions.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-          </select>
-        ) : (
-          <span className="text-sm font-bold px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px] text-slate-400">apartment</span>{projMap[myProject] || 'Chưa phân công'}</span>
-        )}
+        <select value={effectiveProject} onChange={e => setProjectId(e.target.value)} className="text-sm font-bold border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700">
+          {viewAll && <option value="">Tất cả công trình</option>}
+          {(viewAll ? projectOptions : assignedProjects.map(id => ({ id, label: projMap[id] || id }))).map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+        </select>
         <div className="relative flex-1 min-w-[200px] max-w-[300px]">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[16px] text-slate-400">search</span>
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Tìm số phiếu / nhà thầu..." className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg pl-9 pr-3 py-2 bg-white dark:bg-slate-700" />
