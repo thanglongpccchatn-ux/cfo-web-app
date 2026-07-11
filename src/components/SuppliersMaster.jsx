@@ -435,8 +435,8 @@ export default function SuppliersMaster() {
                                                 <div className="flex items-center gap-2">
                                                     <span className={`material-symbols-outlined notranslate text-[16px] text-orange-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} translate="no">chevron_right</span>
                                                     <div>
-                                                        <div>{supplier.name}</div>
-                                                        {supplier.tax_code && <div className="text-[10px] text-slate-400 font-normal mt-0.5">MST: {supplier.tax_code}</div>}
+                                                        <div className="uppercase">{supplier.name}</div>
+                                                        {supplier.tax_code && <div className="text-[10px] text-slate-400 font-normal mt-0.5 normal-case">MST: {supplier.tax_code}</div>}
                                                     </div>
                                                 </div>
                                             </td>
