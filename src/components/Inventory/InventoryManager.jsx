@@ -3,6 +3,7 @@ import { useInventory } from '../../context/InventoryContext';
 import { useAuth } from '../../context/AuthContext';
 import InventoryDashboard from './InventoryDashboard';
 import ProjectStock from './ProjectStock';
+import MaterialRequest from './MaterialRequest';
 import InventoryList from './InventoryList';
 import InventoryInbound from './InventoryInbound';
 import InventoryOutbound from './InventoryOutbound';
@@ -83,7 +84,8 @@ export default function InventoryManager() {
             case 'stock': return <InventoryList onAction={(tab) => setSubTab(tab)} />;
             case 'inbound': return <InventoryInbound onBack={() => setSubTab('stock')} />;
             case 'outbound': return <InventoryOutbound onBack={() => setSubTab('stock')} />;
-            case 'requests': return <InventoryRequestList onCreateNew={() => setSubTab('request_form')} onCreatePO={(reqId) => { setPORequestId(reqId); setSubTab('po_create'); }} />;
+            case 'requests': return <MaterialRequest />;
+            case 'requests_old': return <InventoryRequestList onCreateNew={() => setSubTab('request_form')} onCreatePO={(reqId) => { setPORequestId(reqId); setSubTab('po_create'); }} />;
             case 'request_form': return <InventoryRequestForm onBack={() => setSubTab('requests')} />;
             case 'po': return <PurchaseOrderList onCreateNew={(reqId) => { setPORequestId(reqId); setSubTab('po_create'); }} onViewTab={(tab) => setSubTab(tab)} />;
             case 'po_create': return <PurchaseOrderCreate requestId={poRequestId} onBack={() => { setPORequestId(null); setSubTab('po'); }} />;
