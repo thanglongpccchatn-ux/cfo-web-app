@@ -163,7 +163,7 @@ function TimelineTable({ timeline, onEdit, onDelete, suppliers = [] }) {
                       {isPurchase ? 'Mua' : 'TT'}
                     </span>
                   </td>
-                  <td className="py-2.5 px-3 text-center font-bold text-slate-800 dark:text-white whitespace-nowrap" title={item.partners?.name || ''}>{nccCode(item)}</td>
+                  <td className="py-2.5 px-3 text-center font-bold uppercase text-slate-800 dark:text-white whitespace-nowrap" title={item.partners?.name || ''}>{nccCode(item)}</td>
                   <td className="py-2.5 px-3 text-slate-500">{item.material_group || '—'}</td>
                   <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300 max-w-[200px] truncate">{isPurchase ? item.product_name : (item.notes || 'Thanh toán')}</td>
                   <td className="py-2.5 px-3 text-right font-mono text-slate-600">{isPurchase ? `${formatCurrency(item.quantity)} ${item.unit || ''}` : '—'}</td>

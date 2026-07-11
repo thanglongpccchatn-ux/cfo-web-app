@@ -75,8 +75,8 @@ export default function PayablesSummary({ purchases = [], payments = [], onViewS
                     <td className="py-3 px-3">
                       <div className="flex items-center gap-2">
                         <span className={`material-symbols-outlined text-[16px] transition-transform ${isExpanded ? 'rotate-90' : ''}`}>chevron_right</span>
-                        <span className="font-bold text-slate-800 dark:text-white">{supplier.supplier_code || supplier.supplier_name}</span>
-                        {supplier.supplier_code && <span className="text-[11px] text-slate-400 font-medium truncate max-w-[320px]" title={supplier.supplier_name}>{supplier.supplier_name}</span>}
+                        <span className="font-bold uppercase text-slate-800 dark:text-white">{supplier.supplier_code || supplier.supplier_name}</span>
+                        {supplier.supplier_code && <span className="text-[11px] text-slate-400 font-medium uppercase truncate max-w-[320px]" title={supplier.supplier_name}>{supplier.supplier_name}</span>}
                         <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded-full text-slate-500 font-bold">{groupKeys.length} nhóm</span>
                       </div>
                     </td>

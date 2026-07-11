@@ -128,8 +128,8 @@ export default function SupplierPaymentForm({ projects = [], suppliers = [], pur
               <button onClick={() => toggle(g.supplier_id)} className="flex items-center gap-2 min-w-0 flex-1 text-left">
                 <span className={`material-symbols-outlined text-slate-400 transition-transform ${open ? 'rotate-90' : ''}`}>chevron_right</span>
                 <span className="min-w-0">
-                  <span className="block font-black text-slate-800 dark:text-white truncate">{g.code || g.name}</span>
-                  {g.code && <span className="block text-[11px] text-slate-400 truncate">{g.name}</span>}
+                  <span className="block font-black uppercase text-slate-800 dark:text-white truncate">{g.code || g.name}</span>
+                  {g.code && <span className="block text-[11px] text-slate-400 uppercase truncate">{g.name}</span>}
                 </span>
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 shrink-0">{g.orders.length} đơn</span>
               </button>
@@ -215,7 +215,7 @@ export default function SupplierPaymentForm({ projects = [], suppliers = [], pur
               <div key={p.id} className="flex items-center gap-4 px-4 py-2.5 bg-emerald-50/50 dark:bg-emerald-900/10 rounded-xl border border-emerald-200/50 dark:border-emerald-800/30">
                 <span className="material-symbols-outlined text-emerald-500 text-[20px]">check_circle</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-800 dark:text-white truncate">{p.partners?.code || p.partners?.name || 'NCC'} — {p.projects?.name || 'Dự án'}</p>
+                  <p className="text-sm font-medium text-slate-800 dark:text-white truncate"><span className="uppercase">{p.partners?.code || p.partners?.name || 'NCC'}</span> — {p.projects?.name || 'Dự án'}</p>
                   <p className="text-[12px] text-slate-500">{new Date(p.payment_date).toLocaleDateString('vi-VN')}{p.reference_no ? ` · ${p.reference_no}` : ''}{p.notes ? ` · ${p.notes}` : ''}</p>
                 </div>
                 <span className="font-mono font-bold text-emerald-600 text-sm">{formatCurrency(p.amount)}</span>
@@ -285,7 +285,7 @@ export default function SupplierPaymentForm({ projects = [], suppliers = [], pur
                 {payments.slice(0, 60).map(p => (
                   <tr key={p.id} className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/20">
                     <td className="py-2 px-3 text-slate-600 whitespace-nowrap">{new Date(p.payment_date).toLocaleDateString('vi-VN')}</td>
-                    <td className="py-2 px-3 font-medium text-slate-800 dark:text-white">{p.partners?.code || p.partners?.name || '—'}</td>
+                    <td className="py-2 px-3 font-medium uppercase text-slate-800 dark:text-white">{p.partners?.code || p.partners?.name || '—'}</td>
                     <td className="py-2 px-3 text-right font-mono font-bold text-emerald-600">{formatCurrency(p.amount)}</td>
                     <td className="py-2 px-3 text-slate-500 font-mono text-[12px]">{p.reference_no || '—'}</td>
                     <td className="py-2 px-3 text-slate-500 text-[12px] max-w-[200px] truncate">{p.notes || '—'}</td>
