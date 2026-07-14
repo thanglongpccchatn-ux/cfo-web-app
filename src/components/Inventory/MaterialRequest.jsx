@@ -208,9 +208,15 @@ export default function MaterialRequest({ onIssue }) {
             <button onClick={addLine} className="w-full py-2 text-[13px] font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700/40 border-t border-slate-100 dark:border-slate-700 flex items-center justify-center gap-1"><span className="material-symbols-outlined text-[16px]">add</span>Thêm vật tư</button>
           </div>
 
+          {!canSave && (
+            <p className="text-[11.5px] text-amber-600 font-semibold flex items-center gap-1">
+              <span className="material-symbols-outlined text-[15px]">info</span>
+              Cần {[!header.project_id && 'chọn công trình', !header.subcontractor && 'chọn nhà thầu/tổ đội', validLines.length === 0 && 'ít nhất 1 vật tư có SL đề nghị > 0'].filter(Boolean).join(' · ')} để lưu.
+            </p>
+          )}
           <div className="flex items-center gap-3">
             <input type="text" value={header.notes} onChange={e => setHeader(h => ({ ...h, notes: e.target.value }))} placeholder="Ghi chú..." className="flex-1 text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700" />
-            <button onClick={save} disabled={saving || !canSave} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-lg text-sm font-bold whitespace-nowrap">{saving ? 'Đang lưu...' : 'Lưu đề nghị'}</button>
+            <button onClick={save} disabled={saving || !canSave} title={canSave ? '' : 'Chưa đủ điều kiện lưu'} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold whitespace-nowrap">{saving ? 'Đang lưu...' : 'Lưu đề nghị'}</button>
           </div>
         </div>
       )}
