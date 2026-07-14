@@ -53,14 +53,25 @@ const DashboardOverview = () => {
             if (currentYear !== 'all') {
                 const y = parseInt(currentYear);
                 const inYear = (d) => d && new Date(d).getFullYear() === y;
-                // Hàng thẻ dưới = HỢP ĐỒNG KÝ trong năm (lọc theo sign_date) → Tổng giá trị HĐ, Số HĐ theo năm ký.
+                // projs của năm = HĐ ký trong năm HOẶC có phát sinh trong năm (xuất HĐ/thu/chi).
+                // -> HĐ ký 2025 nhưng có hóa đơn/thu 2026 vẫn xuất hiện khi xem 2026.
                 // Riêng CÔNG NỢ là số dư nên tính cộng dồn all-time (xem totalDebt*Cumulative bên dưới).
-                projs = projs.filter(p => inYear(p.sign_date || p.start_date || p.created_at));
+                const activeIds = new Set();
+                (pmtRes.data || []).forEach(pm => { if (pm.project_id && inYear(pm.invoice_date || pm.created_at)) activeIds.add(pm.project_id); });
+                (extHistRes.data || []).forEach(h => { if (h.project_id && inYear(h.payment_date || h.created_at)) activeIds.add(h.project_id); });
+                (intHistRes.data || []).forEach(h => { if (h.project_id && inYear(h.payment_date || h.created_at)) activeIds.add(h.project_id); });
+                projs = projs.filter(p => inYear(p.sign_date || p.start_date || p.created_at) || activeIds.has(p.id));
                 pmts = pmts.filter(pm => inYear(pm.invoice_date || pm.created_at));
                 extHist = extHist.filter(h => inYear(h.payment_date || h.created_at));
                 intHist = intHist.filter(h => inYear(h.payment_date || h.created_at));
                 loansData = loansData.filter(l => inYear(l.created_at));
             }
+
+            // "Đã xuất HĐ / Đã thu trong năm" = hoạt động TRONG NĂM (theo ngày HĐ / ngày thu),
+            // ĐỘC LẬP với việc HĐ được ký năm nào -> HĐ ký 2025 vẫn có hóa đơn/thu 2026.
+            // (pmts & extHist đã được lọc theo năm ở trên khi currentYear !== 'all').
+            const totalInvoiceThisYear = (pmts || []).reduce((s, pm) => s + (parseFloat(pm.invoice_amount) || 0), 0);
+            const totalIncomeThisYear = (extHist || []).reduce((s, h) => s + (parseFloat(h.amount) || 0), 0);
 
             // Calculate Total Debt from Loans
             const activeLoans = loansData.filter(l => l.status === 'active' || l.status === 'partially_paid' || l.status === 'overdue');
@@ -114,7 +125,7 @@ const DashboardOverview = () => {
                 return { ...p, totalInvoice: b.inv, totalIncome: b.inc, debtInvoice: b.inv - b.inc, debtRequested: b.reqDebt, projPmts: b.list };
             });
 
-            let financials = { totalValueAll: 0, totalIncomeAll: 0, totalDebtInvoiceAll: 0, totalRequestedAll: 0, totalInvoiceAll: 0, recoveryRate: 0, totalIncomeThisYear: 0, totalInvoiceThisYear: 0, totalDebtAll, totalDebtInvoiceCumulative, totalDebtRequestedCumulative, recoveryCumulative };
+            let financials = { totalValueAll: 0, totalIncomeAll: 0, totalDebtInvoiceAll: 0, totalRequestedAll: 0, totalInvoiceAll: 0, recoveryRate: 0, totalIncomeThisYear, totalInvoiceThisYear, totalDebtAll, totalDebtInvoiceCumulative, totalDebtRequestedCumulative, recoveryCumulative };
             let performance = { avg_lng_dt: 0, avg_sl_cp: 0, avg_spi: 1, avg_dt_sl: 0, avg_thu_dt: 0, avg_thu_chi: 0 };
             let chartData = { trend: { labels: [], values: [] }, portfolio: { labels: [], values: [] }, aging: { labels: [], invoiceValues: [], incomeValues: [] }, topProfit: { labels: [], values: [] } };
             let processed = [];
@@ -167,14 +178,7 @@ const DashboardOverview = () => {
                 const totalDebtRequestedAll = processed.reduce((s, p) => s + Math.max(0, p.debtRequested || 0), 0);
                 const recoveryRate = totalValueAll > 0 ? (totalIncomeAll / totalValueAll) * 100 : 0;
 
-                // Tính Thực thu (Cash-in) cho năm hiện tại dựa trên ngày nhận tiền thực tế
-                const totalIncomeThisYear = (extHist || [])
-                    .reduce((sum, h) => sum + (parseFloat(h.amount) || 0), 0);
-
-                // Tính Tổng đã xuất hóa đơn cho năm hiện tại
-                const totalInvoiceThisYear = (pmts || [])
-                    .reduce((sum, pm) => sum + (parseFloat(pm.invoice_amount) || 0), 0);
-
+                // totalIncomeThisYear / totalInvoiceThisYear đã tính ở trên (độc lập năm ký HĐ)
                 financials = { totalValueAll, totalIncomeAll, totalDebtInvoiceAll, totalDebtRequestedAll, totalRequestedAll, totalInvoiceAll, recoveryRate, totalIncomeThisYear, totalInvoiceThisYear, totalDebtAll, totalDebtInvoiceCumulative, totalDebtRequestedCumulative, recoveryCumulative };
 
                 // 3. Chart Data Processing
