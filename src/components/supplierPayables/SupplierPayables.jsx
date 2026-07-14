@@ -6,6 +6,7 @@ import PurchaseTimeline from './PurchaseTimeline';
 import SupplierPaymentForm from './SupplierPaymentForm';
 import PayablesExcelImport from './PayablesExcelImport';
 import { calcPayablesSummary, formatCurrency, projectOption } from './payablesUtils';
+import SearchableSelect from '../common/SearchableSelect';
 
 const TABS = [
   { key: 'summary', label: 'Tổng quan Công nợ', icon: 'account_balance' },
@@ -98,6 +99,11 @@ export default function SupplierPayables() {
     return [...groups].sort();
   }, [purchases]);
 
+  // Options cho ô tìm kiếm thông minh (kèm "Tất cả")
+  const projectSelectOptions = useMemo(() => [{ id: '', label: 'Tất cả' }, ...projects.map(p => ({ id: p.id, label: projectOption(p) }))], [projects]);
+  const supplierSelectOptions = useMemo(() => [{ id: '', label: 'Tất cả' }, ...suppliers.map(s => ({ id: s.id, label: s.name }))], [suppliers]);
+  const groupSelectOptions = useMemo(() => [{ id: '', label: 'Tất cả' }, ...materialGroups.map(g => ({ id: g, label: g }))], [materialGroups]);
+
   const clearFilters = () => {
     setFilterProject('');
     setFilterSupplier('');
@@ -152,27 +158,15 @@ export default function SupplierPayables() {
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[140px]">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Công trình</label>
-            <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
-              className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-800 dark:text-white">
-              <option value="">Tất cả</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{projectOption(p)}</option>)}
-            </select>
+            <SearchableSelect options={projectSelectOptions} value={filterProject} onChange={setFilterProject} placeholder="Tất cả" />
           </div>
           <div className="flex-1 min-w-[140px]">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nhà cung cấp</label>
-            <select value={filterSupplier} onChange={e => setFilterSupplier(e.target.value)}
-              className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-800 dark:text-white">
-              <option value="">Tất cả</option>
-              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+            <SearchableSelect options={supplierSelectOptions} value={filterSupplier} onChange={setFilterSupplier} placeholder="Tất cả" />
           </div>
           <div className="flex-1 min-w-[120px]">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nhóm VT</label>
-            <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)}
-              className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-800 dark:text-white">
-              <option value="">Tất cả</option>
-              {materialGroups.map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
+            <SearchableSelect options={groupSelectOptions} value={filterGroup} onChange={setFilterGroup} placeholder="Tất cả" />
           </div>
           <div className="min-w-[120px]">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Từ ngày</label>

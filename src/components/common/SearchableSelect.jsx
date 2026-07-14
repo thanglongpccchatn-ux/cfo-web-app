@@ -68,12 +68,15 @@ export default function SearchableSelect({
         };
     }, [isOpen]);
 
-    // Filter logic with accent-insensitivity
+    // Tìm kiếm thông minh: không dấu, tách theo khoảng trắng thành nhiều từ khóa,
+    // MỖI từ khóa chỉ cần xuất hiện trong nhãn (không cần liền nhau, không cần đúng thứ tự).
+    const tokens = removeAccents(searchTerm.toLowerCase()).split(/\s+/).filter(Boolean);
     const filteredOptions = options.filter(opt => {
-        const search = removeAccents(searchTerm.toLowerCase());
+        if (tokens.length === 0) return true;
         const label = removeAccents(String(opt.label || '').toLowerCase());
         const subLabel = opt.subLabel ? removeAccents(String(opt.subLabel).toLowerCase()) : '';
-        return label.includes(search) || subLabel.includes(search);
+        const hay = `${label} ${subLabel}`;
+        return tokens.every(t => hay.includes(t));
     });
 
     const handleInputChange = (e) => {
