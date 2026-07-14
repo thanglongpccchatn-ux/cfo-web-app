@@ -12,6 +12,7 @@ export default function PayablesExcelImport({ projects = [], suppliers = [], onC
   const [selectedProject, setSelectedProject] = useState('');
   const [usePerRowProject, setUsePerRowProject] = useState(false); // Use CÔNG TRÌNH col from Excel
   const [importing, setImporting] = useState(false);
+  const [importMode, setImportMode] = useState('append'); // 'append' = nhập thêm | 'replace' = thay thế theo công trình
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
 
@@ -49,6 +50,7 @@ export default function PayablesExcelImport({ projects = [], suppliers = [], onC
 
   const handleImport = async () => {
     if (!usePerRowProject && !selectedProject) { setError('Vui lòng chọn công trình'); return; }
+    if (importMode === 'replace' && !window.confirm('Chế độ THAY THẾ sẽ XÓA toàn bộ dữ liệu mua hàng/thanh toán cũ của (các) công trình có trong file, rồi nhập lại từ file. Không đụng tới công trình khác.\n\nTiếp tục?')) return;
     setImporting(true);
     setStep(3);
     setError('');
@@ -82,7 +84,7 @@ export default function PayablesExcelImport({ projects = [], suppliers = [], onC
         return selectedProject;
       };
 
-      // Import purchases
+      // Dựng batch mua hàng
       const purchaseBatch = parsedData.purchases.map(p => {
         const supplierId = supplierMap[p.supplier_name.toLowerCase().trim()];
         const projectId = resolveProject(p);
@@ -103,13 +105,7 @@ export default function PayablesExcelImport({ projects = [], suppliers = [], onC
         };
       }).filter(Boolean);
 
-      if (purchaseBatch.length > 0) {
-        const { error: pErr } = await supabase.from('supplier_purchases').insert(purchaseBatch);
-        if (pErr) throw pErr;
-        purchaseCount = purchaseBatch.length;
-      }
-
-      // Import payments
+      // Dựng batch thanh toán
       const paymentBatch = parsedData.payments.map(p => {
         const supplierId = supplierMap[p.supplier_name.toLowerCase().trim()];
         const projectId = resolveProject(p);
@@ -128,13 +124,36 @@ export default function PayablesExcelImport({ projects = [], suppliers = [], onC
         };
       }).filter(Boolean);
 
+      // Chế độ THAY THẾ: xóa dữ liệu cũ của đúng các công trình có trong file (theo loại dữ liệu nhập).
+      let deletedPurchases = 0, deletedPayments = 0;
+      if (importMode === 'replace') {
+        const purchaseProjIds = [...new Set(purchaseBatch.map(r => r.project_id).filter(Boolean))];
+        const paymentProjIds = [...new Set(paymentBatch.map(r => r.project_id).filter(Boolean))];
+        if (purchaseBatch.length > 0 && purchaseProjIds.length > 0) {
+          const { data: del, error: dErr } = await supabase.from('supplier_purchases').delete().in('project_id', purchaseProjIds).select('id');
+          if (dErr) throw dErr;
+          deletedPurchases = del?.length || 0;
+        }
+        if (paymentBatch.length > 0 && paymentProjIds.length > 0) {
+          const { data: del, error: dErr } = await supabase.from('supplier_payments').delete().in('project_id', paymentProjIds).select('id');
+          if (dErr) throw dErr;
+          deletedPayments = del?.length || 0;
+        }
+      }
+
+      // Insert dữ liệu mới
+      if (purchaseBatch.length > 0) {
+        const { error: pErr } = await supabase.from('supplier_purchases').insert(purchaseBatch);
+        if (pErr) throw pErr;
+        purchaseCount = purchaseBatch.length;
+      }
       if (paymentBatch.length > 0) {
         const { error: payErr } = await supabase.from('supplier_payments').insert(paymentBatch);
         if (payErr) throw payErr;
         paymentCount = paymentBatch.length;
       }
 
-      setResult({ purchaseCount, paymentCount, skippedCount, skippedReasons });
+      setResult({ purchaseCount, paymentCount, skippedCount, skippedReasons, deletedPurchases, deletedPayments, mode: importMode });
       setStep(4);
       onImported?.();
     } catch (err) {
@@ -267,6 +286,29 @@ export default function PayablesExcelImport({ projects = [], suppliers = [], onC
                 </div>
               )}
 
+              {/* Chế độ nhập */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Cách nhập dữ liệu</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setImportMode('append')}
+                    className={`text-left px-3 py-2.5 rounded-xl border-2 transition-colors ${importMode === 'append' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-600 hover:border-slate-300'}`}>
+                    <p className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px] text-blue-600">add</span>Nhập thêm</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Giữ dữ liệu cũ, thêm dòng mới từ file.</p>
+                  </button>
+                  <button type="button" onClick={() => setImportMode('replace')}
+                    className={`text-left px-3 py-2.5 rounded-xl border-2 transition-colors ${importMode === 'replace' ? 'border-rose-500 bg-rose-50 dark:bg-rose-900/20' : 'border-slate-200 dark:border-slate-600 hover:border-slate-300'}`}>
+                    <p className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px] text-rose-600">swap_horiz</span>Thay thế</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Xóa dữ liệu cũ của (các) công trình trong file rồi nhập lại.</p>
+                  </button>
+                </div>
+                {importMode === 'replace' && (
+                  <p className="mt-1.5 text-[11.5px] text-rose-600 font-semibold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[15px]">warning</span>
+                    Sẽ XÓA mua hàng/thanh toán cũ của đúng các công trình có trong file. Không ảnh hưởng công trình khác.
+                  </p>
+                )}
+              </div>
+
               {/* Preview Tables */}
               {parsedData.purchases.length > 0 && (
                 <div>
@@ -362,6 +404,9 @@ export default function PayablesExcelImport({ projects = [], suppliers = [], onC
                 <span className="material-symbols-outlined text-3xl text-emerald-600">check_circle</span>
               </div>
               <h4 className="text-lg font-bold text-slate-800 dark:text-white">Import thành công!</h4>
+              {result.mode === 'replace' && (result.deletedPurchases > 0 || result.deletedPayments > 0) && (
+                <p className="text-[12px] text-rose-600 font-semibold">Đã thay thế: xóa {result.deletedPurchases} mua hàng + {result.deletedPayments} thanh toán cũ.</p>
+              )}
               <div className="flex gap-6 text-sm">
                 <div className="text-center">
                   <p className="text-2xl font-black text-blue-600">{result.purchaseCount}</p>
