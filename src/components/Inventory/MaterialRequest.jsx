@@ -10,7 +10,7 @@ import { useInventoryScope } from './useInventoryScope';
 const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim().replace(/\s+/g, ' ');
 const today = () => new Date().toISOString().slice(0, 10);
 const qtyFmt = (v) => { const n = Number(v) || 0; return Number.isInteger(n) ? n.toLocaleString('vi-VN') : n.toLocaleString('vi-VN', { maximumFractionDigits: 2 }); };
-const emptyLine = () => ({ id: Math.random().toString(36).slice(2), key: '', product_name: '', unit: '', material_id: null, qty: 0 });
+const emptyLine = () => ({ id: Math.random().toString(36).slice(2), key: '', product_name: '', unit: '', material_id: null, material_group: '', contract_qty: 0, qty: 0, note: '' });
 
 async function fetchAll(table, select, order) {
   const CHUNK = 1000; const all = [];
@@ -37,15 +37,16 @@ export default function MaterialRequest({ onIssue }) {
   const { data } = useQuery({
     queryKey: ['material-requests'],
     queryFn: async () => {
-      const [projs, purch, subs, subP, reqs, reqItems] = await Promise.all([
+      const [projs, purch, mats, subs, subP, reqs, reqItems] = await Promise.all([
         fetchAll('projects', 'id, internal_code, code, name', 'name'),
         fetchAll('supplier_purchases', 'project_id, product_name, material_id, unit'),
+        fetchAll('materials', 'id, name, category_code'),
         fetchAll('subcontractors', 'id, code, name'),
         fetchAll('partners', 'id, code, name'),
         fetchAll('material_requests', '*', 'created_at'),
         fetchAll('material_request_items', '*'),
       ]);
-      return { projects: projs.rows, purchases: purch.rows, subs: subs.rows, partners: subP.rows, requests: reqs.rows, reqItems: reqItems.rows, reqErr: reqs.error };
+      return { projects: projs.rows, purchases: purch.rows, materials: mats.rows, subs: subs.rows, partners: subP.rows, requests: reqs.rows, reqItems: reqItems.rows, reqErr: reqs.error };
     },
   });
 
@@ -60,6 +61,16 @@ export default function MaterialRequest({ onIssue }) {
     return src.map(s => ({ id: s.id, label: s.code ? `${s.code} — ${s.name}` : s.name, name: s.name })).sort((a, b) => a.label.localeCompare(b.label, 'vi'));
   }, [data?.subs, data?.partners]);
 
+  // Tra mã nhóm vật tư từ danh mục (theo material_id, fallback theo tên)
+  const matGroup = useMemo(() => {
+    const byId = {}, byName = {};
+    for (const m of (data?.materials || [])) {
+      if (m.id) byId[m.id] = m.category_code || '';
+      if (m.name) byName[norm(m.name)] = m.category_code || '';
+    }
+    return { byId, byName };
+  }, [data?.materials]);
+
   // Vật tư có thể đề nghị = vật tư đã mua cho dự án đang chọn
   const materialOptions = useMemo(() => {
     if (!header.project_id) return [];
@@ -67,10 +78,10 @@ export default function MaterialRequest({ onIssue }) {
     for (const p of (data?.purchases || [])) {
       if (p.project_id !== header.project_id) continue;
       const k = norm(p.product_name);
-      if (k && !m[k]) m[k] = { id: k, label: p.product_name, unit: p.unit || '', material_id: p.material_id || null, product_name: p.product_name };
+      if (k && !m[k]) m[k] = { id: k, label: p.product_name, unit: p.unit || '', material_id: p.material_id || null, product_name: p.product_name, group: (p.material_id && matGroup.byId[p.material_id]) || matGroup.byName[k] || '' };
     }
     return Object.values(m).sort((a, b) => a.label.localeCompare(b.label, 'vi'));
-  }, [data?.purchases, header.project_id]);
+  }, [data?.purchases, header.project_id, matGroup]);
 
   const itemsByReq = useMemo(() => {
     const m = {}; for (const it of (data?.reqItems || [])) (m[it.request_id] || (m[it.request_id] = [])).push(it);
@@ -82,7 +93,7 @@ export default function MaterialRequest({ onIssue }) {
   const removeLine = (id) => setLines(ls => ls.length <= 1 ? ls : ls.filter(l => l.id !== id));
   const pickMaterial = (id, mkId) => {
     const mo = materialOptions.find(o => o.id === mkId);
-    if (mo) setLine(id, { key: mo.id, product_name: mo.product_name, unit: mo.unit, material_id: mo.material_id });
+    if (mo) setLine(id, { key: mo.id, product_name: mo.product_name, unit: mo.unit, material_id: mo.material_id, material_group: mo.group || '' });
   };
 
   const resetForm = () => { setHeader({ project_id: '', subcontractor: null, request_date: today(), notes: '' }); setLines([emptyLine()]); };
@@ -101,7 +112,7 @@ export default function MaterialRequest({ onIssue }) {
         notes: header.notes || null, created_by: user?.id,
       }).select('id').single();
       if (error) throw error;
-      const items = validLines.map(l => ({ request_id: req.id, material_key: l.key, material_id: l.material_id || null, product_name: l.product_name, unit: l.unit, qty_requested: Number(l.qty), qty_issued: 0 }));
+      const items = validLines.map(l => ({ request_id: req.id, material_key: l.key, material_id: l.material_id || null, product_name: l.product_name, unit: l.unit, material_group: l.material_group || null, contract_qty: Number(l.contract_qty) || 0, note: l.note || null, qty_requested: Number(l.qty), qty_issued: 0 }));
       const { error: iErr } = await supabase.from('material_request_items').insert(items);
       if (iErr) throw iErr;
       smartToast('Đã tạo đề nghị vật tư!');
@@ -146,19 +157,32 @@ export default function MaterialRequest({ onIssue }) {
           </div>
 
           <div className="border border-slate-100 dark:border-slate-700 rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-900/40 text-[11px] font-black uppercase text-slate-500">
-                <tr><th className="text-left px-3 py-2">Vật tư</th><th className="text-center px-3 py-2 w-[80px]">ĐVT</th><th className="text-right px-2 py-2 w-[140px]">SL đề nghị</th><th className="w-10"></th></tr>
+            <table className="w-full text-[12px]">
+              <thead className="bg-slate-50 dark:bg-slate-900/40 text-[10px] font-black uppercase text-slate-500">
+                <tr>
+                  <th className="text-center px-2 py-1.5 w-8">STT</th>
+                  <th className="text-left px-2 py-1.5 w-[90px]">Nhóm VT</th>
+                  <th className="text-left px-2 py-1.5">Vật tư</th>
+                  <th className="text-center px-2 py-1.5 w-[64px]">ĐVT</th>
+                  <th className="text-right px-2 py-1.5 w-[104px]">KL hợp đồng</th>
+                  <th className="text-right px-2 py-1.5 w-[104px]">SL đề nghị</th>
+                  <th className="text-left px-2 py-1.5 w-[150px]">Ghi chú</th>
+                  <th className="w-8"></th>
+                </tr>
               </thead>
               <tbody>
-                {lines.map(l => (
+                {lines.map((l, i) => (
                   <tr key={l.id} className="border-t border-slate-100 dark:border-slate-700/40">
-                    <td className="px-3 py-1.5">
+                    <td className="px-2 py-1 text-center text-slate-400 tabular-nums">{i + 1}</td>
+                    <td className="px-2 py-1 text-slate-500 font-mono text-[11px]">{l.material_group || '—'}</td>
+                    <td className="px-2 py-1">
                       <SearchableSelect options={materialOptions} value={l.key} onChange={mk => pickMaterial(l.id, mk)} placeholder={header.project_id ? 'Chọn vật tư (đã mua cho dự án)...' : 'Chọn công trình trước'} />
                     </td>
-                    <td className="px-3 py-1.5 text-center text-slate-500 text-[12px]">{l.unit || '—'}</td>
-                    <td className="px-2 py-1.5"><NumberInput value={Number(l.qty) || 0} onChange={v => setLine(l.id, { qty: Number(v) || 0 })} className="w-full text-right tabular-nums text-[13px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700" /></td>
-                    <td className="px-2 py-1.5 text-center"><button onClick={() => removeLine(l.id)} className="text-slate-300 hover:text-rose-500"><span className="material-symbols-outlined text-[16px]">close</span></button></td>
+                    <td className="px-2 py-1 text-center text-slate-500">{l.unit || '—'}</td>
+                    <td className="px-2 py-1"><NumberInput value={Number(l.contract_qty) || 0} onChange={v => setLine(l.id, { contract_qty: Number(v) || 0 })} className="w-full text-right tabular-nums text-[12px] border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1 bg-white dark:bg-slate-700" /></td>
+                    <td className="px-2 py-1"><NumberInput value={Number(l.qty) || 0} onChange={v => setLine(l.id, { qty: Number(v) || 0 })} className="w-full text-right tabular-nums text-[12px] font-semibold border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1 bg-white dark:bg-slate-700" /></td>
+                    <td className="px-2 py-1"><input type="text" value={l.note || ''} onChange={e => setLine(l.id, { note: e.target.value })} placeholder="—" className="w-full text-[12px] border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1 bg-white dark:bg-slate-700" /></td>
+                    <td className="px-1 py-1 text-center"><button onClick={() => removeLine(l.id)} className="text-slate-300 hover:text-rose-500"><span className="material-symbols-outlined text-[15px]">close</span></button></td>
                   </tr>
                 ))}
               </tbody>
@@ -197,16 +221,30 @@ export default function MaterialRequest({ onIssue }) {
                 )}
               </div>
               <div className="mt-2 overflow-x-auto">
-                <table className="w-full text-[13px]">
-                  <thead><tr className="text-[10.5px] font-bold uppercase text-slate-400 border-b border-slate-100 dark:border-slate-700"><th className="text-left py-1.5">Vật tư</th><th className="text-center py-1.5">ĐVT</th><th className="text-right py-1.5">SL đề nghị</th><th className="text-right py-1.5">Đã xuất</th><th className="text-right py-1.5">Còn lại</th></tr></thead>
+                <table className="w-full text-[12px]">
+                  <thead><tr className="text-[10px] font-bold uppercase text-slate-400 border-b border-slate-100 dark:border-slate-700">
+                    <th className="text-center py-1.5 w-8">STT</th>
+                    <th className="text-left py-1.5 w-[80px]">Nhóm VT</th>
+                    <th className="text-left py-1.5">Vật tư</th>
+                    <th className="text-center py-1.5">ĐVT</th>
+                    <th className="text-right py-1.5">KL HĐ</th>
+                    <th className="text-right py-1.5">SL đề nghị</th>
+                    <th className="text-right py-1.5">Đã xuất</th>
+                    <th className="text-right py-1.5">Còn lại</th>
+                    <th className="text-left py-1.5 pl-3">Ghi chú</th>
+                  </tr></thead>
                   <tbody>
-                    {items.map(it => (
+                    {items.map((it, i) => (
                       <tr key={it.id} className="border-b border-slate-50 dark:border-slate-700/30">
+                        <td className="py-1.5 text-center text-slate-400 tabular-nums">{i + 1}</td>
+                        <td className="py-1.5 text-slate-500 font-mono text-[11px]">{it.material_group || '—'}</td>
                         <td className="py-1.5 text-slate-700 dark:text-slate-200">{it.product_name}</td>
-                        <td className="py-1.5 text-center text-slate-500 text-[12px]">{it.unit}</td>
+                        <td className="py-1.5 text-center text-slate-500">{it.unit}</td>
+                        <td className="py-1.5 text-right tabular-nums text-slate-400">{it.contract_qty ? qtyFmt(it.contract_qty) : '—'}</td>
                         <td className="py-1.5 text-right tabular-nums">{qtyFmt(it.qty_requested)}</td>
                         <td className="py-1.5 text-right tabular-nums text-emerald-600">{qtyFmt(it.qty_issued)}</td>
                         <td className="py-1.5 text-right tabular-nums font-bold text-rose-600">{qtyFmt(Number(it.qty_requested) - Number(it.qty_issued))}</td>
+                        <td className="py-1.5 pl-3 text-slate-400 text-[11px]">{it.note || ''}</td>
                       </tr>
                     ))}
                   </tbody>
