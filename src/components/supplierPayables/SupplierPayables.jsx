@@ -22,6 +22,7 @@ export default function SupplierPayables() {
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showImport, setShowImport] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Filters
   const [filterProject, setFilterProject] = useState('');
@@ -107,6 +108,27 @@ export default function SupplierPayables() {
 
   const hasFilters = filterProject || filterSupplier || filterGroup || filterDateFrom || filterDateTo;
 
+  // Xóa hàng loạt các dòng MUA HÀNG đang lọc (vd: lọc NCC = Hồng Dương rồi xóa hết bản ghi trùng).
+  const deleteFilteredPurchases = async () => {
+    const rows = filteredPurchases;
+    if (!rows.length) return;
+    const suppName = filterSupplier ? (suppliers.find(s => s.id === filterSupplier)?.name || '') : '';
+    if (!window.confirm(`Xóa ${rows.length} dòng MUA HÀNG đang lọc${suppName ? ` của NCC "${suppName}"` : ''}?\n\nKhông thể hoàn tác.`)) return;
+    setDeleting(true);
+    try {
+      const ids = rows.map(r => r.id).filter(Boolean);
+      for (let i = 0; i < ids.length; i += 500) {
+        const { error } = await supabase.from('supplier_purchases').delete().in('id', ids.slice(i, i + 500));
+        if (error) throw error;
+      }
+      await fetchData();
+    } catch (err) {
+      alert('Lỗi xóa: ' + (err.message || err));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
@@ -166,6 +188,11 @@ export default function SupplierPayables() {
             {hasFilters && (
               <button onClick={clearFilters} className="text-sm text-slate-500 hover:text-rose-500 flex items-center gap-1 px-3 py-2 transition-colors">
                 <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>Xóa lọc
+              </button>
+            )}
+            {hasFilters && activeTab === 'timeline' && filteredPurchases.length > 0 && (
+              <button onClick={deleteFilteredPurchases} disabled={deleting} title="Xóa toàn bộ mua hàng đang lọc" className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold shadow-sm transition-colors">
+                <span className="material-symbols-outlined text-[16px]">delete_sweep</span>{deleting ? 'Đang xóa...' : `Xóa ${filteredPurchases.length} dòng lọc`}
               </button>
             )}
             <button onClick={() => setShowImport(true)} className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors">
