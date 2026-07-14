@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { CashFlowChart, PortfolioChart, ReceivablesAgingChart, TopProfitChart } from './DashboardCharts';
@@ -11,6 +11,7 @@ import { smartToast } from '../utils/globalToast';
 
 const DashboardOverview = () => {
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [userPickedYear, setUserPickedYear] = useState(false);
     const queryClient = useQueryClient();
     const invalidateDashboard = () => queryClient.invalidateQueries({ queryKey: ['dashboard-overview-data', selectedYear] });
 
@@ -261,7 +262,15 @@ const DashboardOverview = () => {
                 performance = { avg_lng_dt, avg_sl_cp, avg_spi, avg_dt_sl, avg_thu_dt, avg_thu_chi };
             }
 
-            return { planData, stats, financials, chartData, performance, projectDetails: processed, debtBreakdown, unsignedProjects, unsettledProjects, pendingPaymentsList };
+            // Các năm THỰC SỰ có dữ liệu (để mặc định mở đúng năm có số liệu, tránh mở năm trống).
+            const yearSet = new Set();
+            const addYear = (d) => { if (!d) return; const y = new Date(d).getFullYear(); if (y >= 2000 && y <= 2100) yearSet.add(y); };
+            (pmtRes.data || []).forEach(pm => addYear(pm.invoice_date || pm.created_at));
+            (projRes.data || []).forEach(p => addYear(p.sign_date || p.start_date || p.created_at));
+            (extHistRes.data || []).forEach(h => addYear(h.payment_date || h.created_at));
+            const availableYears = [...yearSet].sort((a, b) => a - b);
+
+            return { planData, stats, financials, chartData, performance, projectDetails: processed, debtBreakdown, unsignedProjects, unsettledProjects, pendingPaymentsList, availableYears };
         }
     });
 
@@ -273,6 +282,14 @@ const DashboardOverview = () => {
         chartData: { trend: { labels: [], values: [] }, portfolio: { labels: [], values: [] }, aging: { labels: [], invoiceValues: [], incomeValues: [] }, topProfit: { labels: [], values: [] } },
         projectDetails: [], debtBreakdown: [], unsignedProjects: [], unsettledProjects: [], pendingPaymentsList: []
     };
+
+    // Nếu năm đang chọn (mặc định = năm hiện tại) không có dữ liệu, tự nhảy về năm gần nhất có số liệu.
+    useEffect(() => {
+        if (userPickedYear || selectedYear === 'all') return;
+        const years = dashboardData?.availableYears;
+        if (!years || years.length === 0) return;
+        if (!years.includes(selectedYear)) setSelectedYear(Math.max(...years));
+    }, [dashboardData, userPickedYear, selectedYear]);
 
     const [targetModal, setTargetModal] = useState({ isOpen: false, target: 0, isSaving: false });
 
@@ -423,8 +440,8 @@ const DashboardOverview = () => {
                                 <h2 className="text-xl md:text-3xl font-black text-slate-800 tracking-tight flex items-center gap-2">
                                     KẾ HOẠCH DOANH THU
                                     <select 
-                                        value={selectedYear} 
-                                        onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                                        value={selectedYear}
+                                        onChange={(e) => { setUserPickedYear(true); setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value)); }}
                                         className="bg-slate-100/50 border-none rounded-lg text-xl md:text-3xl font-black text-slate-800 focus:ring-0 cursor-pointer py-0 pl-2 pr-8 hover:bg-slate-200 transition-colors"
                                     >
                                         <option value="all">Tất cả</option>
