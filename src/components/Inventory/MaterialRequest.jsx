@@ -6,6 +6,8 @@ import { smartToast } from '../../utils/globalToast';
 import SearchableSelect from '../common/SearchableSelect';
 import NumberInput from '../common/NumberInput';
 import { useInventoryScope } from './useInventoryScope';
+import { printRequestSlip } from './inventoryPrint';
+import { exportToExcel } from '../../utils/exportExcel';
 
 const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim().replace(/\s+/g, ' ');
 const today = () => new Date().toISOString().slice(0, 10);
@@ -123,6 +125,22 @@ export default function MaterialRequest({ onIssue }) {
     } finally { setSaving(false); }
   };
 
+  const exportRequest = (r, items) => {
+    const rows = (items || []).map((it, i) => ({ ...it, stt: i + 1, con_lai: Number(it.qty_requested) - Number(it.qty_issued) }));
+    const cols = [
+      { key: 'stt', label: 'STT' },
+      { key: 'material_group', label: 'Nhóm VT' },
+      { key: 'product_name', label: 'Tên vật tư' },
+      { key: 'unit', label: 'ĐVT' },
+      { key: 'contract_qty', label: 'KL hợp đồng', format: 'number' },
+      { key: 'qty_requested', label: 'SL đề nghị', format: 'number' },
+      { key: 'qty_issued', label: 'Đã xuất', format: 'number' },
+      { key: 'con_lai', label: 'Còn lại', format: 'number' },
+      { key: 'note', label: 'Ghi chú' },
+    ];
+    exportToExcel(rows, cols, `DeNghiVT_${(projMap[r.project_id] || 'DA')}_${r.code || ''}`, 'Đề nghị VT');
+  };
+
   const requests = (data?.requests || []).filter(r => viewAll || assignedProjects.includes(r.project_id));
 
   return (
@@ -216,9 +234,13 @@ export default function MaterialRequest({ onIssue }) {
                   </div>
                   <div className="text-[12px] text-slate-500 mt-0.5">{projMap[r.project_id] || '—'} · <span className="uppercase">{r.subcontractor_name || '—'}</span> · {r.request_date ? new Date(r.request_date).toLocaleDateString('vi-VN') : ''} · {items.length} vật tư</div>
                 </div>
-                {onIssue && !done && (
-                  <button onClick={() => onIssue({ ...r, projectLabel: projMap[r.project_id] || 'DA' })} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[12px] font-bold flex items-center gap-1.5"><span className="material-symbols-outlined text-[15px]">logout</span>Xuất kho</button>
-                )}
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => printRequestSlip({ ...r, projectLabel: projMap[r.project_id] || '' }, items)} title="In phiếu đề nghị" className="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-200 rounded-lg text-[12px] font-bold flex items-center gap-1"><span className="material-symbols-outlined text-[15px]">print</span>In</button>
+                  <button onClick={() => exportRequest(r, items)} title="Xuất Excel" className="px-2.5 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 rounded-lg text-[12px] font-bold flex items-center gap-1"><span className="material-symbols-outlined text-[15px]">table_view</span>Excel</button>
+                  {onIssue && !done && (
+                    <button onClick={() => onIssue({ ...r, projectLabel: projMap[r.project_id] || 'DA' })} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[12px] font-bold flex items-center gap-1.5"><span className="material-symbols-outlined text-[15px]">logout</span>Xuất kho</button>
+                  )}
+                </div>
               </div>
               <div className="mt-2 overflow-x-auto">
                 <table className="w-full text-[12px]">

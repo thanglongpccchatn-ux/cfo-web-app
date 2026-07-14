@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
  * SearchableSelect Component
@@ -23,15 +24,19 @@ export default function SearchableSelect({
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [coords, setCoords] = useState(null);
     const wrapperRef = useRef(null);
     const inputRef = useRef(null);
+    const dropdownRef = useRef(null);
 
     const selectedOption = options.find(opt => opt.id === value);
 
-    // Close on click outside
+    // Close on click outside (kể cả khi dropdown render qua portal)
     useEffect(() => {
         function handleClickOutside(event) {
-            if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+            const inWrapper = wrapperRef.current && wrapperRef.current.contains(event.target);
+            const inDropdown = dropdownRef.current && dropdownRef.current.contains(event.target);
+            if (!inWrapper && !inDropdown) {
                 setIsOpen(false);
                 setSearchTerm('');
             }
@@ -39,6 +44,29 @@ export default function SearchableSelect({
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    // Định vị dropdown theo vị trí ô input (fixed) — không bị cắt bởi overflow của bảng/thẻ cha
+    useEffect(() => {
+        if (!isOpen) return;
+        const update = () => {
+            const el = wrapperRef.current;
+            if (!el) return;
+            const r = el.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - r.bottom;
+            const DROP_H = 350;
+            const flipUp = spaceBelow < DROP_H && r.top > spaceBelow;
+            setCoords(flipUp
+                ? { bottom: window.innerHeight - r.top + 6, left: r.left, width: r.width }
+                : { top: r.bottom + 6, left: r.left, width: r.width });
+        };
+        update();
+        window.addEventListener('scroll', update, true);
+        window.addEventListener('resize', update);
+        return () => {
+            window.removeEventListener('scroll', update, true);
+            window.removeEventListener('resize', update);
+        };
+    }, [isOpen]);
 
     // Filter logic with accent-insensitivity
     const filteredOptions = options.filter(opt => {
@@ -111,9 +139,9 @@ export default function SearchableSelect({
                 )}
             </div>
 
-            {/* Dropdown Results */}
-            {isOpen && (
-                <div className="absolute z-[100] w-full mt-2 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-2xl overflow-hidden animate-slide-up max-h-[350px] flex flex-col border-t-0 ring-1 ring-black/5">
+            {/* Dropdown Results — render qua portal (fixed) để không bị bảng/thẻ cha cắt */}
+            {isOpen && coords && createPortal(
+                <div ref={dropdownRef} style={{ position: 'fixed', top: coords.top, bottom: coords.bottom, left: coords.left, width: coords.width, zIndex: 9999 }} className="bg-white/95 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-2xl overflow-hidden animate-slide-up max-h-[350px] flex flex-col ring-1 ring-black/5">
                     <div className="overflow-y-auto no-scrollbar py-2">
                         {filteredOptions.length === 0 ? (
                             <div className="px-6 py-10 text-center space-y-2">
@@ -149,7 +177,8 @@ export default function SearchableSelect({
                             ))
                         )}
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

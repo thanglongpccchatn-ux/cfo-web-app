@@ -45,3 +45,48 @@ export function printIssueSlip(slip, hidePrice = false) {
   const w = window.open('', '_blank', 'width=900,height=700');
   if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400); }
 }
+
+/**
+ * In PHIẾU ĐỀ NGHỊ VẬT TƯ. req = { code, request_date, projectLabel, subcontractor_name, notes }
+ * items = [{ material_group, product_name, unit, contract_qty, qty_requested, note }]
+ */
+export function printRequestSlip(req, items) {
+  const rows = (items || []).map((it, i) => `
+    <tr>
+      <td style="text-align:center">${i + 1}</td>
+      <td style="text-align:center">${it.material_group || ''}</td>
+      <td>${it.product_name || ''}</td>
+      <td style="text-align:center">${it.unit || ''}</td>
+      <td style="text-align:right">${it.contract_qty ? qtyFmt(it.contract_qty) : ''}</td>
+      <td style="text-align:right">${qtyFmt(it.qty_requested)}</td>
+      <td>${it.note || ''}</td>
+    </tr>`).join('');
+  const d = new Date(req.request_date);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${req.code || 'Phiếu đề nghị vật tư'}</title>
+    <style>
+      body{font-family:'Times New Roman',serif;color:#000;padding:24px;font-size:14px}
+      h2{text-align:center;margin:4px 0}
+      table{width:100%;border-collapse:collapse;margin-top:12px}
+      th,td{border:1px solid #000;padding:5px 8px}
+      th{background:#f0f0f0}
+      .head{display:flex;justify-content:space-between;font-size:13px}
+      .sign{display:flex;justify-content:space-around;margin-top:40px;text-align:center;font-size:13px}
+      .sign div{width:30%}
+      @media print{button{display:none}}
+    </style></head><body>
+    <div class="head"><div><b>CÔNG TY CP CƠ ĐIỆN & PCCC SATECO</b><br/>Dự án: ${req.projectLabel || ''}</div>
+      <div style="text-align:right">Số phiếu: <b>${req.code || ''}</b><br/>Ngày ${d.getDate()} tháng ${d.getMonth() + 1} năm ${d.getFullYear()}</div></div>
+    <h2>PHIẾU ĐỀ NGHỊ VẬT TƯ</h2>
+    <div>Đơn vị đề nghị: <b>${(req.subcontractor_name || '').toUpperCase()}</b></div>
+    <div>Nội dung: ${req.notes || 'Đề nghị cấp vật tư thi công'}</div>
+    <table><thead><tr>
+      <th style="width:36px">STT</th><th style="width:70px">Nhóm VT</th><th>Tên vật tư</th>
+      <th style="width:56px">ĐVT</th><th style="width:90px">KL hợp đồng</th><th style="width:90px">SL đề nghị</th><th style="width:120px">Ghi chú</th>
+    </tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="sign"><div><b>Người đề nghị</b><br/>(Ký, họ tên)</div><div><b>Chỉ huy trưởng</b><br/>(Ký, họ tên)</div><div><b>Thủ kho</b><br/>(Ký, họ tên)</div></div>
+    <button onclick="window.print()" style="margin-top:24px;padding:8px 16px">In</button>
+    </body></html>`;
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400); }
+}
