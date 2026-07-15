@@ -60,12 +60,14 @@ export default function PayablesExcelImport({ projects = [], suppliers = [], onC
       const supplierMap = {};
       suppliers.forEach(s => { supplierMap[s.name.toLowerCase().trim()] = s.id; });
 
+      // Khóa chuẩn hóa: bỏ dấu, thường hóa, bỏ khoảng trắng/gạch/underscore
+      // -> "INTCO-12HA" == "INTCO 12HA" == "intco12ha".
+      const normKey = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd')
+        .toLowerCase().replace(/[\s\-_.]+/g, '').trim();
       const projectMap = {};
-      projects.forEach(p => {
-        if (p.internal_code) projectMap[p.internal_code.toLowerCase().trim()] = p.id;
-        if (p.code) projectMap[p.code.toLowerCase().trim()] = p.id;
-        if (p.name) projectMap[p.name.toLowerCase().trim()] = p.id;
-      });
+      const addProj = (v, id) => { if (v) { projectMap[String(v).toLowerCase().trim()] = id; projectMap[normKey(v)] = id; } };
+      projects.forEach(p => { addProj(p.internal_code, p.id); addProj(p.code, p.id); addProj(p.name, p.id); });
+      const lookupProject = (name) => projectMap[String(name).toLowerCase().trim()] ?? projectMap[normKey(name)];
 
       // Tự tạo NCC còn thiếu trong danh mục -> KHÔNG bỏ qua dòng -> tổng khớp với file.
       let createdSuppliers = 0;
@@ -82,6 +84,24 @@ export default function PayablesExcelImport({ projects = [], suppliers = [], onC
         createdSuppliers = ins.data?.length || 0;
       }
 
+      // Tự tạo CÔNG TRÌNH còn thiếu (chỉ khi dùng mã CT theo dòng) -> không bỏ qua dòng -> tổng khớp.
+      let createdProjects = 0;
+      const createdProjectNames = [];
+      if (usePerRowProject) {
+        const neededProjs = [...new Set([...parsedData.purchases, ...parsedData.payments]
+          .map(r => (r.project_name || '').trim()).filter(Boolean))];
+        const missingProjs = neededProjs.filter(n => !lookupProject(n));
+        if (missingProjs.length > 0) {
+          const ins = await supabase.from('projects')
+            .insert(missingProjs.map(nm => ({ code: nm, internal_code: nm, name: nm, client: 'Import Excel' })))
+            .select('id, code, internal_code, name');
+          if (ins.error) throw ins.error;
+          (ins.data || []).forEach(p => { addProj(p.internal_code, p.id); addProj(p.code, p.id); addProj(p.name, p.id); });
+          createdProjects = ins.data?.length || 0;
+          createdProjectNames.push(...missingProjs);
+        }
+      }
+
       let purchaseCount = 0;
       let paymentCount = 0;
       let skippedCount = 0;
@@ -90,7 +110,7 @@ export default function PayablesExcelImport({ projects = [], suppliers = [], onC
       // Resolve project ID for a row
       const resolveProject = (row) => {
         if (usePerRowProject && row.project_name) {
-          const pid = projectMap[row.project_name.toLowerCase().trim()];
+          const pid = lookupProject(row.project_name);
           if (!pid) {
             skippedReasons.push(`Dòng ${row._row}: Không tìm thấy CT "${row.project_name}"`);
           }
@@ -169,7 +189,7 @@ export default function PayablesExcelImport({ projects = [], suppliers = [], onC
       }
 
       const importedValue = purchaseBatch.reduce((s, r) => s + (Number(r.quantity) || 0) * (Number(r.unit_price) || 0) * (1 + (Number(r.vat_rate) || 0) / 100), 0);
-      setResult({ purchaseCount, paymentCount, skippedCount, skippedReasons, deletedPurchases, deletedPayments, mode: importMode, createdSuppliers, importedValue });
+      setResult({ purchaseCount, paymentCount, skippedCount, skippedReasons, deletedPurchases, deletedPayments, mode: importMode, createdSuppliers, createdProjects, createdProjectNames, importedValue });
       setStep(4);
       onImported?.();
     } catch (err) {
@@ -425,6 +445,11 @@ export default function PayablesExcelImport({ projects = [], suppliers = [], onC
               )}
               {result.createdSuppliers > 0 && (
                 <p className="text-[12px] text-emerald-600 font-semibold">Đã tự tạo {result.createdSuppliers} nhà cung cấp mới trong danh mục.</p>
+              )}
+              {result.createdProjects > 0 && (
+                <p className="text-[12px] text-amber-600 font-semibold" title={(result.createdProjectNames || []).join(', ')}>
+                  Đã tự tạo {result.createdProjects} công trình mới (mã: {(result.createdProjectNames || []).slice(0, 8).join(', ')}{result.createdProjects > 8 ? '…' : ''}). Vào Hợp đồng để bổ sung thông tin.
+                </p>
               )}
               {result.mode === 'replace' && (result.deletedPurchases > 0 || result.deletedPayments > 0) && (
                 <p className="text-[12px] text-rose-600 font-semibold">Đã thay thế: xóa {result.deletedPurchases} mua hàng + {result.deletedPayments} thanh toán cũ.</p>
