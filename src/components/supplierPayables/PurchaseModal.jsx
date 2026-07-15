@@ -398,7 +398,7 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
                 <th className="py-2 px-2 text-left text-[10px] font-bold text-slate-500 w-[70px]">ĐVT</th>
                 <th className="py-2 px-2 text-right text-[10px] font-bold text-slate-500 w-[80px]">SỐ LƯỢNG</th>
                 <th className="py-2 px-2 text-right text-[10px] font-bold text-slate-500 w-[120px]">ĐƠN GIÁ</th>
-                <th className="py-2 px-2 text-right text-[10px] font-bold text-slate-500 w-[60px]">VAT%</th>
+                <th className="py-2 px-2 text-right text-[10px] font-bold text-slate-500 w-[80px]">VAT%</th>
                 <th className="py-2 px-2 text-right text-[10px] font-bold text-slate-500 w-[120px]">THÀNH TIỀN</th>
                 <th className="py-2 px-2 text-left text-[10px] font-bold text-slate-500 w-[120px]">GHI CHÚ</th>
                 <th className="w-10 py-2 px-2 rounded-tr-lg"></th>
@@ -447,7 +447,7 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
                     </td>
                     <td className="py-1.5 px-2">
                       <input type="number" value={line.vat_rate} onChange={e => handleLineChange(idx, { ...line, vat_rate: e.target.value })}
-                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded px-2 py-1.5 bg-white dark:bg-slate-700 text-right font-mono tabular-nums" />
+                        className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded pl-1.5 pr-0.5 py-1.5 bg-white dark:bg-slate-700 text-right font-mono tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                     </td>
                     <td className="py-1.5 px-2 text-right font-mono tabular-nums font-bold text-blue-600 text-sm whitespace-nowrap">
                       {formatCurrency(total)}
