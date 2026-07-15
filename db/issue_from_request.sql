@@ -14,9 +14,12 @@ create or replace function public.issue_from_request(
     p_lines            jsonb   -- [{ request_item_id, material_id, material_key, product_name, unit, quantity, unit_price }]
 ) returns void
 language plpgsql
+security definer
+set search_path = public
 as $$
 declare v_project uuid;
 begin
+    -- Tự kiểm tra quyền trong hàm; chạy security definer để insert không bị RLS chặn.
     if not (public.current_user_has_perm('export_inventory') or public.current_user_has_perm('manage_materials') or public.current_user_has_perm('manage_materials_tracking')) then
         raise exception 'forbidden';
     end if;

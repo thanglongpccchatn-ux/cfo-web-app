@@ -2,14 +2,11 @@ import React, { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { smartToast } from '../../utils/globalToast';
-import { fmt } from '../../utils/formatters';
-import { useAuth } from '../../context/AuthContext';
 import NumberInput from '../common/NumberInput';
 import { printIssueSlip } from './inventoryPrint';
 
 const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim().replace(/\s+/g, ' ');
 const today = () => new Date().toISOString().slice(0, 10);
-const money = (v) => fmt(Math.round(Number(v) || 0));
 const qtyFmt = (v) => { const n = Number(v) || 0; return Number.isInteger(n) ? n.toLocaleString('vi-VN') : n.toLocaleString('vi-VN', { maximumFractionDigits: 2 }); };
 
 async function fetchAll(table, select, filterCol, filterVal) {
@@ -27,8 +24,6 @@ async function fetchAll(table, select, filterCol, filterVal) {
 
 export default function MaterialIssue({ request, onBack }) {
   const queryClient = useQueryClient();
-  const { profile, hasPermission } = useAuth();
-  const showPrice = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN' || hasPermission('view_material_price');
   const [issueDate, setIssueDate] = useState(today());
   const [notes, setNotes] = useState('');
   const [drafts, setDrafts] = useState({});   // request_item_id -> qty
@@ -71,7 +66,6 @@ export default function MaterialIssue({ request, onBack }) {
 
   const setQty = (id, v) => setDrafts(d => ({ ...d, [id]: Number(v) || 0 }));
   const validRows = rows.filter(r => Number(r.qty) > 0);
-  const totalVal = validRows.reduce((s, r) => s + r.qty * r.avg, 0);
 
   const save = async () => {
     if (!validRows.length) { smartToast('Nhập SL xuất > 0 cho ít nhất 1 dòng'); return; }
@@ -90,7 +84,7 @@ export default function MaterialIssue({ request, onBack }) {
       queryClient.invalidateQueries({ queryKey: ['material-requests'] });
       queryClient.invalidateQueries({ queryKey: ['project-stock'] });
       // In phiếu ngay
-      printIssueSlip({ code, issue_date: issueDate, projectLabel: request.projectLabel, subcontractor_name: request.subcontractor_name, notes, lines }, !showPrice);
+      printIssueSlip({ code, issue_date: issueDate, projectLabel: request.projectLabel, subcontractor_name: request.subcontractor_name, notes, lines }, true);
       onBack?.();
     } catch (err) {
       smartToast('Lỗi xuất kho: ' + (err.message || 'thiếu RPC issue_from_request? chạy db/issue_from_request.sql.'));
@@ -115,26 +109,30 @@ export default function MaterialIssue({ request, onBack }) {
         </div>
 
         {isLoading ? <div className="p-6 text-center text-slate-400">Đang tải...</div> : (
-          <div className="overflow-x-auto border border-slate-100 dark:border-slate-700 rounded-xl">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-900/40 text-[11px] font-black uppercase text-slate-500">
-                <tr><th className="text-left px-3 py-2">Vật tư</th><th className="text-center px-2 py-2">ĐVT</th><th className="text-right px-2 py-2">Đề nghị</th><th className="text-right px-2 py-2">Còn lại</th><th className="text-right px-2 py-2">Tồn kho</th><th className="text-right px-2 py-2 w-[130px]">SL xuất</th>{showPrice && <th className="text-right px-2 py-2">Đơn giá</th>}{showPrice && <th className="text-right px-3 py-2">Thành tiền</th>}</tr>
+          <div className="overflow-x-auto border border-slate-100 dark:border-slate-700 rounded-xl max-w-3xl">
+            <table className="w-full text-[12px]">
+              <thead className="bg-slate-50 dark:bg-slate-900/40 text-[10px] font-black uppercase text-slate-500">
+                <tr>
+                  <th className="text-left px-2 py-1.5">Vật tư</th>
+                  <th className="text-center px-2 py-1.5 w-[52px]">ĐVT</th>
+                  <th className="text-right px-2 py-1.5 w-[64px]">Đề nghị</th>
+                  <th className="text-right px-2 py-1.5 w-[64px]">Còn lại</th>
+                  <th className="text-right px-2 py-1.5 w-[64px]">Tồn kho</th>
+                  <th className="text-right px-2 py-1.5 w-[110px]">SL xuất</th>
+                </tr>
               </thead>
               <tbody>
                 {rows.map(r => (
                   <tr key={r.id} className="border-t border-slate-100 dark:border-slate-700/40">
-                    <td className="px-3 py-1.5 font-semibold text-slate-700 dark:text-slate-200">{r.product_name}</td>
-                    <td className="px-2 py-1.5 text-center text-slate-500 text-[12px]">{r.unit}</td>
-                    <td className="px-2 py-1.5 text-right tabular-nums">{qtyFmt(r.qty_requested)}</td>
-                    <td className="px-2 py-1.5 text-right tabular-nums text-amber-600">{qtyFmt(r.remain)}</td>
-                    <td className={`px-2 py-1.5 text-right tabular-nums font-bold ${r.ton <= 0 ? 'text-rose-500' : 'text-blue-600'}`}>{qtyFmt(r.ton)}</td>
-                    <td className="px-2 py-1.5"><NumberInput value={Number(r.qty) || 0} onChange={v => setQty(r.id, v)} className="w-full text-right tabular-nums text-[13px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-700" /></td>
-                    {showPrice && <td className="px-2 py-1.5 text-right tabular-nums text-slate-500">{money(r.avg)}</td>}
-                    {showPrice && <td className="px-3 py-1.5 text-right tabular-nums font-semibold">{money(r.qty * r.avg)}</td>}
+                    <td className="px-2 py-1 font-semibold text-slate-700 dark:text-slate-200">{r.product_name}</td>
+                    <td className="px-2 py-1 text-center text-slate-500">{r.unit}</td>
+                    <td className="px-2 py-1 text-right tabular-nums">{qtyFmt(r.qty_requested)}</td>
+                    <td className="px-2 py-1 text-right tabular-nums text-amber-600">{qtyFmt(r.remain)}</td>
+                    <td className={`px-2 py-1 text-right tabular-nums font-bold ${r.ton <= 0 ? 'text-rose-500' : 'text-blue-600'}`}>{qtyFmt(r.ton)}</td>
+                    <td className="px-2 py-1"><NumberInput value={Number(r.qty) || 0} onChange={v => setQty(r.id, v)} className="w-full text-right tabular-nums text-[13px] font-semibold border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1 bg-white dark:bg-slate-700" /></td>
                   </tr>
                 ))}
               </tbody>
-              {showPrice && <tfoot><tr className="bg-slate-50 dark:bg-slate-900/40 border-t-2 border-slate-200 dark:border-slate-700"><td className="px-3 py-2 font-black uppercase text-[11px] text-slate-500" colSpan={7}>Tổng giá trị xuất</td><td className="px-3 py-2 text-right font-mono font-black text-slate-800 dark:text-white">{money(totalVal)}</td></tr></tfoot>}
             </table>
           </div>
         )}
