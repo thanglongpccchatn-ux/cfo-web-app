@@ -121,6 +121,16 @@ export const parseCurrency = (str) => {
 };
 
 /**
+ * Đọc % VAT từ ô Excel: giữ đúng 0 / 8 / 10; ô TRỐNG mới mặc định 8
+ * (không ép về 10 như trước — total_amount là generated column theo vat_rate).
+ */
+export const parseVatRate = (raw) => {
+  if (raw === '' || raw === null || raw === undefined) return 8;
+  const n = Number(String(raw).replace(/[^0-9.]/g, ''));
+  return Number.isFinite(n) ? n : 8;
+};
+
+/**
  * Calculate summary stats from purchases and payments data
  */
 export function calcPayablesSummary(purchases = [], payments = []) {
@@ -330,7 +340,7 @@ function parseNewFormat(wb) {
         unit: String(getCol(row, 'DVT', 'ĐVT', 'unit') || 'cái').trim(),
         quantity: parseCurrency(getCol(row, 'SỐ LƯỢNG', 'KHỐI LƯỢNG', 'SL', 'quantity')),
         unit_price: parseCurrency(getCol(row, 'ĐƠN GIÁ', 'GIÁ', 'unit_price')),
-        vat_rate: parseCurrency(getCol(row, 'VAT', 'VAT(%)', 'THUẾ VAT', 'vat_rate') || '10'),
+        vat_rate: parseVatRate(getCol(row, 'VAT(%)', 'VAT', 'THUẾ VAT', 'vat_rate')),
         notes: String(getCol(row, 'GHI CHÚ', 'notes') || '').trim(),
         project_name: String(getCol(row, 'CÔNG TRÌNH', 'DỰ ÁN', 'project_name') || '').trim(),
       });
@@ -415,7 +425,7 @@ function parseLegacyFormat(wb) {
         unit: String(row['DVT'] || 'cái').trim(),
         quantity: parseCurrency(row['KHỐI LƯỢNG'] || row['SỐ LƯỢNG']),
         unit_price: parseCurrency(row['ĐƠN GIÁ']),
-        vat_rate: parseCurrency(row['THUẾ VAT'] || row['VAT'] || '10'),
+        vat_rate: parseVatRate(row['VAT(%)'] ?? row['THUẾ VAT'] ?? row['VAT']),
         notes: String(row['GHI CHÚ'] || '').trim(),
         project_name: String(row['CÔNG TRÌNH'] || '').trim(),
       });
@@ -469,7 +479,7 @@ export function parseExcelRows(rows) {
         unit: String(row['DVT'] || 'cái').trim(),
         quantity: parseCurrency(row['KHỐI LƯỢNG'] || row['SỐ LƯỢNG']),
         unit_price: parseCurrency(row['ĐƠN GIÁ']),
-        vat_rate: parseCurrency(row['THUẾ VAT'] || row['VAT'] || '10'),
+        vat_rate: parseVatRate(row['VAT(%)'] ?? row['THUẾ VAT'] ?? row['VAT']),
         notes: String(row['GHI CHÚ'] || '').trim(),
         project_name: String(row['CÔNG TRÌNH'] || '').trim(),
       });
