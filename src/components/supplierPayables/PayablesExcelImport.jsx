@@ -67,6 +67,21 @@ export default function PayablesExcelImport({ projects = [], suppliers = [], onC
         if (p.name) projectMap[p.name.toLowerCase().trim()] = p.id;
       });
 
+      // Tự tạo NCC còn thiếu trong danh mục -> KHÔNG bỏ qua dòng -> tổng khớp với file.
+      let createdSuppliers = 0;
+      const neededNames = [...new Set([...parsedData.purchases, ...parsedData.payments]
+        .map(r => (r.supplier_name || '').trim()).filter(Boolean))];
+      const missingNames = neededNames.filter(n => !supplierMap[n.toLowerCase().trim()]);
+      if (missingNames.length > 0) {
+        const acronym = (nm) => nm.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd')
+          .split(/\s+/).map(w => w[0] || '').join('').toUpperCase().slice(0, 12);
+        let ins = await supabase.from('suppliers').insert(missingNames.map(nm => ({ name: nm, code: acronym(nm) || null }))).select('id, name');
+        if (ins.error) ins = await supabase.from('suppliers').insert(missingNames.map(nm => ({ name: nm }))).select('id, name');
+        if (ins.error) throw ins.error;
+        (ins.data || []).forEach(s => { supplierMap[s.name.toLowerCase().trim()] = s.id; });
+        createdSuppliers = ins.data?.length || 0;
+      }
+
       let purchaseCount = 0;
       let paymentCount = 0;
       let skippedCount = 0;
@@ -153,7 +168,8 @@ export default function PayablesExcelImport({ projects = [], suppliers = [], onC
         paymentCount = paymentBatch.length;
       }
 
-      setResult({ purchaseCount, paymentCount, skippedCount, skippedReasons, deletedPurchases, deletedPayments, mode: importMode });
+      const importedValue = purchaseBatch.reduce((s, r) => s + (Number(r.quantity) || 0) * (Number(r.unit_price) || 0) * (1 + (Number(r.vat_rate) || 0) / 100), 0);
+      setResult({ purchaseCount, paymentCount, skippedCount, skippedReasons, deletedPurchases, deletedPayments, mode: importMode, createdSuppliers, importedValue });
       setStep(4);
       onImported?.();
     } catch (err) {
@@ -404,6 +420,12 @@ export default function PayablesExcelImport({ projects = [], suppliers = [], onC
                 <span className="material-symbols-outlined text-3xl text-emerald-600">check_circle</span>
               </div>
               <h4 className="text-lg font-bold text-slate-800 dark:text-white">Import thành công!</h4>
+              {result.importedValue > 0 && (
+                <p className="text-[13px] text-slate-600 dark:text-slate-300">Tổng giá trị mua đã nhập (gồm VAT): <span className="font-mono font-black text-blue-600">{formatCurrency(result.importedValue)}</span></p>
+              )}
+              {result.createdSuppliers > 0 && (
+                <p className="text-[12px] text-emerald-600 font-semibold">Đã tự tạo {result.createdSuppliers} nhà cung cấp mới trong danh mục.</p>
+              )}
               {result.mode === 'replace' && (result.deletedPurchases > 0 || result.deletedPayments > 0) && (
                 <p className="text-[12px] text-rose-600 font-semibold">Đã thay thế: xóa {result.deletedPurchases} mua hàng + {result.deletedPayments} thanh toán cũ.</p>
               )}
