@@ -238,20 +238,24 @@ export function groupByOrder(purchases = [], payments = []) {
  * - A Date object
  */
 function smartParseDate(val) {
-  if (!val) return new Date().toISOString().slice(0, 10);
+  const pad = (n) => String(n).padStart(2, '0');
+  // Dùng thành phần ngày CỤC BỘ, KHÔNG dùng toISOString (lệch -1 ngày ở UTC+7).
+  const fmtLocal = (dt) => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+  const fmtUTC = (dt) => `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
 
-  // Already a Date object
+  if (!val) return fmtLocal(new Date());
+
+  // Date object (SheetJS cellDates = nửa đêm giờ địa phương) -> lấy ngày cục bộ
   if (val instanceof Date && !isNaN(val)) {
-    return val.toISOString().slice(0, 10);
+    return fmtLocal(val);
   }
 
   const str = String(val).trim();
 
-  // Excel serial number (a plain number > 30000 and < 60000)
+  // Excel serial number (30000..60000) -> nửa đêm UTC -> lấy ngày UTC
   const num = Number(str);
   if (!isNaN(num) && num > 30000 && num < 60000) {
-    const date = new Date((num - 25569) * 86400000);
-    return date.toISOString().slice(0, 10);
+    return fmtUTC(new Date(Math.round((num - 25569) * 86400000)));
   }
 
   // dd/mm/yyyy or dd-mm-yyyy
@@ -264,14 +268,15 @@ function smartParseDate(val) {
   // yyyy-mm-dd (ISO)
   const isoMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (isoMatch) {
-    return str;
+    const [, y, m, d] = isoMatch;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
 
-  // Fallback: try native parse
+  // Fallback: native parse -> lấy ngày cục bộ
   const parsed = new Date(str);
-  if (!isNaN(parsed)) return parsed.toISOString().slice(0, 10);
+  if (!isNaN(parsed)) return fmtLocal(parsed);
 
-  return new Date().toISOString().slice(0, 10);
+  return fmtLocal(new Date());
 }
 
 /**
