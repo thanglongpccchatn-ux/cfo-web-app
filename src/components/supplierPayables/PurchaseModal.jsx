@@ -68,6 +68,8 @@ function ProductAutocomplete({ value, onChange, onSelect, materials, priceMap, i
   return (
     <div className="relative" ref={ref}>
       <input type="text" value={query} id={inputId}
+        autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
+        name={`vt-${inputId || Math.random().toString(36).slice(2)}`} data-lpignore="true" data-form-type="other"
         onChange={e => { onChange(e.target.value); openList(); setActive(0); }}
         onFocus={openList}
         onKeyDown={onKeyDown}
