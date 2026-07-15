@@ -146,6 +146,7 @@ function TimelineTable({ timeline, onEdit, onDelete, suppliers = [] }) {
               <th className="text-left py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Sản phẩm</th>
               <th className="text-right py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">SL</th>
               <th className="text-right py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Đơn giá</th>
+              <th className="text-right py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">VAT</th>
               <th className="text-right py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Thành tiền</th>
               <th className="text-left py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Công trình</th>
               <th className="w-20"></th>
@@ -168,6 +169,7 @@ function TimelineTable({ timeline, onEdit, onDelete, suppliers = [] }) {
                   <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300 max-w-[200px] truncate">{isPurchase ? item.product_name : (item.notes || 'Thanh toán')}</td>
                   <td className="py-2.5 px-3 text-right font-mono text-slate-600">{isPurchase ? `${formatCurrency(item.quantity)} ${item.unit || ''}` : '—'}</td>
                   <td className="py-2.5 px-3 text-right font-mono text-slate-600">{isPurchase ? formatCurrency(item.unit_price) : '—'}</td>
+                  <td className="py-2.5 px-3 text-right font-mono text-slate-500 text-[12px]">{isPurchase ? `${Number(item.vat_rate) || 0}%` : '—'}</td>
                   <td className={`py-2.5 px-3 text-right font-mono font-bold ${isPurchase ? 'text-slate-800 dark:text-white' : 'text-emerald-600'}`}>
                     {isPurchase ? formatCurrency(item.total_amount) : formatCurrency(item.amount)}
                   </td>
@@ -190,11 +192,10 @@ function TimelineTable({ timeline, onEdit, onDelete, suppliers = [] }) {
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-slate-300 dark:border-slate-500 bg-slate-50 dark:bg-slate-800/50">
-              <td colSpan={5} className="py-3 px-3 font-black text-slate-700 dark:text-white text-[11px] uppercase">
-                Tổng ({filtered.length} bản ghi)
+              <td colSpan={8} className="py-3 px-3 font-black text-slate-700 dark:text-white text-[11px] uppercase">
+                Tổng ({filtered.length} bản ghi) · TT: <span className="font-mono text-emerald-600">{formatCurrency(totals.paymentTotal)}</span>
               </td>
-              <td colSpan={2} className="py-3 px-3 text-right text-[11px] text-slate-500">Mua: <span className="font-mono font-bold text-slate-800 dark:text-white">{formatCurrency(totals.purchaseTotal)}</span></td>
-              <td className="py-3 px-3 text-right text-[11px] text-slate-500">TT: <span className="font-mono font-bold text-emerald-600">{formatCurrency(totals.paymentTotal)}</span></td>
+              <td className="py-3 px-3 text-right font-mono font-bold text-slate-800 dark:text-white">{formatCurrency(totals.purchaseTotal)}</td>
               <td colSpan={2} className="py-3 px-3 text-right text-[11px]">
                 Còn nợ: <span className={`font-mono font-bold ${totals.purchaseTotal - totals.paymentTotal > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                   {formatCurrency(totals.purchaseTotal - totals.paymentTotal)}
