@@ -107,7 +107,7 @@ export default function MaterialRequest({ onIssue }) {
     setSaving(true);
     try {
       const projLabel = projMap[header.project_id] || 'DA';
-      const code = `ĐN-${projLabel}-${today().replace(/-/g, '').slice(2)}-${Math.floor(Math.random() * 900 + 100)}`;
+      const code = `ĐN-${projLabel}-${today().replace(/-/g, '').slice(2)}-${Date.now().toString(36).slice(-5).toUpperCase()}`;
       const { data: req, error } = await supabase.from('material_requests').insert({
         code, project_id: header.project_id, subcontractor_id: header.subcontractor.id,
         subcontractor_name: header.subcontractor.name, request_date: header.request_date, status: 'OPEN',

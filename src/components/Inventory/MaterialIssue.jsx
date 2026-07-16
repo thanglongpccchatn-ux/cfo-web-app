@@ -74,7 +74,7 @@ export default function MaterialIssue({ request, onBack }) {
     if (over && !window.confirm(`"${over.product_name}" xuất ${qtyFmt(over.qty)} > tồn ${qtyFmt(over.ton)}. Vẫn xuất?`)) return;
     setSaving(true);
     try {
-      const code = `PX-${request.projectLabel || 'DA'}-${today().replace(/-/g, '').slice(2)}-${Math.floor(Math.random() * 900 + 100)}`;
+      const code = `PX-${request.projectLabel || 'DA'}-${today().replace(/-/g, '').slice(2)}-${Date.now().toString(36).slice(-5).toUpperCase()}`;
       const lines = validRows.map(r => ({ request_item_id: r.id, material_id: r.material_id || '', material_key: r.material_key, product_name: r.product_name, unit: r.unit, quantity: r.qty, unit_price: Math.round(r.avg) }));
       const { error } = await supabase.rpc('issue_from_request', {
         p_request_id: request.id, p_slip_code: code, p_subcontractor_id: request.subcontractor_id || null,
