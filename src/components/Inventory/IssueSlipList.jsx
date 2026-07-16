@@ -31,7 +31,7 @@ export default function IssueSlipList() {
     queryKey: ['issue-slips'],
     queryFn: async () => {
       const [issues, projs] = await Promise.all([
-        fetchAll('material_issues', 'id, slip_code, project_id, subcontractor_name, issue_date, product_name, unit, quantity, unit_price, notes, created_at', 'issue_date'),
+        fetchAll('material_issues_v', 'id, slip_code, project_id, subcontractor_name, issue_date, product_name, unit, quantity, unit_price, notes, created_at', 'issue_date'),
         fetchAll('projects', 'id, internal_code, code, name'),
       ]);
       return { issues, projects: projs };

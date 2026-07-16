@@ -35,7 +35,7 @@ export default function MaterialIssue({ request, onBack }) {
     queryFn: async () => {
       const [items, purch, issues] = await Promise.all([
         fetchAll('material_request_items', '*', 'request_id', request.id),
-        fetchAll('supplier_purchases', 'product_name, quantity, unit_price, total_amount', 'project_id', request.project_id),
+        fetchAll('supplier_purchases_v', 'product_name, quantity, unit_price, total_amount', 'project_id', request.project_id),
         fetchAll('material_issues', 'material_key, quantity', 'project_id', request.project_id),
       ]);
       return { items: items.rows, purchases: purch.rows, issues: issues.rows };
@@ -78,7 +78,8 @@ export default function MaterialIssue({ request, onBack }) {
       const lines = validRows.map(r => ({ request_item_id: r.id, material_id: r.material_id || '', material_key: r.material_key, product_name: r.product_name, unit: r.unit, quantity: r.qty, unit_price: Math.round(r.avg) }));
       const { error } = await supabase.rpc('issue_from_request', {
         p_request_id: request.id, p_slip_code: code, p_subcontractor_id: request.subcontractor_id || null,
-        p_subcontractor_name: request.subcontractor_name || '', p_issue_date: issueDate, p_notes: notes || null, p_lines: lines,
+        p_subcontractor_name: request.subcontractor_name || '', p_issue_date: issueDate, p_notes: notes || null,
+        p_lines: lines, p_allow_over: !!over,   // user đã bấm xác nhận xuất quá tồn
       });
       if (error) throw error;
       smartToast('Đã xuất kho & tạo phiếu!');

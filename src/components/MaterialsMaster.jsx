@@ -60,11 +60,11 @@ export default function MaterialsMaster() {
         // Lịch sử mua thực tế nằm ở supplier_purchases (module Mua hàng). Ưu tiên khớp material_id;
         // hàng import thường material_id rỗng -> fallback khớp theo TÊN sản phẩm.
         const sel = 'unit_price, purchase_date, quantity, unit, project_id, projects:project_id(name, code), partners:supplier_id(name, code)';
-        let { data } = await supabase.from('supplier_purchases').select(sel)
+        let { data } = await supabase.from('supplier_purchases_v').select(sel)
             .eq('material_id', materialId).gt('unit_price', 0)
             .order('purchase_date', { ascending: false }).limit(15);
         if ((!data || data.length === 0) && m.name) {
-            const r = await supabase.from('supplier_purchases').select(sel)
+            const r = await supabase.from('supplier_purchases_v').select(sel)
                 .ilike('product_name', m.name).gt('unit_price', 0)
                 .order('purchase_date', { ascending: false }).limit(15);
             data = r.data;

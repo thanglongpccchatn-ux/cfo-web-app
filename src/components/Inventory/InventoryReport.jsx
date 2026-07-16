@@ -34,8 +34,8 @@ export default function InventoryReport() {
     queryKey: ['inv-report'],
     queryFn: async () => {
       const [purch, issues, projs] = await Promise.all([
-        fetchAll('supplier_purchases', 'project_id, product_name, quantity, unit, unit_price, total_amount, purchase_date'),
-        fetchAll('material_issues', 'project_id, material_key, product_name, unit, quantity, unit_price, issue_date'),
+        fetchAll('supplier_purchases_v', 'project_id, product_name, quantity, unit, unit_price, total_amount, purchase_date'),
+        fetchAll('material_issues_v', 'project_id, material_key, product_name, unit, quantity, unit_price, issue_date'),
         fetchAll('projects', 'id, internal_code, code, name'),
       ]);
       return { purch, issues, projs };

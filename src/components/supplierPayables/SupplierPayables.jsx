@@ -52,7 +52,7 @@ export default function SupplierPayables() {
         return [...map.values()];
       };
       const [purchAll, payAll, projRes, suppRes] = await Promise.all([
-        fetchAll('supplier_purchases', '*, partners:supplier_id(name, code), projects:project_id(name, code, internal_code)', 'purchase_date'),
+        fetchAll('supplier_purchases_v', '*, partners:supplier_id(name, code), projects:project_id(name, code, internal_code)', 'purchase_date'),
         fetchAll('supplier_payments', '*, partners:supplier_id(name, code), projects:project_id(name, code, internal_code)', 'payment_date'),
         supabase.from('projects').select('id, name, code, internal_code').order('name'),
         // NCC lấy từ bảng `suppliers` (danh mục Nhà cung cấp, CÓ mã) — cũng là bảng mà

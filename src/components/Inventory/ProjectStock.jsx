@@ -36,20 +36,24 @@ function IssueModal({ row, onClose, onSaved, userId, showPrice }) {
   const amt = Number(qty) || 0;
 
   const save = async () => {
+    if (saving) return;
     if (!(amt > 0)) { smartToast('Nhập số lượng xuất > 0'); return; }
-    if (amt > row.ton + 0.0001) { if (!window.confirm(`Xuất ${qtyFmt(amt)} > tồn ${qtyFmt(row.ton)}. Vẫn xuất?`)) return; }
+    const over = amt > row.ton + 0.0001;
+    if (over && !window.confirm(`Xuất ${qtyFmt(amt)} > tồn ${qtyFmt(row.ton)}. Vẫn xuất?`)) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('material_issues').insert({
-        project_id: row.project_id, material_id: row.material_id || null, material_key: row.material_key,
-        product_name: row.product_name, unit: row.unit, quantity: amt, unit_price: Math.round(row.avgPrice),
-        issue_date: date, notes: notes || null, created_by: userId,
+      const slip = `PX-${row.projLabel || 'DA'}-${date.replace(/-/g, '').slice(2)}-${Date.now().toString(36).slice(-5).toUpperCase()}`;
+      // Xuất qua RPC (kiểm quyền + công trình + tồn ở server; đơn giá tự tính server).
+      const { error } = await supabase.rpc('issue_adhoc', {
+        p_project_id: row.project_id, p_material_id: row.material_id || null, p_material_key: row.material_key,
+        p_product_name: row.product_name, p_unit: row.unit, p_quantity: amt, p_unit_price: 0,
+        p_issue_date: date, p_notes: notes || null, p_slip_code: slip, p_subcontractor_name: null, p_allow_over: over,
       });
       if (error) throw error;
       smartToast('Đã xuất kho!');
       onSaved();
     } catch (err) {
-      smartToast('Lỗi xuất kho: ' + (err.message || 'thiếu bảng material_issues? chạy db/material_issues.sql.'));
+      smartToast('Lỗi xuất kho: ' + (err.message || 'chạy db/issue_from_request.sql (RPC issue_adhoc).'));
     } finally { setSaving(false); }
   };
 
@@ -108,9 +112,9 @@ export default function ProjectStock() {
     queryKey: ['project-stock'],
     queryFn: async () => {
       const [purch, projs, issues] = await Promise.all([
-        fetchAll('supplier_purchases', 'project_id, product_name, material_id, quantity, unit, unit_price, total_amount'),
+        fetchAll('supplier_purchases_v', 'project_id, product_name, material_id, quantity, unit, unit_price, total_amount'),
         fetchAll('projects', 'id, internal_code, code, name'),
-        fetchAll('material_issues', 'project_id, material_key, quantity, unit_price'),
+        fetchAll('material_issues', 'project_id, material_key, quantity'),
       ]);
       return { purchases: purch.rows, projects: projs.rows, issues: issues.rows, issuesErr: issues.error };
     },
@@ -233,7 +237,7 @@ export default function ProjectStock() {
                   {showPrice && <td className="py-2 px-3 text-right tabular-nums font-black text-slate-800 dark:text-white">{money(r.tonValue)}</td>}
                   {canIssue && (
                     <td className="py-2 px-3 text-center">
-                      <button onClick={() => setIssueRow(r)} disabled={r.ton <= 0}
+                      <button onClick={() => setIssueRow({ ...r, projLabel: projMap[r.project_id] || '' })} disabled={r.ton <= 0}
                         className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-lg text-[12px] font-bold">Xuất</button>
                     </td>
                   )}

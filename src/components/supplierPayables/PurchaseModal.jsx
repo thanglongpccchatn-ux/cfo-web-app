@@ -212,7 +212,7 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
   // Build price map when supplier changes
   useEffect(() => {
     if (!header.supplier_id) { setPriceMap({}); return; }
-    supabase.from('supplier_purchases').select('product_name, unit_price').eq('supplier_id', header.supplier_id)
+    supabase.from('supplier_purchases_v').select('product_name, unit_price').eq('supplier_id', header.supplier_id)
       .order('purchase_date', { ascending: false }).limit(500)
       .then(({ data }) => {
         const map = {};
@@ -302,16 +302,18 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
         }
       } else {
         const batch = validLines.map(l => ({ ...rowPayload(l), created_by: user?.id }));
-        const { data: inserted, error } = await supabase.from('supplier_purchases').insert(batch).select('id, product_name, unit_price, supplier_id');
+        // Không select cột giá (đã khóa ở bảng gốc); lấy id theo thứ tự trả về, giá lấy từ batch.
+        const { data: inserted, error } = await supabase.from('supplier_purchases').insert(batch).select('id, product_name, supplier_id');
         if (error) throw error;
         if (inserted) {
           const priceChanges = [];
-          for (const row of inserted) {
-            const lastPrice = priceMap[row.product_name.toLowerCase()];
-            if (lastPrice !== undefined && lastPrice !== row.unit_price) {
-              priceChanges.push({ product_name: row.product_name, supplier_id: row.supplier_id, old_price: lastPrice, new_price: row.unit_price, change_date: header.purchase_date, purchase_id: row.id });
+          inserted.forEach((row, i) => {
+            const newPrice = Number(batch[i]?.unit_price) || 0;
+            const lastPrice = priceMap[(row.product_name || '').toLowerCase()];
+            if (lastPrice !== undefined && lastPrice !== newPrice) {
+              priceChanges.push({ product_name: row.product_name, supplier_id: row.supplier_id, old_price: lastPrice, new_price: newPrice, change_date: header.purchase_date, purchase_id: row.id });
             }
-          }
+          });
           if (priceChanges.length > 0) await supabase.from('supplier_price_history').insert(priceChanges).catch(() => {});
         }
       }
