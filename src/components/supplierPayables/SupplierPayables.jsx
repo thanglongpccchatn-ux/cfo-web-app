@@ -5,11 +5,13 @@ import PayablesSummary from './PayablesSummary';
 import PurchaseTimeline from './PurchaseTimeline';
 import SupplierPaymentForm from './SupplierPaymentForm';
 import PayablesExcelImport from './PayablesExcelImport';
+import PurchaseOrders from './PurchaseOrders';
 import { calcPayablesSummary, formatCurrency, projectOption } from './payablesUtils';
 import SearchableSelect from '../common/SearchableSelect';
 
 const TABS = [
   { key: 'summary', label: 'Tổng quan Công nợ', icon: 'account_balance' },
+  { key: 'orders', label: 'Đơn mua hàng', icon: 'receipt_long' },
   { key: 'timeline', label: 'Chi tiết Mua hàng', icon: 'timeline' },
   { key: 'payment', label: 'Thanh toán NCC', icon: 'payments' },
 ];
@@ -224,6 +226,15 @@ export default function SupplierPayables() {
               purchases={filteredPurchases}
               payments={filteredPayments}
               onViewSupplier={(supplierId) => { setFilterSupplier(supplierId); setActiveTab('timeline'); }}
+            />
+          )}
+          {activeTab === 'orders' && (
+            <PurchaseOrders
+              purchases={filteredPurchases}
+              payments={filteredPayments}
+              projects={projects}
+              suppliers={suppliers}
+              onRefresh={fetchData}
             />
           )}
           {activeTab === 'timeline' && (

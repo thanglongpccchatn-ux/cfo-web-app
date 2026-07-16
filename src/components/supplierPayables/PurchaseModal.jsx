@@ -271,11 +271,27 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
     return [projCode, abbr, dmy].filter(Boolean).join('-');
   };
 
+  // Số HĐ duy nhất cho 1 đơn: nếu cùng dự án/NCC/ngày đã có số HĐ base thì thêm -2, -3...
+  const uniqueRef = async (base) => {
+    if (!base) return base;
+    const { data } = await supabase.from('supplier_purchases')
+      .select('reference_no')
+      .eq('project_id', header.project_id).eq('supplier_id', header.supplier_id)
+      .eq('purchase_date', header.purchase_date).like('reference_no', `${base}%`);
+    const existing = new Set((data || []).map(r => r.reference_no));
+    if (!existing.has(base)) return base;
+    let n = 2; while (existing.has(`${base}-${n}`)) n++;
+    return `${base}-${n}`;
+  };
+
   const handleSave = async () => {
     if (!canSave) return;
     setSaving(true);
     try {
-      const refNo = header.reference_no?.trim() || buildReference();
+      const userRef = header.reference_no?.trim();
+      // Tạo mới + số HĐ tự sinh -> đảm bảo KHÔNG trùng đơn khác cùng ngày/dự án/NCC.
+      let refNo = userRef || buildReference();
+      if (!editing && !userRef) refNo = await uniqueRef(refNo);
       const rowPayload = (l) => ({
         project_id: header.project_id, supplier_id: header.supplier_id,
         material_group: l.material_group || 'Khác', purchase_date: header.purchase_date,
