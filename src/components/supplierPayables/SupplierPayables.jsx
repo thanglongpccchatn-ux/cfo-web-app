@@ -38,15 +38,18 @@ export default function SupplierPayables() {
     try {
       // Supabase mặc định trả tối đa 1000 dòng/lần -> lặp phân trang để lấy HẾT bản ghi.
       const fetchAll = async (table, select, orderCol) => {
-        const CHUNK = 1000; const all = [];
+        const CHUNK = 1000; const map = new Map();
         for (let from = 0; ; from += CHUNK) {
+          // Khóa phụ 'id' để phân trang ỔN ĐỊNH (orderCol chỉ theo ngày -> trùng giá trị,
+          // không có tiebreaker sẽ sót/nhân đôi ở mốc 1000). Dedup theo id cho chắc.
           const { data, error } = await supabase.from(table).select(select)
-            .order(orderCol, { ascending: false }).range(from, from + CHUNK - 1);
+            .order(orderCol, { ascending: false }).order('id', { ascending: false })
+            .range(from, from + CHUNK - 1);
           if (error) throw error;
-          all.push(...(data || []));
+          (data || []).forEach(r => { if (r?.id != null) map.set(r.id, r); });
           if (!data || data.length < CHUNK) break;
         }
-        return all;
+        return [...map.values()];
       };
       const [purchAll, payAll, projRes, suppRes] = await Promise.all([
         fetchAll('supplier_purchases', '*, partners:supplier_id(name, code), projects:project_id(name, code, internal_code)', 'purchase_date'),

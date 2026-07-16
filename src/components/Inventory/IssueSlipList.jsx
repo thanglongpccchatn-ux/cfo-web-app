@@ -63,9 +63,9 @@ export default function IssueSlipList() {
   const filtered = useMemo(() => {
     const kw = norm(q.trim());
     return slips
-      .filter(s => !effectiveProject || s.project_id === effectiveProject)
+      .filter(s => (viewAll || assignedProjects.includes(s.project_id)) && (!effectiveProject || s.project_id === effectiveProject))
       .filter(s => !kw || norm(`${s.code} ${s.subcontractor_name}`).includes(kw));
-  }, [slips, effectiveProject, q]);
+  }, [slips, effectiveProject, q, viewAll, assignedProjects]);
 
   const grandTotal = filtered.reduce((s, x) => s + x.total, 0);
 

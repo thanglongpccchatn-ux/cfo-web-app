@@ -130,6 +130,13 @@ export const parseVatRate = (raw) => {
   return Number.isFinite(n) ? n : 8;
 };
 
+/** Ngày HÔM NAY theo lịch ĐỊA PHƯƠNG (yyyy-mm-dd) — tránh lệch -1 ngày do toISOString() ở UTC+7. */
+export const todayStr = () => {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
+
 /**
  * Calculate summary stats from purchases and payments data
  */

@@ -84,10 +84,10 @@ export default function InventoryReport() {
   const filtered = useMemo(() => {
     const kw = norm(q);
     return rows
-      .filter(r => !effectiveProject || r.project_id === effectiveProject)
+      .filter(r => (viewAll || assignedProjects.includes(r.project_id)) && (!effectiveProject || r.project_id === effectiveProject))
       .filter(r => !kw || norm(r.product_name).includes(kw))
       .sort((a, b) => b.tonCuoiVal - a.tonCuoiVal);
-  }, [rows, effectiveProject, q]);
+  }, [rows, effectiveProject, q, viewAll, assignedProjects]);
 
   const totals = useMemo(() => filtered.reduce((t, r) => ({
     nhap: t.nhap + r.nhapInVal, xuat: t.xuat + r.xuatInVal, ton: t.ton + r.tonCuoiVal,

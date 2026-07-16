@@ -2,6 +2,8 @@ import { fmt } from '../../utils/formatters';
 
 const money = (v) => fmt(Math.round(Number(v) || 0));
 const qtyFmt = (v) => { const n = Number(v) || 0; return Number.isInteger(n) ? n.toLocaleString('vi-VN') : n.toLocaleString('vi-VN', { maximumFractionDigits: 2 }); };
+// Chống XSS: escape mọi chuỗi tự do trước khi nhét vào HTML của cửa sổ in.
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /**
  * In PHIẾU XUẤT KHO. slip = { code, issue_date, projectLabel, subcontractor_name, notes,
@@ -12,15 +14,15 @@ export function printIssueSlip(slip, hidePrice = false) {
   const rows = (slip.lines || []).map((l, i) => `
     <tr>
       <td style="text-align:center">${i + 1}</td>
-      <td>${l.product_name || ''}</td>
-      <td style="text-align:center">${l.unit || ''}</td>
+      <td>${esc(l.product_name)}</td>
+      <td style="text-align:center">${esc(l.unit)}</td>
       <td style="text-align:right">${qtyFmt(l.quantity)}</td>
       ${hidePrice ? '' : `<td style="text-align:right">${money(l.unit_price)}</td><td style="text-align:right">${money((Number(l.quantity) || 0) * (Number(l.unit_price) || 0))}</td>`}
     </tr>`).join('');
   const total = (slip.lines || []).reduce((s, l) => s + (Number(l.quantity) || 0) * (Number(l.unit_price) || 0), 0);
   const totalRow = hidePrice ? '' : `<tr><td colspan="5" style="text-align:right"><b>TỔNG CỘNG</b></td><td style="text-align:right"><b>${money(total)}</b></td></tr>`;
   const d = new Date(slip.issue_date);
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${slip.code || 'Phiếu xuất kho'}</title>
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(slip.code || 'Phiếu xuất kho')}</title>
     <style>
       body{font-family:'Times New Roman',serif;color:#000;padding:24px;font-size:14px}
       h2{text-align:center;margin:4px 0}
@@ -32,11 +34,11 @@ export function printIssueSlip(slip, hidePrice = false) {
       .sign div{width:30%}
       @media print{button{display:none}}
     </style></head><body>
-    <div class="head"><div><b>CÔNG TY CP CƠ ĐIỆN & PCCC SATECO</b><br/>Dự án: ${slip.projectLabel || ''}</div>
-      <div style="text-align:right">Số phiếu: <b>${slip.code || ''}</b><br/>Ngày ${d.getDate()} tháng ${d.getMonth() + 1} năm ${d.getFullYear()}</div></div>
+    <div class="head"><div><b>CÔNG TY CP CƠ ĐIỆN & PCCC SATECO</b><br/>Dự án: ${esc(slip.projectLabel)}</div>
+      <div style="text-align:right">Số phiếu: <b>${esc(slip.code)}</b><br/>Ngày ${d.getDate()} tháng ${d.getMonth() + 1} năm ${d.getFullYear()}</div></div>
     <h2>PHIẾU XUẤT KHO</h2>
-    <div>Người nhận: <b>${(slip.subcontractor_name || '').toUpperCase()}</b></div>
-    <div>Lý do xuất: ${slip.notes || 'Xuất vật tư thi công'}</div>
+    <div>Người nhận: <b>${esc((slip.subcontractor_name || '').toUpperCase())}</b></div>
+    <div>Lý do xuất: ${esc(slip.notes || 'Xuất vật tư thi công')}</div>
     <table><thead><tr><th style="width:36px">STT</th><th>Tên vật tư</th><th style="width:60px">ĐVT</th><th style="width:90px">Số lượng</th>${priceHead}</tr></thead>
     <tbody>${rows}${totalRow}</tbody></table>
     <div class="sign"><div><b>Người lập phiếu</b><br/>(Ký, họ tên)</div><div><b>Thủ kho</b><br/>(Ký, họ tên)</div><div><b>Người nhận</b><br/>(Ký, họ tên)</div></div>
@@ -54,15 +56,15 @@ export function printRequestSlip(req, items) {
   const rows = (items || []).map((it, i) => `
     <tr>
       <td style="text-align:center">${i + 1}</td>
-      <td style="text-align:center">${it.material_group || ''}</td>
-      <td>${it.product_name || ''}</td>
-      <td style="text-align:center">${it.unit || ''}</td>
+      <td style="text-align:center">${esc(it.material_group)}</td>
+      <td>${esc(it.product_name)}</td>
+      <td style="text-align:center">${esc(it.unit)}</td>
       <td style="text-align:right">${it.contract_qty ? qtyFmt(it.contract_qty) : ''}</td>
       <td style="text-align:right">${qtyFmt(it.qty_requested)}</td>
-      <td>${it.note || ''}</td>
+      <td>${esc(it.note)}</td>
     </tr>`).join('');
   const d = new Date(req.request_date);
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${req.code || 'Phiếu đề nghị vật tư'}</title>
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(req.code || 'Phiếu đề nghị vật tư')}</title>
     <style>
       body{font-family:'Times New Roman',serif;color:#000;padding:24px;font-size:14px}
       h2{text-align:center;margin:4px 0}
@@ -74,11 +76,11 @@ export function printRequestSlip(req, items) {
       .sign div{width:30%}
       @media print{button{display:none}}
     </style></head><body>
-    <div class="head"><div><b>CÔNG TY CP CƠ ĐIỆN & PCCC SATECO</b><br/>Dự án: ${req.projectLabel || ''}</div>
-      <div style="text-align:right">Số phiếu: <b>${req.code || ''}</b><br/>Ngày ${d.getDate()} tháng ${d.getMonth() + 1} năm ${d.getFullYear()}</div></div>
+    <div class="head"><div><b>CÔNG TY CP CƠ ĐIỆN & PCCC SATECO</b><br/>Dự án: ${esc(req.projectLabel)}</div>
+      <div style="text-align:right">Số phiếu: <b>${esc(req.code)}</b><br/>Ngày ${d.getDate()} tháng ${d.getMonth() + 1} năm ${d.getFullYear()}</div></div>
     <h2>PHIẾU ĐỀ NGHỊ VẬT TƯ</h2>
-    <div>Đơn vị đề nghị: <b>${(req.subcontractor_name || '').toUpperCase()}</b></div>
-    <div>Nội dung: ${req.notes || 'Đề nghị cấp vật tư thi công'}</div>
+    <div>Đơn vị đề nghị: <b>${esc((req.subcontractor_name || '').toUpperCase())}</b></div>
+    <div>Nội dung: ${esc(req.notes || 'Đề nghị cấp vật tư thi công')}</div>
     <table><thead><tr>
       <th style="width:36px">STT</th><th style="width:70px">Nhóm VT</th><th>Tên vật tư</th>
       <th style="width:56px">ĐVT</th><th style="width:90px">KL hợp đồng</th><th style="width:90px">SL đề nghị</th><th style="width:120px">Ghi chú</th>

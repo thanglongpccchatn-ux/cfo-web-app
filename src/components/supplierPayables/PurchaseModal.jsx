@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
-import { formatCurrency, MATERIAL_GROUPS } from './payablesUtils';
+import { formatCurrency, MATERIAL_GROUPS, todayStr } from './payablesUtils';
 import NumberInput from '../common/NumberInput';
 import SearchableSelect from '../common/SearchableSelect';
 import QuickAddMaterialModal from './QuickAddMaterialModal';
@@ -128,7 +128,7 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
   const [saving, setSaving] = useState(false);
 
   // Header
-  const [header, setHeader] = useState({ project_id: '', supplier_id: '', purchase_date: new Date().toISOString().slice(0, 10), reference_no: '' });
+  const [header, setHeader] = useState({ project_id: '', supplier_id: '', purchase_date: todayStr(), reference_no: '' });
   // Lines
   const [lines, setLines] = useState([emptyLine()]);
   // Materials
@@ -203,7 +203,7 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
         vat_rate: r.vat_rate ?? 8, notes: r.notes || '', material_id: r.material_id || null,
       })));
     } else {
-      setHeader({ project_id: '', supplier_id: '', purchase_date: new Date().toISOString().slice(0, 10), reference_no: '' });
+      setHeader({ project_id: '', supplier_id: '', purchase_date: todayStr(), reference_no: '' });
       setLines([emptyLine()]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
-import { formatCurrency, PAYMENT_METHODS, groupByOrder, projectOption, projectLabel } from './payablesUtils';
+import { formatCurrency, PAYMENT_METHODS, groupByOrder, projectOption, projectLabel, todayStr } from './payablesUtils';
 import { smartToast } from '../../utils/globalToast';
 import NumberInput from '../common/NumberInput';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = todayStr;
 const removeDiacritics = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
 
 export default function SupplierPaymentForm({ projects = [], suppliers = [], purchases = [], payments = [], materialGroups = [], onSaved }) {

@@ -156,10 +156,10 @@ export default function ProjectStock() {
   const filtered = useMemo(() => {
     const kw = norm(q);
     return rows
-      .filter(r => (!effectiveProject || r.project_id === effectiveProject))
+      .filter(r => (viewAll || assignedProjects.includes(r.project_id)) && (!effectiveProject || r.project_id === effectiveProject))
       .filter(r => !kw || norm(r.product_name).includes(kw))
       .sort((a, b) => b.tonValue - a.tonValue);
-  }, [rows, effectiveProject, q]);
+  }, [rows, effectiveProject, q, viewAll, assignedProjects]);
 
   const totalTonValue = filtered.reduce((s, r) => s + r.tonValue, 0);
 

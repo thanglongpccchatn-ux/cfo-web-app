@@ -68,6 +68,7 @@ export default function MaterialIssue({ request, onBack }) {
   const validRows = rows.filter(r => Number(r.qty) > 0);
 
   const save = async () => {
+    if (saving) return;   // chặn double-submit (click nhanh 2 lần)
     if (!validRows.length) { smartToast('Nhập SL xuất > 0 cho ít nhất 1 dòng'); return; }
     const over = validRows.find(r => r.qty > r.ton + 0.0001);
     if (over && !window.confirm(`"${over.product_name}" xuất ${qtyFmt(over.qty)} > tồn ${qtyFmt(over.ton)}. Vẫn xuất?`)) return;

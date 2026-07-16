@@ -103,7 +103,7 @@ export default function MaterialRequest({ onIssue }) {
   const canSave = header.project_id && header.subcontractor && validLines.length > 0;
 
   const save = async () => {
-    if (!canSave) return;
+    if (saving || !canSave) return;   // chặn double-submit
     setSaving(true);
     try {
       const projLabel = projMap[header.project_id] || 'DA';
