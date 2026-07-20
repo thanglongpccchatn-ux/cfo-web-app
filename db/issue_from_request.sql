@@ -5,12 +5,26 @@
 -- ============================================================
 
 -- 0) Hàm chuẩn hóa tên vật tư (khớp norm() phía JS: bỏ dấu, đ->d, thường, gộp khoảng trắng).
---    IMMUTABLE để dùng được cho functional index.
-create extension if not exists unaccent;
-create or replace function public.norm_vt(txt text)
-returns text language sql immutable as $$
-    select lower(regexp_replace(trim(unaccent(translate(coalesce(txt, ''), 'đĐ', 'dD'))), '\s+', ' ', 'g'));
-$$;
+--    Dùng unaccent 2 ĐỐI SỐ + ghim schema cứng (unaccent 1 đối số phụ thuộc search_path nên
+--    không thực sự IMMUTABLE -> functional index có thể hỏng khi pg_dump/pg_restore).
+--    Kết quả giống hệt bản cũ nên index đã tạo vẫn đúng, không cần reindex.
+do $do$
+declare v_schema text;
+begin
+    if not exists (select 1 from pg_extension where extname = 'unaccent') then
+        execute 'create extension unaccent with schema public';
+    end if;
+    -- Supabase có thể đã cài unaccent ở schema "extensions" — tự dò schema thật.
+    select n.nspname into v_schema
+    from pg_extension e join pg_namespace n on n.oid = e.extnamespace
+    where e.extname = 'unaccent';
+    execute format($f$
+        create or replace function public.norm_vt(txt text)
+        returns text language sql immutable as $body$
+            select lower(regexp_replace(trim(%I.unaccent(%L::regdictionary, translate(coalesce(txt, ''), 'đĐ', 'dD'))), '\s+', ' ', 'g'));
+        $body$;
+    $f$, v_schema, v_schema || '.unaccent');
+end $do$;
 
 -- Index tăng tốc tính tồn theo (công trình, tên chuẩn hóa).
 create index if not exists idx_sp_proj_normkey on public.supplier_purchases (project_id, public.norm_vt(product_name));
@@ -69,12 +83,14 @@ begin
     -- CHẶN TỒN ÂM: mỗi dòng, tồn = Σ nhập − Σ đã xuất (khớp theo tên chuẩn hóa, cùng công trình).
     if not coalesce(p_allow_over, false) then
         for r_line in
+            -- Gộp CHỈ theo key chuẩn hóa: 2 dòng "Xi măng"/"xi mang" là cùng vật tư,
+            -- phải cộng dồn số lượng rồi mới so tồn (tách nhóm sẽ lọt over-issue).
             select public.norm_vt(l->>'product_name') as key,
-                   coalesce(l->>'product_name','') as name,
+                   min(coalesce(l->>'product_name','')) as name,
                    sum((l->>'quantity')::numeric) as qty
             from jsonb_array_elements(p_lines) l
             where (l->>'quantity')::numeric > 0
-            group by 1, 2
+            group by 1
         loop
             v_ton := coalesce((select sum(quantity) from public.supplier_purchases
                                where project_id = v_project and public.norm_vt(product_name) = r_line.key), 0)

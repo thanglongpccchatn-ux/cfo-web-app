@@ -4,6 +4,12 @@
 --  unit_price/vat_rate/total_amount — kể cả gõ Console.
 --
 --  Cách: khóa cột GIÁ trên BẢNG GỐC; đọc giá qua VIEW che-cột-theo-quyền.
+--
+--  ⚠️ LƯU Ý QUAN TRỌNG: 2 view _v dùng security_invoker = false (chạy quyền owner) nên
+--  BYPASS RLS HÀNG của bảng gốc. Hiện policy SELECT là using(true) nên không lộ gì thêm,
+--  nhưng NẾU SAU NÀY siết đọc theo công trình/phòng ban ở bảng gốc thì PHẢI thêm điều kiện
+--  lọc hàng tương ứng vào 2 view này (hoặc chuyển security_invoker = true) — nếu không
+--  view sẽ âm thầm mở toang dữ liệu.
 --  ⚠️ CHẠY TRÊN SUPABASE SQL EDITOR (cần current_user_has_perm từ security_rls_phase2.sql).
 --  ⚠️ SAU KHI CHẠY test 2 tài khoản: thủ kho thấy tồn KHÔNG giá; kế toán thấy đủ giá,
 --     Mua hàng & Công nợ NCC vẫn chạy bình thường.
