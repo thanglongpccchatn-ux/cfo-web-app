@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../context/AuthContext';
 import { formatCurrency, MATERIAL_GROUPS, todayStr } from './payablesUtils';
 import NumberInput from '../common/NumberInput';
 import SearchableSelect from '../common/SearchableSelect';
@@ -124,7 +123,6 @@ function ProductAutocomplete({ value, onChange, onSelect, materials, priceMap, i
    PURCHASE MODAL — Full-screen modal for purchase entry
    ══════════════════════════════════════════════════════════ */
 export default function PurchaseModal({ open, onClose, editData, projects, suppliers, onSaved }) {
-  const { user } = useAuth();
   const [saving, setSaving] = useState(false);
 
   // Header
@@ -191,6 +189,8 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
   // editData có thể là 1 dòng (cũ) hoặc MẢNG dòng cùng 1 đơn (sửa theo đơn).
   const editRows = Array.isArray(editData) ? editData : (editData ? [editData] : []);
   const editing = editRows.length > 0;
+  // Giá null = view _v che theo quyền -> cấm sửa, tránh update đè giá thật về 0.
+  const pricesMasked = editing && editRows.some(r => r.unit_price == null);
 
   // Init form when editData changes
   useEffect(() => {
@@ -248,7 +248,7 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
     return lines.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unit_price) || 0) * (1 + (Number(l.vat_rate) || 0) / 100), 0);
   }, [lines]);
 
-  const canSave = header.project_id && header.supplier_id && validLines.length > 0;
+  const canSave = header.project_id && header.supplier_id && validLines.length > 0 && !pricesMasked;
 
   // Viết tắt tên công ty NCC: ưu tiên mã NCC; nếu không có, lấy chữ cái đầu các từ chính.
   const CORP_WORDS = new Set(['CONG', 'TY', 'TNHH', 'CP', 'CO', 'PHAN', 'CHI', 'NHANH', 'MTV', 'DOANH', 'NGHIEP', 'VIET', 'NAM', 'VN']);
@@ -271,73 +271,38 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
     return [projCode, abbr, dmy].filter(Boolean).join('-');
   };
 
-  // Số HĐ duy nhất cho 1 đơn: nếu cùng dự án/NCC/ngày đã có số HĐ base thì thêm -2, -3...
-  const uniqueRef = async (base) => {
-    if (!base) return base;
-    const { data } = await supabase.from('supplier_purchases')
-      .select('reference_no')
-      .eq('project_id', header.project_id).eq('supplier_id', header.supplier_id)
-      .eq('purchase_date', header.purchase_date).like('reference_no', `${base}%`);
-    const existing = new Set((data || []).map(r => r.reference_no));
-    if (!existing.has(base)) return base;
-    let n = 2; while (existing.has(`${base}-${n}`)) n++;
-    return `${base}-${n}`;
-  };
-
   const handleSave = async () => {
     if (!canSave) return;
     setSaving(true);
     try {
-      const userRef = header.reference_no?.trim();
-      // Tạo mới + số HĐ tự sinh -> đảm bảo KHÔNG trùng đơn khác cùng ngày/dự án/NCC.
-      let refNo = userRef || buildReference();
-      if (!editing && !userRef) refNo = await uniqueRef(refNo);
-      const rowPayload = (l) => ({
-        project_id: header.project_id, supplier_id: header.supplier_id,
-        material_group: l.material_group || 'Khác', purchase_date: header.purchase_date,
-        product_name: l.product_name, unit: l.unit, quantity: Number(l.quantity) || 0,
-        unit_price: Number(l.unit_price) || 0, vat_rate: Number.isFinite(Number(l.vat_rate)) ? Number(l.vat_rate) : 8,
-        notes: l.notes, material_id: l.material_id || null, reference_no: refNo || null,
+      const keptIds = new Set(validLines.filter(l => l.id).map(l => l.id));
+      const toDelete = editing ? editRows.map(r => r.id).filter(id => id && !keptIds.has(id)) : [];
+      // Toàn bộ lưu/sửa chạy trong 1 TRANSACTION ở server (RPC save_purchase_order):
+      // số HĐ tự sinh không trùng (advisory lock), sửa đơn không bị nửa vời, lịch sử giá ghi cùng lúc.
+      const { error } = await supabase.rpc('save_purchase_order', {
+        p_project_id: header.project_id,
+        p_supplier_id: header.supplier_id,
+        p_purchase_date: header.purchase_date,
+        p_reference_no: header.reference_no?.trim() || null,
+        p_ref_base: buildReference() || null,
+        p_lines: validLines.map(l => ({
+          id: l.id || null, product_name: l.product_name, material_group: l.material_group || 'Khác',
+          unit: l.unit, quantity: Number(l.quantity) || 0, unit_price: Number(l.unit_price) || 0,
+          vat_rate: Number.isFinite(Number(l.vat_rate)) ? Number(l.vat_rate) : 8,
+          notes: l.notes || null, material_id: l.material_id || null,
+        })),
+        p_delete_ids: toDelete,
+        p_editing: editing,
       });
-      if (editing) {
-        // SỬA THEO ĐƠN: cập nhật dòng có id, thêm dòng mới, xoá dòng đã bỏ (áp header cho cả đơn)
-        const keptIds = new Set(validLines.filter(l => l.id).map(l => l.id));
-        for (const l of validLines) {
-          if (l.id) {
-            const { error } = await supabase.from('supplier_purchases').update(rowPayload(l)).eq('id', l.id);
-            if (error) throw error;
-          } else {
-            const { error } = await supabase.from('supplier_purchases').insert([{ ...rowPayload(l), created_by: user?.id }]);
-            if (error) throw error;
-          }
-        }
-        const toDelete = editRows.map(r => r.id).filter(id => id && !keptIds.has(id));
-        if (toDelete.length > 0) {
-          const { error } = await supabase.from('supplier_purchases').delete().in('id', toDelete);
-          if (error) throw error;
-        }
-      } else {
-        const batch = validLines.map(l => ({ ...rowPayload(l), created_by: user?.id }));
-        // Không select cột giá (đã khóa ở bảng gốc); lấy id theo thứ tự trả về, giá lấy từ batch.
-        const { data: inserted, error } = await supabase.from('supplier_purchases').insert(batch).select('id, product_name, supplier_id');
-        if (error) throw error;
-        if (inserted) {
-          const priceChanges = [];
-          inserted.forEach((row, i) => {
-            const newPrice = Number(batch[i]?.unit_price) || 0;
-            const lastPrice = priceMap[(row.product_name || '').toLowerCase()];
-            if (lastPrice !== undefined && lastPrice !== newPrice) {
-              priceChanges.push({ product_name: row.product_name, supplier_id: row.supplier_id, old_price: lastPrice, new_price: newPrice, change_date: header.purchase_date, purchase_id: row.id });
-            }
-          });
-          if (priceChanges.length > 0) await supabase.from('supplier_price_history').insert(priceChanges).catch(() => {});
-        }
-      }
+      if (error) throw error;
       onSaved?.();
       onClose();
     } catch (err) {
       console.error('Error saving purchase:', err);
-      smartToast('Lỗi lưu đơn mua hàng: ' + (err.message || 'không rõ nguyên nhân'));
+      const msg = err?.code === 'PGRST202'
+        ? 'chưa có RPC — chạy db/save_purchase_order.sql trong Supabase SQL Editor.'
+        : (err.message || 'không rõ nguyên nhân');
+      smartToast('Lỗi lưu đơn mua hàng: ' + msg);
     } finally { setSaving(false); }
   };
 
@@ -350,24 +315,30 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
 
       {/* Modal */}
       <div
-        className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-[95vw] max-w-[1200px] max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700"
+        className="relative bg-white dark:bg-slate-800 shadow-2xl w-full h-[100dvh] max-h-[100dvh] rounded-none sm:w-[95vw] sm:h-auto sm:max-h-[90vh] sm:rounded-2xl max-w-[1200px] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700"
         onKeyDown={(e) => {
           if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && canSave && !saving) { e.preventDefault(); handleSave(); }
         }}
       >
 
         {/* ── HEADER ── */}
-        <div className="shrink-0 border-b border-slate-200 dark:border-slate-700 px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-800">
+        <div className="shrink-0 border-b border-slate-200 dark:border-slate-700 px-4 py-3 sm:px-6 sm:py-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-800 max-h-[45dvh] overflow-y-auto sm:max-h-none sm:overflow-visible">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
               <span className="material-symbols-outlined text-blue-600 text-[22px]">receipt_long</span>
-              {editData?.id ? 'Sửa đơn mua hàng' : 'Tạo đơn mua hàng'}
+              {editing ? 'Sửa đơn mua hàng' : 'Tạo đơn mua hàng'}
             </h2>
             <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
               <span className="material-symbols-outlined text-[20px] text-slate-500">close</span>
             </button>
           </div>
-          <div className="grid grid-cols-4 gap-3">
+          {pricesMasked && (
+            <div className="mb-3 flex items-center gap-2 text-[12px] font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg px-3 py-2">
+              <span className="material-symbols-outlined text-[16px]">lock</span>
+              Tài khoản của bạn không có quyền xem giá — không thể sửa đơn này (tránh ghi đè mất giá gốc).
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <label className="block text-[11px] font-bold text-slate-500 mb-1">CÔNG TRÌNH *</label>
               <SearchableSelect
@@ -407,9 +378,10 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
           </div>
         </div>
 
-        {/* ── LINE ITEMS TABLE ── */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          <table className="w-full text-sm">
+        {/* ── LINE ITEMS TABLE ── (mobile: cuộn ngang, min-w giữ đủ cột nhập liệu; gradient mép phải báo còn nội dung) */}
+        <div className="relative flex-1 min-h-0">
+          <div className="h-full overflow-auto px-4 sm:px-6 py-4">
+          <table className="w-full min-w-[900px] text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-slate-100 dark:bg-slate-700/50">
                 <th className="w-10 py-2 px-2 text-center text-[10px] font-bold text-slate-500 rounded-tl-lg">STT</th>
@@ -490,24 +462,26 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
             </tbody>
           </table>
 
-          {/* Add line button */}
-          {!editData?.id && (
+          {/* Add line button — sửa theo đơn cũng thêm được dòng (RPC xử lý insert cùng transaction) */}
+          {!pricesMasked && (
             <button onClick={addLine}
-              className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-bold mt-3 px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors border border-dashed border-blue-300 dark:border-blue-700 w-full justify-center">
+              className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-bold mt-3 px-3 py-2 min-h-[44px] sm:min-h-0 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors border border-dashed border-blue-300 dark:border-blue-700 w-full justify-center">
               <span className="material-symbols-outlined text-[16px]">add</span>
               Thêm dòng vật tư
             </button>
           )}
+          </div>
+          <div className="md:hidden pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-white/90 dark:from-slate-800/90 to-transparent" />
         </div>
 
-        {/* ── FOOTER ── */}
-        <div className="shrink-0 border-t border-slate-200 dark:border-slate-700 px-6 py-4 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between">
-          <div className="flex items-center gap-6">
+        {/* ── FOOTER ── (mobile: xếp dọc, nút Lưu full-width dễ bấm) */}
+        <div className="shrink-0 border-t border-slate-200 dark:border-slate-700 px-4 sm:px-6 py-3 sm:py-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-4 bg-slate-50 dark:bg-slate-800/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center justify-between sm:justify-start gap-6">
             <div className="text-sm text-slate-500">
               <span className="font-bold text-slate-700 dark:text-white">{validLines.length}</span> sản phẩm
             </div>
             <div className="text-sm">
-              Tổng cộng: <span className="text-xl font-black text-blue-600 ml-1">{formatCurrency(orderTotal)} đ</span>
+              Tổng cộng: <span className="text-lg sm:text-xl font-black text-blue-600 ml-1">{formatCurrency(orderTotal)} đ</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -516,11 +490,11 @@ export default function PurchaseModal({ open, onClose, editData, projects, suppl
               Hủy
             </button>
             <button onClick={handleSave} disabled={saving || !canSave}
-              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold shadow-lg shadow-blue-600/20 transition-all flex items-center gap-2">
+              className="flex-1 sm:flex-initial justify-center px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold shadow-lg shadow-blue-600/20 transition-all flex items-center gap-2">
               {saving ? (
                 <><span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span> Đang lưu...</>
               ) : (
-                <><span className="material-symbols-outlined text-[16px]">save</span> {editData?.id ? 'Cập nhật' : `Lưu ${validLines.length} dòng`}</>
+                <><span className="material-symbols-outlined text-[16px]">save</span> {editing ? 'Cập nhật' : `Lưu ${validLines.length} dòng`}</>
               )}
             </button>
           </div>

@@ -26,6 +26,7 @@ export default function SupplierPayables() {
   const [loading, setLoading] = useState(true);
   const [showImport, setShowImport] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);   // mobile: thu gọn bộ lọc
 
   // Filters
   const [filterProject, setFilterProject] = useState('');
@@ -118,6 +119,7 @@ export default function SupplierPayables() {
   };
 
   const hasFilters = filterProject || filterSupplier || filterGroup || filterDateFrom || filterDateTo;
+  const activeFilterCount = [filterProject, filterSupplier, filterGroup, filterDateFrom, filterDateTo].filter(Boolean).length;
 
   // Xóa hàng loạt các dòng MUA HÀNG đang lọc (vd: lọc NCC = Hồng Dương rồi xóa hết bản ghi trùng).
   const deleteFilteredPurchases = async () => {
@@ -158,43 +160,64 @@ export default function SupplierPayables() {
         <KPICard icon="percent" label="Tỉ lệ TT" value={`${summary.paidPercent.toFixed(1)}%`} color="amber" />
       </div>
 
-      {/* Filters */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[140px]">
+      {/* Filters — mobile: thu gọn sau nút "Bộ lọc" (1 instance duy nhất, live-apply như cũ); desktop: hiển thị trực tiếp */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-3 md:p-4">
+        {/* Hàng nút mobile: toggle bộ lọc + Import luôn hiển thị (không giấu vào khối thu gọn) */}
+        <div className="flex md:hidden items-center gap-2">
+          <button onClick={() => setFiltersOpen(o => !o)} aria-expanded={filtersOpen}
+            className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 px-3 rounded-lg border border-slate-200 dark:border-slate-600 text-sm font-bold text-slate-600 dark:text-slate-300 active:bg-slate-50 dark:active:bg-slate-700/40">
+            <span className="material-symbols-outlined text-[18px]">filter_list</span>Bộ lọc
+            {activeFilterCount > 0 && (
+              <span className="min-w-[20px] h-5 px-1 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center">{activeFilterCount}</span>
+            )}
+            <span className="material-symbols-outlined text-[18px]">{filtersOpen ? 'expand_less' : 'expand_more'}</span>
+          </button>
+          <button onClick={() => setShowImport(true)} className="min-h-[44px] flex items-center gap-1.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors">
+            <span className="material-symbols-outlined text-[16px]">upload_file</span>Import
+          </button>
+        </div>
+        {/* Nút xóa hàng loạt (nguy hiểm): luôn hiển thị rõ trên mobile khi active, không giấu trong bộ lọc */}
+        {hasFilters && activeTab === 'timeline' && filteredPurchases.length > 0 && (
+          <button onClick={deleteFilteredPurchases} disabled={deleting}
+            className="md:hidden mt-2 w-full min-h-[44px] flex items-center justify-center gap-1.5 px-4 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold shadow-sm transition-colors">
+            <span className="material-symbols-outlined text-[16px]">delete_sweep</span>{deleting ? 'Đang xóa...' : `Xóa ${filteredPurchases.length} dòng lọc`}
+          </button>
+        )}
+        <div className={`${filtersOpen ? 'flex' : 'hidden'} md:flex flex-wrap items-end gap-3 mt-3 md:mt-0`}>
+          <div className="w-full md:flex-1 md:min-w-[140px]">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Công trình</label>
             <SearchableSelect options={projectSelectOptions} value={filterProject} onChange={setFilterProject} placeholder="Tất cả" />
           </div>
-          <div className="flex-1 min-w-[140px]">
+          <div className="w-full md:flex-1 md:min-w-[140px]">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nhà cung cấp</label>
             <SearchableSelect options={supplierSelectOptions} value={filterSupplier} onChange={setFilterSupplier} placeholder="Tất cả" />
           </div>
-          <div className="flex-1 min-w-[120px]">
+          <div className="w-full md:flex-1 md:min-w-[120px]">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nhóm VT</label>
             <SearchableSelect options={groupSelectOptions} value={filterGroup} onChange={setFilterGroup} placeholder="Tất cả" />
           </div>
-          <div className="min-w-[120px]">
+          <div className="flex-1 min-w-[45%] md:flex-none md:min-w-[120px]">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Từ ngày</label>
             <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)}
-              className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-800 dark:text-white" />
+              className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2.5 md:py-2 bg-white dark:bg-slate-700 text-slate-800 dark:text-white" />
           </div>
-          <div className="min-w-[120px]">
+          <div className="flex-1 min-w-[45%] md:flex-none md:min-w-[120px]">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Đến ngày</label>
             <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)}
-              className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-white dark:bg-slate-700 text-slate-800 dark:text-white" />
+              className="w-full text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2.5 md:py-2 bg-white dark:bg-slate-700 text-slate-800 dark:text-white" />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full md:w-auto">
             {hasFilters && (
-              <button onClick={clearFilters} className="text-sm text-slate-500 hover:text-rose-500 flex items-center gap-1 px-3 py-2 transition-colors">
+              <button onClick={clearFilters} className="flex-1 md:flex-none min-h-[44px] md:min-h-0 justify-center text-sm text-slate-500 hover:text-rose-500 flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 md:border-0 transition-colors">
                 <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>Xóa lọc
               </button>
             )}
             {hasFilters && activeTab === 'timeline' && filteredPurchases.length > 0 && (
-              <button onClick={deleteFilteredPurchases} disabled={deleting} title="Xóa toàn bộ mua hàng đang lọc" className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold shadow-sm transition-colors">
+              <button onClick={deleteFilteredPurchases} disabled={deleting} title="Xóa toàn bộ mua hàng đang lọc" className="hidden md:flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold shadow-sm transition-colors">
                 <span className="material-symbols-outlined text-[16px]">delete_sweep</span>{deleting ? 'Đang xóa...' : `Xóa ${filteredPurchases.length} dòng lọc`}
               </button>
             )}
-            <button onClick={() => setShowImport(true)} className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors">
+            <button onClick={() => setShowImport(true)} className="hidden md:flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors">
               <span className="material-symbols-outlined text-[16px]">upload_file</span>Import Excel
             </button>
           </div>
@@ -208,7 +231,8 @@ export default function SupplierPayables() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-5 py-3 text-sm font-bold transition-all border-b-2 ${
+              aria-label={tab.label}
+              className={`flex-1 sm:flex-none justify-center sm:justify-start min-h-[44px] flex items-center gap-2 px-2 sm:px-5 py-3 text-sm font-bold transition-all border-b-2 ${
                 activeTab === tab.key
                   ? 'border-blue-600 text-blue-600 bg-blue-50/50 dark:bg-blue-900/10'
                   : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-700/30'
@@ -287,14 +311,14 @@ function KPICard({ icon, label, value, color = 'blue' }) {
   };
 
   return (
-    <div className={`bg-gradient-to-br ${colorMap[color]} rounded-2xl p-4 border border-white/60 dark:border-slate-700/50`}>
-      <div className="flex items-center gap-3 mb-2">
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${iconBg[color]}`}>
-          <span className="material-symbols-outlined text-[20px]">{icon}</span>
+    <div className={`bg-gradient-to-br ${colorMap[color]} rounded-2xl p-3 md:p-4 border border-white/60 dark:border-slate-700/50`}>
+      <div className="flex items-center gap-2 md:gap-3 mb-1.5 md:mb-2">
+        <div className={`w-7 h-7 md:w-9 md:h-9 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 ${iconBg[color]}`}>
+          <span className="material-symbols-outlined text-[16px] md:text-[20px]">{icon}</span>
         </div>
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</span>
+        <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 leading-tight">{label}</span>
       </div>
-      <p className={`text-xl md:text-2xl font-black tracking-tight ${colorMap[color].split(' ').slice(2).join(' ')}`}>{value}</p>
+      <p className={`text-base sm:text-xl md:text-2xl font-black tracking-tight break-words ${colorMap[color].split(' ').slice(2).join(' ')}`}>{value}</p>
     </div>
   );
 }

@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { formatCurrency, projectLabel, groupByOrder, orderKeyOf } from './payablesUtils';
 import PurchaseModal from './PurchaseModal';
 
-/* Tab "Đơn mua hàng": gom các dòng chi tiết thành TỪNG ĐƠN (cùng NCC + dự án + ngày + số hóa đơn). */
+/* Tab "Đơn mua hàng": gom các dòng chi tiết thành TỪNG ĐƠN (cùng NCC + dự án + ngày + số hóa đơn).
+   Desktop: bảng đầy đủ. Mobile (<md): danh sách thẻ gọn, bấm để xem dòng chi tiết. */
 export default function PurchaseOrders({ purchases = [], payments = [], projects = [], suppliers = [], onRefresh }) {
   const [showModal, setShowModal] = useState(false);
   const [editData, setEditData] = useState(null);
@@ -35,20 +36,101 @@ export default function PurchaseOrders({ purchases = [], payments = [], projects
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <p className="text-sm text-slate-500">{filtered.length} đơn</p>
-          <div className="relative">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <p className="text-sm text-slate-500 shrink-0">{filtered.length} đơn</p>
+          <div className="relative flex-1 sm:flex-initial min-w-0">
             <span className="material-symbols-outlined text-[16px] text-slate-400 absolute left-2 top-1/2 -translate-y-1/2">search</span>
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Tìm số HĐ, NCC, dự án..."
-              className="text-sm border border-slate-200 dark:border-slate-600 rounded-lg pl-7 pr-3 py-1.5 bg-white dark:bg-slate-700 w-[240px]" />
+              className="text-sm border border-slate-200 dark:border-slate-600 rounded-lg pl-7 pr-3 py-1.5 bg-white dark:bg-slate-700 w-full sm:w-[240px]" />
           </div>
         </div>
-        <button onClick={openNew} className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-sm">
+        <button onClick={openNew} className="flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-sm w-full sm:w-auto">
           <span className="material-symbols-outlined text-[16px]">add</span>Thêm mua hàng
         </button>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* ── MOBILE: danh sách thẻ ── */}
+      <div className="md:hidden space-y-3">
+        {filtered.length === 0 ? (
+          <p className="py-10 text-center text-slate-400 text-sm">Chưa có đơn mua hàng nào.</p>
+        ) : filtered.map(o => {
+          const isOpen = expanded === o.key;
+          const lines = linesByKey[o.key] || [];
+          return (
+            <div key={o.key} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden">
+              <button onClick={() => setExpanded(isOpen ? null : o.key)} className="w-full text-left px-3 py-2.5 active:bg-slate-50 dark:active:bg-slate-700/30">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono font-bold text-[13px] text-slate-800 dark:text-white truncate">{o.reference_no || '—'}</span>
+                  <span className="text-[11px] text-slate-500 shrink-0">{fmtDate(o.purchase_date)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2 mt-0.5">
+                  <span className="text-[12px] font-bold uppercase text-slate-700 dark:text-slate-200 truncate">{o.supplier_code || o.supplier_name}</span>
+                  <span className="text-[11px] text-slate-400 shrink-0">{o.lineCount} dòng</span>
+                </div>
+                {projectLabel(o.projects) && <p className="text-[11px] text-slate-400 truncate mt-0.5">{projectLabel(o.projects)}</p>}
+                <div className="grid grid-cols-3 gap-1 mt-2 text-[11px]">
+                  <div>
+                    <p className="text-slate-400">Tổng tiền</p>
+                    <p className="font-mono font-bold text-slate-800 dark:text-white">{formatCurrency(o.total)}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400">Đã trả</p>
+                    <p className="font-mono text-emerald-600">{formatCurrency(o.paid)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-slate-400">Còn nợ</p>
+                    <p className={`font-mono font-bold ${o.remaining > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{formatCurrency(o.remaining)}</p>
+                  </div>
+                </div>
+              </button>
+              {isOpen && (
+                <div className="border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/60 dark:bg-slate-900/20 px-3 py-2">
+                  <div className="divide-y divide-slate-100 dark:divide-slate-700/30">
+                    {lines.map(l => (
+                      <div key={l.id} className="py-1.5 text-[12px]">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-slate-700 dark:text-slate-200 flex-1">{l.product_name}</span>
+                          <span className="font-mono font-semibold shrink-0">{l.total_amount == null ? '—' : formatCurrency(l.total_amount)}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 font-mono">
+                          {formatCurrency(l.quantity)} {l.unit}
+                          {l.unit_price != null && <> × {formatCurrency(l.unit_price)}</>}
+                          {l.vat_rate != null && <> · VAT {Number(l.vat_rate) || 0}%</>}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => openEdit(o)} className="mt-2 w-full flex items-center justify-center gap-1.5 py-2 text-[12px] font-bold text-blue-600 border border-blue-200 dark:border-blue-800 rounded-lg active:bg-blue-50 dark:active:bg-blue-900/20">
+                    <span className="material-symbols-outlined text-[15px]">edit</span>Sửa đơn
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {filtered.length > 0 && (
+          <div className="rounded-xl border-2 border-slate-300 dark:border-slate-500 bg-slate-50 dark:bg-slate-800/50 px-3 py-2.5">
+            <p className="text-[11px] font-black uppercase text-slate-700 dark:text-white mb-1.5">Tổng {filtered.length} đơn</p>
+            <div className="grid grid-cols-3 gap-1 text-[11px]">
+              <div>
+                <p className="text-slate-400">Tổng tiền</p>
+                <p className="font-mono font-bold text-slate-800 dark:text-white">{formatCurrency(totals.total)}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">Đã trả</p>
+                <p className="font-mono font-bold text-emerald-600">{formatCurrency(totals.paid)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-slate-400">Còn nợ</p>
+                <p className="font-mono font-bold text-rose-600">{formatCurrency(totals.remaining)}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── DESKTOP: bảng đầy đủ ── */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b-2 border-slate-200 dark:border-slate-600 text-[11px] font-bold uppercase tracking-wider text-slate-500">

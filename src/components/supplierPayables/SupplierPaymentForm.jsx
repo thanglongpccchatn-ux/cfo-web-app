@@ -138,14 +138,67 @@ export default function SupplierPaymentForm({ projects = [], suppliers = [], pur
                 <span className="font-mono font-black text-rose-600 text-[15px]">{formatCurrency(g.remaining)}</span>
               </span>
               <button onClick={() => payGroup(g)} disabled={groupBusy}
-                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-[12px] font-bold flex items-center gap-1.5 shrink-0">
+                className="min-h-[44px] md:min-h-0 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-[12px] font-bold flex items-center gap-1.5 shrink-0">
                 <span className="material-symbols-outlined text-[15px]">done_all</span>{groupBusy ? 'Đang ghi...' : 'Trả cả NCC'}
               </button>
             </div>
 
-            {/* Các đơn */}
+            {/* Các đơn — MOBILE: card xếp dọc, input đủ lớn để chạm */}
             {open && (
-              <div className="overflow-x-auto">
+              <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-700/40">
+                {g.orders.map(o => {
+                  const d = draftOf(o);
+                  const busy = payingKey === o.key || groupBusy;
+                  return (
+                    <div key={o.key} className="px-3 py-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-700 dark:text-slate-200 text-[13px] break-words line-clamp-2">{o.reference_no || projectLabel(o.projects) || 'Đơn không mã'}</p>
+                          <p className="text-[11px] text-slate-400">
+                            {o.purchase_date ? new Date(o.purchase_date).toLocaleDateString('vi-VN') : '—'}
+                            {o.lineCount > 1 ? ` · ${o.lineCount} VT` : ''} · Tổng {formatCurrency(o.total)}
+                            {o.paid > 0 ? ` · đã trả ${formatCurrency(o.paid)}` : ''}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-[10px] font-bold uppercase text-slate-400">Còn nợ</p>
+                          <p className="font-mono font-bold text-rose-600 text-[13px]">{formatCurrency(o.remaining)}</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Số tiền trả</label>
+                          <NumberInput value={Number(d.amount) || 0} onChange={v => patchDraft(o, { amount: Number(v) || 0 })}
+                            className="w-full min-h-[44px] text-right tabular-nums text-[13px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-2 bg-white dark:bg-slate-700" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Ngày TT</label>
+                          <input type="date" value={d.date} onChange={e => patchDraft(o, { date: e.target.value })}
+                            className="w-full min-h-[44px] text-[13px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-2 bg-white dark:bg-slate-700" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Số CT (UNC)</label>
+                          <input type="text" value={d.ref} placeholder="UNC..." onChange={e => patchDraft(o, { ref: e.target.value })}
+                            className="w-full min-h-[44px] text-[13px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-2 bg-white dark:bg-slate-700" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Ghi chú</label>
+                          <input type="text" value={d.notes} placeholder="Ghi chú..." onChange={e => patchDraft(o, { notes: e.target.value })}
+                            className="w-full min-h-[44px] text-[13px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-2 bg-white dark:bg-slate-700" />
+                        </div>
+                      </div>
+                      <button onClick={() => payOne(o)} disabled={busy}
+                        className="mt-2 w-full min-h-[44px] bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-[13px] font-bold">
+                        {payingKey === o.key ? 'Đang ghi...' : 'Ghi nhận thanh toán'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {/* Các đơn — DESKTOP: bảng như cũ */}
+            {open && (
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-[10.5px] font-bold uppercase tracking-wide text-slate-400 border-b border-slate-100 dark:border-slate-700/60">
