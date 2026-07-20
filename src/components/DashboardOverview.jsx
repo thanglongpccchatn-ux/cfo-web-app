@@ -440,13 +440,13 @@ const DashboardOverview = () => {
                             <span className="material-symbols-outlined text-[28px] md:text-[32px]">query_stats</span>
                         </div>
                         <div>
-                            <div className="flex items-center gap-3 mb-1">
-                                <h2 className="text-xl md:text-3xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-1">
+                                <h2 className="text-lg md:text-3xl font-black text-slate-800 tracking-tight flex flex-wrap items-center gap-2">
                                     KẾ HOẠCH DOANH THU
-                                    <select 
+                                    <select
                                         value={selectedYear}
                                         onChange={(e) => { setUserPickedYear(true); setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value)); }}
-                                        className="bg-slate-100/50 border-none rounded-lg text-xl md:text-3xl font-black text-slate-800 focus:ring-0 cursor-pointer py-0 pl-2 pr-8 hover:bg-slate-200 transition-colors"
+                                        className="bg-slate-100/50 border-none rounded-lg text-lg md:text-3xl font-black text-slate-800 focus:ring-0 cursor-pointer py-0 pl-2 pr-8 hover:bg-slate-200 transition-colors"
                                     >
                                         <option value="all">Tất cả</option>
                                         {[2023, 2024, 2025, 2026, 2027, 2028, 2029].map(y => <option key={y} value={y}>{y}</option>)}
@@ -502,7 +502,7 @@ const DashboardOverview = () => {
                         </div>
                     </div>
 
-                    <div className="bg-blue-50/50 rounded-2xl p-4 md:p-5 border border-blue-100/50 flex flex-col justify-center">
+                    <div className="col-span-2 lg:col-span-1 bg-blue-50/50 rounded-2xl p-4 md:p-5 border border-blue-100/50 flex flex-col justify-center">
                         <div className="flex items-end justify-between mb-2">
                             <p className="text-[10px] md:text-xs font-black text-blue-600 uppercase tracking-widest">% HOÀN THÀNH</p>
                             <span className="text-2xl md:text-3xl font-black text-blue-600 tracking-tighter leading-none">{targetRevenue > 0 ? completionPercent.toFixed(1) : '0'}%</span>
@@ -536,19 +536,19 @@ const DashboardOverview = () => {
                             if (kpi.route) window.location.href = kpi.route;
                             else if (kpi.type) handleOpenDetail(kpi.type);
                         }}
-                        className={`bg-white rounded-2xl md:rounded-[20px] p-3 md:p-4 shadow-sm border border-slate-200/60 relative overflow-hidden group hover:shadow-md transition-all ${(kpi.type || kpi.route) ? 'cursor-pointer hover:ring-2 hover:border-transparent hover:-translate-y-1 ' + (kpi.color === 'rose' ? 'hover:ring-rose-400' : 'hover:ring-amber-400') : ''}`}
+                        className={`bg-white rounded-2xl md:rounded-[20px] p-3 md:p-4 shadow-sm border border-slate-200/60 relative overflow-hidden group hover:shadow-md transition-all ${idx === 6 ? 'col-span-2 md:col-span-3 xl:col-span-1' : ''} ${(kpi.type || kpi.route) ? 'cursor-pointer hover:ring-2 hover:border-transparent hover:-translate-y-1 ' + (kpi.color === 'rose' ? 'hover:ring-rose-400' : 'hover:ring-amber-400') : ''}`}
                     >
                         {kpi.type && (
-                            <div className={`absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ${kpi.color === 'rose' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
+                            <div className={`absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity ${kpi.color === 'rose' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
                                 <span className="material-symbols-outlined text-[12px]">open_in_new</span>
                             </div>
                         )}
                         <div className={`absolute -right-4 -top-4 w-20 h-20 bg-${kpi.color === 'slate' ? 'slate' : kpi.color}-50 rounded-full opacity-60 group-hover:scale-110 transition-transform`} />
                         <div className="relative flex flex-col h-full justify-between">
                             <div className="mb-2">
-                                <p className="text-[8px] md:text-[9px] font-black text-slate-500 uppercase tracking-widest leading-tight">{kpi.label}</p>
+                                <p className="text-[10px] md:text-[9px] font-black text-slate-500 uppercase tracking-widest leading-tight">{kpi.label}</p>
                                 {kpi.subLabel && (
-                                    <p className="text-[7px] md:text-[8px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">{kpi.subLabel}</p>
+                                    <p className="text-[9px] md:text-[8px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">{kpi.subLabel}</p>
                                 )}
                             </div>
                             <div className="flex justify-between items-end">
@@ -556,7 +556,7 @@ const DashboardOverview = () => {
                                     <h3 className={`text-lg md:text-xl font-black text-${kpi.color === 'slate' ? 'slate-700' : (kpi.color === 'rose' ? 'rose-600' : (kpi.color === 'emerald' ? 'emerald-600' : (kpi.color === 'amber' ? 'amber-600' : (kpi.color === 'blue' ? 'blue-600' : 'indigo-600'))))} tracking-tighter`}>
                                         {kpi.isPercent ? kpi.value.toFixed(1) : formatBillionParts(kpi.value).number}
                                     </h3>
-                                    <span className="text-[9px] md:text-[10px] font-black text-slate-400 capitalize">
+                                    <span className="text-[10px] font-black text-slate-400 capitalize">
                                         {kpi.isPercent ? '%' : formatBillionParts(kpi.value).unit}
                                     </span>
                                 </div>
@@ -574,7 +574,7 @@ const DashboardOverview = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 md:p-4 flex flex-col justify-between hover:shadow-md transition-all group">
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-blue-500 transition-colors">Tổng Số Hợp Đồng</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-blue-500 transition-colors">Tổng Số Hợp Đồng</p>
                             <h3 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">{stats.totalProjects}</h3>
                         </div>
                         <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 shadow-inner group-hover:scale-110 group-hover:rotate-3 transition-transform shrink-0">
@@ -589,7 +589,7 @@ const DashboardOverview = () => {
                 >
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-[9px] md:text-[10px] font-black text-rose-500 uppercase tracking-widest mb-1">Chưa Ký HĐ</p>
+                            <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-1">Chưa Ký HĐ</p>
                             <div className="flex items-baseline gap-1.5">
                                 <h3 className="text-xl md:text-2xl font-black text-rose-700 tracking-tight">{stats.unsignedContracts}</h3>
                                 <span className="text-[9px] font-bold text-rose-400">Hợp đồng</span>
@@ -607,7 +607,7 @@ const DashboardOverview = () => {
                 >
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-[9px] md:text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1" title="Đã hoàn thành thi công nhưng chưa quyết toán">Chưa Quyết Toán</p>
+                            <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1" title="Đã hoàn thành thi công nhưng chưa quyết toán">Chưa Quyết Toán</p>
                             <div className="flex items-baseline gap-1.5">
                                 <h3 className="text-xl md:text-2xl font-black text-amber-700 tracking-tight">{stats.unsettledContracts}</h3>
                                 <span className="text-[9px] font-bold text-amber-500">Dự án H.Thành</span>
@@ -625,7 +625,7 @@ const DashboardOverview = () => {
                 >
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-orange-500 transition-colors">Chờ Duyệt Chi</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-orange-500 transition-colors">Chờ Duyệt Chi</p>
                             <div className="flex items-baseline gap-1.5">
                                 <h3 className="text-xl md:text-2xl font-black text-orange-600 tracking-tight">{stats.pendingPayments}</h3>
                             </div>
@@ -639,7 +639,7 @@ const DashboardOverview = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 md:p-4 flex flex-col justify-between hover:shadow-md transition-all group">
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-emerald-500 transition-colors">Đã Duyệt</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-emerald-500 transition-colors">Đã Duyệt</p>
                             <h3 className="text-2xl md:text-3xl font-black text-emerald-600 tracking-tight">{stats.approvedPayments}</h3>
                         </div>
                         <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shadow-inner group-hover:scale-110 group-hover:rotate-3 transition-transform">
@@ -652,7 +652,7 @@ const DashboardOverview = () => {
                     <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50/50 rounded-full blur-3xl -mr-12 -mt-12"></div>
                     <div className="flex justify-between items-start relative z-10">
                         <div>
-                            <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Sức Khoẻ</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Sức Khoẻ</p>
                             <div className="flex items-center gap-1.5 mt-1">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                                 <h3 className="text-sm md:text-lg font-black text-emerald-600 uppercase tracking-tighter">Ổn Định</h3>
@@ -792,7 +792,7 @@ const DashboardOverview = () => {
                                 <span className="text-[9px] md:text-[11px] font-black text-slate-200">#0{i+1}</span>
                             </div>
                             <div>
-                                <p className="text-[8px] md:text-[11px] font-black text-slate-500 uppercase tracking-tighter mb-0.5 md:mb-1.5 leading-tight line-clamp-1">{k.label}</p>
+                                <p className="text-[10px] md:text-[11px] font-black text-slate-500 uppercase tracking-tighter mb-0.5 md:mb-1.5 leading-tight line-clamp-1">{k.label}</p>
                                 <p className="hidden md:block text-[10.5px] font-bold text-slate-400 italic mb-2.5 leading-tight h-8 line-clamp-2">{k.note}</p>
                                 <div className="flex items-baseline gap-0.5 md:gap-1">
                                     <span className={`text-lg md:text-2xl font-black text-${k.color}-700 tracking-tighter`}>
