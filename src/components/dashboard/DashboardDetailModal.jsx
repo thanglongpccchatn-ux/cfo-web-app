@@ -6,8 +6,13 @@ import { formatVND } from '../../utils/formatters';
  * Supports: invoice, requested, unsigned, unsettled, pending
  * Desktop (md+): bảng 5 cột như cũ. Mobile: full-screen + card list + footer tổng luôn hiển thị.
  */
+// Bỏ dấu tiếng Việt + thường hóa để tìm kiếm "thông minh" (gõ không dấu vẫn khớp)
+const norm = (s) => (s ?? '').toString().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+
 export default function DashboardDetailModal({ detailModal, setDetailModal }) {
     const [expandedProject, setExpandedProject] = useState(null);
+    const [search, setSearch] = useState('');
 
     if (!detailModal.isOpen) return null;
 
@@ -37,7 +42,17 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
         if (type === 'pending') return { code: p.payment_code, name: p.projects?.name || 'N/A', sub: p.stage_name };
         return { code: p.internal_code || p.code, name: p.name, sub: p.partners?.short_name || p.partners?.name || 'N/A' };
     };
-    const totals = detailModal.data.reduce((a, p) => {
+    // Lọc theo ô tìm kiếm: khớp mã, tên dự án, đối tác/diễn giải (không phân biệt dấu)
+    const q = norm(search.trim());
+    const rows = q
+        ? detailModal.data.filter(p => {
+            const { code, name, sub } = rowLabels(p);
+            return norm(`${code} ${name} ${sub}`).includes(q);
+        })
+        : detailModal.data;
+
+    // Tổng cộng tính theo danh sách ĐANG hiển thị — lọc gì thì tổng nấy
+    const totals = rows.reduce((a, p) => {
         const v = rowValues(p);
         a.val1 += v.val1; a.valThu += v.valThu; a.valNo += v.valNo;
         return a;
@@ -69,7 +84,11 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
     const valNoLabel = (type === 'unsigned' || type === 'unsettled') ? 'Giá trị HĐ' : 'Công Nợ';
     const countLabel = type === 'pending' ? 'HỒ SƠ' : 'DỰ ÁN';
 
-    const closeModal = () => setDetailModal({ isOpen: false, type: null, data: [] });
+    const closeModal = () => {
+        setSearch('');
+        setExpandedProject(null);
+        setDetailModal({ isOpen: false, type: null, data: [] });
+    };
 
     return (
         <div className="light-scope fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={closeModal}>
@@ -116,10 +135,41 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                     </button>
                 </div>
 
+                {/* ── Thanh tìm kiếm thông minh (không dấu vẫn khớp) ── */}
+                {detailModal.data.length > 3 && (
+                    <div className="shrink-0 px-3 md:px-8 py-2 md:py-2.5 bg-white border-b border-slate-100">
+                        <div className="relative">
+                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px] pointer-events-none">search</span>
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                placeholder="Tìm mã dự án, đối tác, tên dự án... (không cần gõ dấu)"
+                                aria-label="Tìm kiếm trong danh sách"
+                                className="w-full min-h-[44px] md:min-h-0 pl-10 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/40 focus:border-blue-300 focus:bg-white outline-none transition-all"
+                            />
+                            {search && (
+                                <button
+                                    onClick={() => setSearch('')}
+                                    aria-label="Xóa tìm kiếm"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">close</span>
+                                </button>
+                            )}
+                        </div>
+                        {q && (
+                            <p className="text-[11px] font-bold text-slate-400 mt-1.5">
+                                Khớp <span className="text-blue-600">{rows.length}</span>/{detailModal.data.length} {countLabel.toLowerCase()}
+                            </p>
+                        )}
+                    </div>
+                )}
+
                 <div className="p-0 overflow-auto flex-1 bg-slate-50/30">
                     {/* ── MOBILE: card list ── */}
                     <div className="md:hidden p-3 space-y-3">
-                        {detailModal.data.map(p => {
+                        {rows.map(p => {
                             const { val1, valThu, valNo } = rowValues(p);
                             const { code, name, sub } = rowLabels(p);
                             const isExpanded = expandedProject === p.id && isDebtType;
@@ -221,13 +271,13 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                                 </div>
                             );
                         })}
-                        {detailModal.data.length === 0 && (
+                        {rows.length === 0 && (
                             <div className="py-14 text-center">
                                 <div className="w-16 h-16 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300 mx-auto mb-3">
-                                    <span className="material-symbols-outlined text-3xl">done_all</span>
+                                    <span className="material-symbols-outlined text-3xl">{q ? 'search_off' : 'done_all'}</span>
                                 </div>
-                                <p className="text-slate-600 font-bold">Thật tuyệt vời!</p>
-                                <p className="text-slate-400 text-sm mt-1">Không có dự án nào ghi nhận công nợ trên hệ thống.</p>
+                                <p className="text-slate-600 font-bold">{q ? 'Không tìm thấy kết quả' : 'Thật tuyệt vời!'}</p>
+                                <p className="text-slate-400 text-sm mt-1">{q ? `Không có ${countLabel.toLowerCase()} nào khớp "${search}".` : 'Không có dự án nào ghi nhận công nợ trên hệ thống.'}</p>
                             </div>
                         )}
                     </div>
@@ -252,7 +302,7 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {detailModal.data.map(p => {
+                            {rows.map(p => {
                                 const { val1, valThu, valNo } = rowValues(p);
                                 const { code, name, sub } = rowLabels(p);
                                 const isExpanded = expandedProject === p.id && isDebtType;
@@ -380,14 +430,14 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                                     </React.Fragment>
                                 );
                             })}
-                            {detailModal.data.length === 0 && (
+                            {rows.length === 0 && (
                                 <tr>
                                     <td colSpan={5} className="px-6 py-16 text-center">
                                         <div className="w-20 h-20 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300 mx-auto mb-4">
-                                            <span className="material-symbols-outlined text-4xl">done_all</span>
+                                            <span className="material-symbols-outlined text-4xl">{q ? 'search_off' : 'done_all'}</span>
                                         </div>
-                                        <p className="text-slate-600 font-bold text-lg">Thật tuyệt vời!</p>
-                                        <p className="text-slate-400 text-sm mt-1">Không có dự án nào ghi nhận công nợ trên hệ thống.</p>
+                                        <p className="text-slate-600 font-bold text-lg">{q ? 'Không tìm thấy kết quả' : 'Thật tuyệt vời!'}</p>
+                                        <p className="text-slate-400 text-sm mt-1">{q ? `Không có ${countLabel.toLowerCase()} nào khớp "${search}".` : 'Không có dự án nào ghi nhận công nợ trên hệ thống.'}</p>
                                     </td>
                                 </tr>
                             )}
@@ -395,7 +445,7 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                         <tfoot className="bg-white sticky bottom-0 z-10 shadow-[0_-10px_40px_rgba(0,0,0,0.06)] border-t-2 border-slate-200">
                             <tr>
                                 <td colSpan={2} className="px-5 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">
-                                    TỔNG CỘNG ({detailModal.data.length} {countLabel})
+                                    TỔNG CỘNG ({rows.length} {countLabel}){q ? ' — ĐANG LỌC' : ''}
                                 </td>
                                 <td className="px-5 py-5 text-right text-base font-black text-slate-800 tabular-nums whitespace-nowrap">
                                     {formatVND(totals.val1)}
@@ -413,9 +463,9 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
                 </div>
 
                 {/* ── MOBILE: tổng cộng LUÔN hiển thị (nằm ngoài vùng cuộn, đệm safe-area iOS) ── */}
-                {detailModal.data.length > 0 && (
+                {rows.length > 0 && (
                     <div className="md:hidden shrink-0 border-t-2 border-slate-200 bg-white px-4 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.06)]">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tổng cộng ({detailModal.data.length} {countLabel})</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tổng cộng ({rows.length} {countLabel}){q ? ' — đang lọc' : ''}</p>
                         <div className="grid grid-cols-3 gap-1 text-[11px] tabular-nums">
                             <div>
                                 <p className="text-slate-400 text-[9px] uppercase font-bold">{val1Label}</p>

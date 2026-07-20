@@ -113,16 +113,18 @@ const DashboardOverview = () => {
             allPmts.forEach(pm => {
                 const k = pm.project_id;
                 if (!k) return;
-                const b = pmtByProj[k] || (pmtByProj[k] = { inv: 0, inc: 0, reqDebt: 0, list: [] });
+                const b = pmtByProj[k] || (pmtByProj[k] = { inv: 0, inc: 0, req: 0, reqDebt: 0, list: [] });
                 const inc = parseFloat(pm.external_income) || 0;
+                const req = parseFloat(pm.payment_request_amount) || 0;
                 if (pm.invoice_date) b.inv += parseFloat(pm.invoice_amount) || 0; // đã xuất HĐ: chỉ dòng có ngày xuất
                 b.inc += inc;                                                     // thực thu: KỂ CẢ tạm ứng
-                b.reqDebt += Math.max(0, (parseFloat(pm.payment_request_amount) || 0) - inc);
+                b.req += req;                                                     // tổng đề nghị (cột "Tổng Đề Nghị" của modal)
+                b.reqDebt += Math.max(0, req - inc);
                 b.list.push(pm);                                                  // giữ danh sách đợt cho modal chi tiết
             });
             const debtBreakdown = (projRes.data || []).map(p => {
-                const b = pmtByProj[p.id] || { inv: 0, inc: 0, reqDebt: 0, list: [] };
-                return { ...p, totalInvoice: b.inv, totalIncome: b.inc, debtInvoice: b.inv - b.inc, debtRequested: b.reqDebt, projPmts: b.list };
+                const b = pmtByProj[p.id] || { inv: 0, inc: 0, req: 0, reqDebt: 0, list: [] };
+                return { ...p, totalInvoice: b.inv, totalIncome: b.inc, totalRequested: b.req, debtInvoice: b.inv - b.inc, debtRequested: b.reqDebt, projPmts: b.list };
             });
 
             let financials = { totalValueAll: 0, totalIncomeAll: 0, totalDebtInvoiceAll: 0, totalRequestedAll: 0, totalInvoiceAll: 0, recoveryRate: 0, totalIncomeThisYear, totalInvoiceThisYear, totalDebtAll, totalDebtInvoiceCumulative, totalDebtRequestedCumulative, recoveryCumulative };
