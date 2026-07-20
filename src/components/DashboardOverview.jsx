@@ -374,7 +374,7 @@ const DashboardOverview = () => {
     }
 
     return (
-        <div className="space-y-4 md:space-y-8 animate-fade-in relative">
+        <div className="light-scope space-y-4 md:space-y-8 animate-fade-in relative">
             {/* Target Modal */}
             {targetModal.isOpen && (
                 <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">

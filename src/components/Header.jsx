@@ -4,10 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import NotificationBell from './NotificationBell';
 import GlobalSearch from './GlobalSearch';
 import Icon from './common/Icon';
+import useDarkMode from '../hooks/useDarkMode';
 
 export default function Header({ title, subtitle, onAction, isSidebarOpen, setIsSidebarOpen }) {
     const { profile, logout } = useAuth();
     const navigate = useNavigate();
+    const { isDark, toggle: toggleDark } = useDarkMode();
     return (
         <header className="h-16 bg-white dark:bg-[#1a2634] flex items-center justify-between px-3 md:px-8 z-30 shadow-sm flex-shrink-0 relative" role="banner">
             <div className="flex items-center gap-2 md:gap-3">
@@ -42,6 +44,15 @@ export default function Header({ title, subtitle, onAction, isSidebarOpen, setIs
 
             <div className="flex items-center gap-1.5 md:gap-4">
                 <GlobalSearch />
+
+                <button
+                    onClick={toggleDark}
+                    title={isDark ? 'Chuyển giao diện sáng' : 'Chuyển giao diện tối'}
+                    aria-label={isDark ? 'Chuyển giao diện sáng' : 'Chuyển giao diện tối'}
+                    className="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-300 transition-colors cursor-pointer"
+                >
+                    <Icon name={isDark ? 'light_mode' : 'dark_mode'} size={20} />
+                </button>
 
                 <NotificationBell />
 

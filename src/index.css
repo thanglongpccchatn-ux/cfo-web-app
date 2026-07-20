@@ -544,6 +544,84 @@ h6 {
   animation: slideInRight 0.3s ease-out;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   DARK MODE — LỚP PHỦ TỰ ĐỘNG
+   Nhiều màn chưa viết class dark: — lớp này map màu sáng phổ biến
+   sang tông tối tương ứng để toàn app tối đồng bộ.
+   - :where() giữ specificity thấp → class dark: viết tay LUÔN thắng.
+   - Vùng .light-scope (DashboardOverview, DashboardDetailModal theo
+     quyết định thiết kế) được miễn — giữ nền sáng kể cả khi dark.
+   ═══════════════════════════════════════════════════════════════ */
+
+:where(.dark) body {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+:where(.dark) ::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+/* Nền card / bề mặt */
+:where(.dark) .bg-white:where(:not(.light-scope, .light-scope *)) { background-color: #1e293b; }
+:where(.dark) .bg-slate-50:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .bg-gray-50:where(:not(.light-scope, .light-scope *)) { background-color: #0f172a; }
+:where(.dark) .bg-slate-100:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .bg-gray-100:where(:not(.light-scope, .light-scope *)) { background-color: #334155; }
+:where(.dark) .bg-slate-200:where(:not(.light-scope, .light-scope *)) { background-color: #475569; }
+
+/* Chữ */
+:where(.dark) .text-black:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .text-slate-900:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .text-slate-800:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .text-gray-900:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .text-gray-800:where(:not(.light-scope, .light-scope *)) { color: #f1f5f9; }
+:where(.dark) .text-slate-700:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .text-slate-600:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .text-gray-700:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .text-gray-600:where(:not(.light-scope, .light-scope *)) { color: #cbd5e1; }
+:where(.dark) .text-slate-500:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .text-gray-500:where(:not(.light-scope, .light-scope *)) { color: #94a3b8; }
+
+/* Viền & đường kẻ */
+:where(.dark) .border-slate-100:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .border-slate-200:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .border-slate-300:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .border-gray-100:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .border-gray-200:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .border-gray-300:where(:not(.light-scope, .light-scope *)) { border-color: #334155; }
+:where(.dark) .divide-slate-100:where(:not(.light-scope, .light-scope *)) > :not([hidden]) ~ :not([hidden]),
+:where(.dark) .divide-slate-200:where(:not(.light-scope, .light-scope *)) > :not([hidden]) ~ :not([hidden]),
+:where(.dark) .divide-gray-200:where(:not(.light-scope, .light-scope *)) > :not([hidden]) ~ :not([hidden]) { border-color: #334155; }
+
+/* Hover nền sáng → hover nền tối */
+:where(.dark) .hover\:bg-slate-50:hover:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .hover\:bg-gray-50:hover:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .hover\:bg-slate-100:hover:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .hover\:bg-gray-100:hover:where(:not(.light-scope, .light-scope *)) { background-color: rgba(51, 65, 85, 0.6); }
+
+/* Chip màu nhạt (bg-*-50) → tint mờ cùng tông trên nền tối */
+:where(.dark) .bg-blue-50:where(:not(.light-scope, .light-scope *)) { background-color: rgba(59, 130, 246, 0.12); }
+:where(.dark) .bg-indigo-50:where(:not(.light-scope, .light-scope *)) { background-color: rgba(99, 102, 241, 0.12); }
+:where(.dark) .bg-emerald-50:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .bg-green-50:where(:not(.light-scope, .light-scope *)) { background-color: rgba(16, 185, 129, 0.12); }
+:where(.dark) .bg-amber-50:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .bg-yellow-50:where(:not(.light-scope, .light-scope *)) { background-color: rgba(245, 158, 11, 0.12); }
+:where(.dark) .bg-red-50:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .bg-rose-50:where(:not(.light-scope, .light-scope *)) { background-color: rgba(239, 68, 68, 0.12); }
+:where(.dark) .bg-purple-50:where(:not(.light-scope, .light-scope *)) { background-color: rgba(168, 85, 247, 0.12); }
+
+/* Chữ màu đậm trên chip → nâng sáng để đọc được trên nền tối */
+:where(.dark) .text-blue-800:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .text-blue-700:where(:not(.light-scope, .light-scope *)) { color: #93c5fd; }
+:where(.dark) .text-indigo-700:where(:not(.light-scope, .light-scope *)) { color: #a5b4fc; }
+:where(.dark) .text-emerald-700:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .text-green-700:where(:not(.light-scope, .light-scope *)) { color: #6ee7b7; }
+:where(.dark) .text-amber-700:where(:not(.light-scope, .light-scope *)) { color: #fcd34d; }
+:where(.dark) .text-red-700:where(:not(.light-scope, .light-scope *)),
+:where(.dark) .text-rose-700:where(:not(.light-scope, .light-scope *)) { color: #fca5a5; }
+:where(.dark) .text-purple-700:where(:not(.light-scope, .light-scope *)) { color: #d8b4fe; }
+
 /* ── Focus Visible (Accessibility) ── */
 *:focus-visible {
   outline: 2px solid var(--color-primary, #3b82f6);

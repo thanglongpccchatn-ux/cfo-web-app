@@ -72,7 +72,7 @@ export default function DashboardDetailModal({ detailModal, setDetailModal }) {
     const closeModal = () => setDetailModal({ isOpen: false, type: null, data: [] });
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={closeModal}>
+        <div className="light-scope fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={closeModal}>
             <div className="bg-white shadow-2xl w-full h-[100dvh] max-h-[100dvh] rounded-none sm:h-auto sm:max-h-[90vh] sm:rounded-[24px] max-w-6xl flex flex-col overflow-hidden border border-slate-200/60 relative animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                 <div className={`p-4 md:p-8 border-b flex items-center justify-between gap-3 shrink-0 ${
                     type === 'invoice' || type === 'unsigned' ? 'bg-rose-50/80 border-rose-100' :

@@ -13,7 +13,7 @@ import {
     Network, BookOpen, ClipboardList, Receipt, Repeat, CalendarDays, HardHat,
     Wrench, Truck, HandCoins, Warehouse, ListChecks, CalendarClock, Handshake,
     Package, Settings, UserCog, User, History, CircleHelp, ChevronLeft,
-    ChevronRight, ChevronDown, LogOut, Menu, Plus, Search, X,
+    ChevronRight, ChevronDown, LogOut, Menu, Plus, Search, X, Sun, Moon,
 } from 'lucide-react';
 
 // Material Symbol name → lucide component
@@ -62,6 +62,8 @@ const MAP = {
     expand_more: ChevronDown,
     logout: LogOut,
     menu: Menu,
+    light_mode: Sun,
+    dark_mode: Moon,
     add: Plus,
     search: Search,
     close: X,
