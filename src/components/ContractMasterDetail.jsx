@@ -50,31 +50,15 @@ export default function ContractMasterDetail({ onOpenFullscreen }) {
         
         try {
             toast.info('Đang thực hiện xóa...');
-            
-            const { data: receipts } = await supabase.from('inventory_receipts').select('id').eq('project_id', projId);
-            const receiptIds = receipts?.map(r => r.id) || [];
-            
-            if (receiptIds.length > 0) {
-                await supabase.from('inventory_receipt_items').delete().in('receipt_id', receiptIds);
-                await supabase.from('inventory_receipts').delete().in('id', receiptIds);
-            }
-            
-            const { data: requests } = await supabase.from('inventory_requests').select('id').eq('project_id', projId);
-            const requestIds = requests?.map(r => r.id) || [];
-            
-            if (requestIds.length > 0) {
-                await supabase.from('inventory_request_items').delete().in('request_id', requestIds);
-                await supabase.from('inventory_requests').delete().in('id', requestIds);
+
+            // Xóa ATOMIC qua RPC (1 transaction: kho + thanh toán + lịch sử + dự án).
+            // Trước đây là chuỗi 5+ lệnh delete rời rạc — lỗi giữa chừng để lại dữ liệu dở dang.
+            const { error } = await supabase.rpc('delete_project_cascade', { p_project_id: projId });
+            if (error) {
+                if (error.code === 'PGRST202') throw new Error('chưa có RPC — chạy db/delete_project_rpc.sql trong Supabase SQL Editor.');
+                throw error;
             }
 
-            const { error } = await supabase
-                .from('projects')
-                .delete()
-                .eq('id', projId);
-
-            if (error) throw error;
-
-            
             // Invalidate cache → auto-refetch
             queryClient.invalidateQueries({ queryKey: ['contractsData'] });
             toast.success('Đã xóa hợp đồng thành công.');

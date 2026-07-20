@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import { logAudit } from '../lib/auditLog';
 import { smartToast } from '../utils/globalToast';
 import { fmt, fmtDate } from '../utils/formatters';
@@ -9,6 +10,7 @@ import { getPaymentStatus, daysDiff, STAGE_TYPES } from '../utils/paymentUtils';
 
 
 export default function PaymentTracking({ project, onBack, embedded }) {
+    const { hasPermission } = useAuth();
     const [stages, setStages] = useState([]);
     const queryClient = useQueryClient();
     const [_isAdding, setIsAdding] = useState(false);
@@ -137,21 +139,26 @@ export default function PaymentTracking({ project, onBack, embedded }) {
 
     const handleDeleteStage = async (id) => {
         if (!window.confirm('Xóa đợt thanh toán này?')) return;
-        await supabase.from('payments').delete().eq('id', id);
+        // count: 'exact' để phát hiện RLS chặn (delete 0 dòng KHÔNG trả error)
+        const { error, count } = await supabase.from('payments').delete({ count: 'exact' }).eq('id', id);
+        if (error) { smartToast('Lỗi xóa đợt thanh toán: ' + error.message); return; }
+        if (!count) { smartToast('Không xóa được — bạn không có quyền xóa hồ sơ thanh toán.'); return; }
         invalidateStages();
     };
 
     const handleSaveEdit = async (stage) => {
         const inv = Number(editForm.invoice) || 0;
         const req = Number(editForm.request) || 0;
-        await supabase.from('payments').update({ 
-            invoice_amount: inv, 
-            invoice_date: editForm.invoiceDate || null, 
-            payment_request_amount: req, 
-            due_date: editForm.dueDate || null, 
-            addenda_amount: Number(editForm.addenda) || 0 
-        }).eq('id', stage.id);
-        
+        const { error, count } = await supabase.from('payments').update({
+            invoice_amount: inv,
+            invoice_date: editForm.invoiceDate || null,
+            payment_request_amount: req,
+            due_date: editForm.dueDate || null,
+            addenda_amount: Number(editForm.addenda) || 0
+        }, { count: 'exact' }).eq('id', stage.id);
+        if (error) { smartToast('Lỗi lưu thông số: ' + error.message); return; }
+        if (!count) { smartToast('Không lưu được — bạn không có quyền sửa hồ sơ thanh toán.'); return; }
+
         setEditingStage(null);
         invalidateStages();
     };
@@ -197,8 +204,11 @@ export default function PaymentTracking({ project, onBack, embedded }) {
 
     const handleDeleteCdtPayment = async (record) => {
         if (!window.confirm('Xóa giao dịch này?')) return;
-        await supabase.from('external_payment_history').delete().eq('id', record.id);
-        
+        const { error: delErr, count } = await supabase.from('external_payment_history').delete({ count: 'exact' }).eq('id', record.id);
+        if (delErr) { smartToast('Lỗi xóa giao dịch: ' + delErr.message); return; }
+        if (!count) { smartToast('Không xóa được — bạn không có quyền xóa giao dịch thu tiền.'); return; }
+
+        // Chỉ ghi audit SAU KHI chắc chắn đã xóa (tránh audit ghi nhận vụ xóa không xảy ra)
         await logAudit({
             action: 'DELETE',
             tableName: 'external_payment_history',
@@ -211,7 +221,8 @@ export default function PaymentTracking({ project, onBack, embedded }) {
         // SUM-based recalculation: tính lại tổng từ lịch sử thay vì phép trừ
         const { data: remaining } = await supabase.from('external_payment_history').select('amount').eq('payment_stage_id', cdtModal.id);
         const newIncome = (remaining || []).reduce((sum, r) => sum + Number(r.amount || 0), 0);
-        await supabase.from('payments').update({ external_income: newIncome, status: newIncome > 0 ? 'CĐT Đã thanh toán' : 'Chưa thanh toán' }).eq('id', cdtModal.id);
+        const { error: updErr } = await supabase.from('payments').update({ external_income: newIncome, status: newIncome > 0 ? 'CĐT Đã thanh toán' : 'Chưa thanh toán' }).eq('id', cdtModal.id);
+        if (updErr) smartToast('Đã xóa giao dịch nhưng cập nhật tổng lỗi: ' + updErr.message);
         invalidateStages();
         const { data: updated } = await supabase.from('payments').select('*').eq('id', cdtModal.id).single();
         if (updated) setCdtModal(updated);
@@ -254,8 +265,11 @@ export default function PaymentTracking({ project, onBack, embedded }) {
 
     const handleDeleteTlSatecoPayment = async (record) => {
         if (!window.confirm('Xóa giao dịch này?')) return;
-        await supabase.from('internal_payment_history').delete().eq('id', record.id);
-        
+        const { error: delErr, count } = await supabase.from('internal_payment_history').delete({ count: 'exact' }).eq('id', record.id);
+        if (delErr) { smartToast('Lỗi xóa giao dịch: ' + delErr.message); return; }
+        if (!count) { smartToast('Không xóa được — bạn không có quyền xóa giao dịch nội bộ.'); return; }
+
+        // Chỉ ghi audit SAU KHI chắc chắn đã xóa
         await logAudit({
             action: 'DELETE',
             tableName: 'internal_payment_history',
@@ -268,7 +282,8 @@ export default function PaymentTracking({ project, onBack, embedded }) {
         // SUM-based recalculation: tính lại tổng từ lịch sử thay vì phép trừ
         const { data: remaining } = await supabase.from('internal_payment_history').select('amount').eq('payment_stage_id', tlSatecoModal.id);
         const newPaid = (remaining || []).reduce((sum, r) => sum + Number(r.amount || 0), 0);
-        await supabase.from('payments').update({ internal_paid: newPaid }).eq('id', tlSatecoModal.id);
+        const { error: updErr } = await supabase.from('payments').update({ internal_paid: newPaid }).eq('id', tlSatecoModal.id);
+        if (updErr) smartToast('Đã xóa giao dịch nhưng cập nhật tổng lỗi: ' + updErr.message);
         invalidateStages();
         const { data: updated } = await supabase.from('payments').select('*').eq('id', tlSatecoModal.id).single();
         if (updated) setTlSatecoModal(updated);
@@ -506,7 +521,9 @@ export default function PaymentTracking({ project, onBack, embedded }) {
                                                             </div>
                                                         </div>
                                                         <div className="mt-4 pt-3 border-t border-slate-100">
+                                                            {hasPermission('edit_payments') && (
                                                             <button onClick={() => openCdtModal(stage)} className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-lg border border-blue-200 transition-colors">Cập nhật Lịch sử Thu CĐT</button>
+                                                            )}
                                                         </div>
                                                     </div>
 
@@ -526,7 +543,9 @@ export default function PaymentTracking({ project, onBack, embedded }) {
                                                             </div>
                                                         </div>
                                                         <div className="mt-4 pt-3 border-t border-slate-100">
+                                                            {hasPermission('edit_payments') && (
                                                             <button onClick={() => openTlSatecoModal(stage)} className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg border border-indigo-200 transition-colors">Cập nhật Lịch sử Chuyển Sateco</button>
+                                                            )}
                                                         </div>
                                                     </div>
 
@@ -587,13 +606,17 @@ export default function PaymentTracking({ project, onBack, embedded }) {
                                                         </div>
                                                     ) : (
                                                         <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+                                                            {hasPermission('edit_payments') ? (
                                                             <button onClick={() => { setEditingStage(stage.id); setEditForm({ invoice: stage.invoice_amount || '', invoiceDate: stage.invoice_date || '', request: stage.payment_request_amount || '', dueDate: stage.due_date || '', addenda: stage.addenda_amount || '' }); }}
                                                                 className="px-4 py-2 text-xs bg-white border border-slate-300 text-slate-700 hover:border-emerald-400 hover:text-emerald-700 rounded-lg font-bold transition-all flex items-center gap-1.5 shadow-sm">
                                                                 <span className="material-symbols-outlined notranslate text-[16px]" translate="no">edit_document</span> Set Thông Số Hóa Đơn / ĐNTT
                                                             </button>
+                                                            ) : <span />}
+                                                            {hasPermission('delete_payments') && (
                                                             <button onClick={() => handleDeleteStage(stage.id)} className="px-3 py-2 text-xs text-rose-500 hover:bg-rose-50 rounded-lg font-bold transition-colors flex items-center gap-1 whitespace-nowrap">
                                                                 <span className="material-symbols-outlined notranslate text-[16px]" translate="no">delete</span> Xóa đợt
                                                             </button>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
@@ -632,7 +655,9 @@ export default function PaymentTracking({ project, onBack, embedded }) {
                                     <div className="flex-[2] min-w-[160px]">
                                         <input type="text" value={cdtForm.notes} onChange={e => setCdtForm(f => ({ ...f, notes: e.target.value }))} className="w-full rounded border border-blue-300 px-3 py-2 text-sm focus:border-blue-500 outline-none" placeholder="Ghi chú (VD: Bank transfer...)" />
                                     </div>
+                                    {hasPermission('edit_payments') && (
                                     <button onClick={handleAddCdtPayment} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded shadow transition-colors">Lưu</button>
+                                    )}
                                 </div>
                             </div>
                             
@@ -644,7 +669,9 @@ export default function PaymentTracking({ project, onBack, embedded }) {
                                             <div className="font-bold text-blue-700">{fmt(rec.amount)} ₫</div>
                                             <div className="text-xs text-slate-500 mt-1">{fmtDate(rec.payment_date)} {rec.description && `• ${rec.description}`}</div>
                                         </div>
+                                        {hasPermission('delete_payments') && (
                                         <button onClick={() => handleDeleteCdtPayment(rec)} className="w-8 h-8 flex items-center justify-center text-rose-500 hover:bg-rose-100 rounded-lg transition-colors"><span className="material-symbols-outlined notranslate text-[18px]" translate="no">delete</span></button>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -676,7 +703,9 @@ export default function PaymentTracking({ project, onBack, embedded }) {
                                     <div className="flex-[2] min-w-[160px]">
                                         <input type="text" value={tlSatecoForm.notes} onChange={e => setTlSatecoForm(f => ({ ...f, notes: e.target.value }))} className="w-full rounded border border-indigo-300 px-3 py-2 text-sm focus:border-indigo-500 outline-none" placeholder="Ghi chú (VD: CK nội bộ...)" />
                                     </div>
+                                    {hasPermission('edit_payments') && (
                                     <button onClick={handleAddTlSatecoPayment} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded shadow transition-colors">Lưu</button>
+                                    )}
                                 </div>
                             </div>
                             
@@ -688,7 +717,9 @@ export default function PaymentTracking({ project, onBack, embedded }) {
                                             <div className="font-bold text-indigo-700">{fmt(rec.amount)} ₫</div>
                                             <div className="text-xs text-slate-500 mt-1">{fmtDate(rec.payment_date)} {rec.description && `• ${rec.description}`}</div>
                                         </div>
+                                        {hasPermission('delete_payments') && (
                                         <button onClick={() => handleDeleteTlSatecoPayment(rec)} className="w-8 h-8 flex items-center justify-center text-rose-500 hover:bg-rose-100 rounded-lg transition-colors"><span className="material-symbols-outlined notranslate text-[18px]" translate="no">delete</span></button>
+                                        )}
                                     </div>
                                 ))}
                             </div>

@@ -7,7 +7,7 @@ import ReceiptFormModal from './payments/ReceiptFormModal';
 import { useAuth } from '../context/AuthContext';
 
 export default function PaymentReceiptsModule() {
-    const { profile } = useAuth();
+    const { profile, hasPermission } = useAuth();
     const isKeToanNoiBo = profile?.role_code === 'KETOAN';
     const [activeTab, setActiveTab] = useState(isKeToanNoiBo ? 'internal' : 'external');
     const [availablePayments, setAvailablePayments] = useState([]);
@@ -357,8 +357,10 @@ export default function PaymentReceiptsModule() {
             const item = list.find(r => r.id === id);
             const stageId = item?.payment_stage_id;
 
-            const { error } = await supabase.from(table).delete().eq('id', id);
+            // count: 'exact' để phát hiện RLS chặn (delete 0 dòng không trả error)
+            const { error, count } = await supabase.from(table).delete({ count: 'exact' }).eq('id', id);
             if (error) throw error;
+            if (!count) throw new Error('không có quyền xóa giao dịch (RLS chặn)');
 
             // Sync
             if (stageId) {
@@ -451,13 +453,15 @@ export default function PaymentReceiptsModule() {
                 </div>
 
                 <div className="flex items-center gap-3 relative z-10">
-                    <button 
+                    {hasPermission('create_payments') && (
+                    <button
                         onClick={() => { resetForm(); setShowModal(true); }}
                         className={`${activeTab === 'external' ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-100' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'} text-white px-6 py-2.5 rounded-xl font-black text-sm flex items-center gap-2 shadow-lg transition-all active:scale-95`}
                     >
                         <span className="material-symbols-outlined notranslate text-[20px]" translate="no">add_circle</span>
                         {activeTab === 'external' ? 'GHI NHẬN THU TIỀN' : 'GHI NHẬN CHUYỂN TIỀN'}
                     </button>
+                    )}
                 </div>
             </header>
 
@@ -622,8 +626,12 @@ export default function PaymentReceiptsModule() {
                             </div>
 
                             <div className="flex justify-end gap-2 pt-2 border-t border-slate-50 mt-1">
+                                {hasPermission('edit_payments') && (
                                 <button onClick={() => handleEdit(item)} className="p-1.5 rounded-lg bg-blue-50 text-blue-600"><span className="material-symbols-outlined text-[16px]">edit</span></button>
+                                )}
+                                {hasPermission('delete_payments') && (
                                 <button onClick={() => setConfirmDeleteId(item.id)} className="p-1.5 rounded-lg bg-rose-50 text-rose-600"><span className="material-symbols-outlined text-[16px]">delete</span></button>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -696,12 +704,16 @@ export default function PaymentReceiptsModule() {
                                     </td>
                                     <td className="px-6 py-4 text-center">
                                         <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {hasPermission('edit_payments') && (
                                             <button onClick={() => handleEdit(item)} className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors" title="Sửa">
                                                 <span className="material-symbols-outlined notranslate text-[18px]" translate="no">edit</span>
                                             </button>
+                                            )}
+                                            {hasPermission('delete_payments') && (
                                             <button onClick={() => setConfirmDeleteId(item.id)} className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors" title="Xóa">
                                                 <span className="material-symbols-outlined notranslate text-[18px]" translate="no">delete</span>
                                             </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>

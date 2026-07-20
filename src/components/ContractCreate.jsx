@@ -338,11 +338,14 @@ export default function ContractCreate({ onBack, project }) {
             }
         }
 
-        await supabase.from('company_settings').upsert([
+        // Ghi cấu hình ngân hàng cần quyền manage_settings/manage_users — nếu bị RLS chặn thì
+        // vẫn lưu hợp đồng bình thường nhưng PHẢI báo (trước đây nuốt lỗi im lặng).
+        const { error: bankErr } = await supabase.from('company_settings').upsert([
             { company_key: 'thanglong', company_name: 'CÔNG TY TNHH THĂNG LONG', bank_account: tlBank.account, bank_name: tlBank.name, bank_branch: tlBank.branch, account_holder: tlBank.holder },
             { company_key: 'thanhphat', company_name: 'CÔNG TY TNHH THÀNH PHÁT', bank_account: tpBank.account, bank_name: tpBank.name, bank_branch: tpBank.branch, account_holder: tpBank.holder },
             { company_key: 'sateco', company_name: 'CÔNG TY CP SATECO', bank_account: stBank.account, bank_name: stBank.name, bank_branch: stBank.branch, account_holder: stBank.holder },
         ], { onConflict: 'company_key' });
+        if (bankErr) toast.warning('Thông tin ngân hàng KHÔNG lưu được (cần quyền quản trị hệ thống): ' + bankErr.message);
 
         const selectedPartner = partners.find(p => p.id === partnerId);
         
