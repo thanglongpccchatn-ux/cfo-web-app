@@ -102,19 +102,26 @@ body {
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
 }
 
-/* Typography */
+/* Typography — tiêu đề dùng Manrope cho có cá tính, thân bài giữ Inter */
 h1,
 h2,
 h3,
 h4,
 h5,
 h6 {
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  font-family: 'Manrope', 'Inter', system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: var(--text-primary);
 }
 
 .text-gradient {
+  background: linear-gradient(to right, #0f172a, #475569);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dark .text-gradient {
   background: linear-gradient(to right, #ffffff, #94a3b8);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -144,12 +151,12 @@ h6 {
 }
 
 .btn-primary {
-  background: white;
-  color: black;
+  background: var(--color-primary, #005faf);
+  color: #ffffff;
 }
 
 .btn-primary:hover {
-  background: #f1f5f9;
+  background: var(--color-primary-hover, #004786);
   transform: translateY(-1px);
 }
 
@@ -277,11 +284,19 @@ h6 {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.15);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.3);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
 }
 
@@ -577,17 +592,9 @@ h6 {
     min-width: 600px;
   }
 
-  /* Touch target minimum 44px */
-  button, a, select, [role="button"] {
-    min-height: 44px;
-    min-width: 44px;
-  }
-
-  /* Exception for inline status badges/pills */
-  select.appearance-none {
-    min-height: 28px;
-    min-width: unset;
-  }
+  /* Touch target 44px: đã khai báo có chọn lọc ở block mobile phía trên
+     (button, a[role=button], [role=tab], nav a) — KHÔNG ép min-width lên
+     thẻ a/select thường vì làm phồng link chữ và ô chọn inline. */
 
   /* Mobile font size floor */
   .text-\[9px\], .text-\[10px\] {
