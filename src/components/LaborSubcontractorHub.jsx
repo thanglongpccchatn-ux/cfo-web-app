@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import LaborTracking from './LaborTracking';
-import SubcontractorsMaster from './SubcontractorsMaster';
 import SubcontractorContracts from './SubcontractorContracts';
+import SubcontractorDebtSummary from './SubcontractorDebtSummary';
 import PartnerManagement from './PartnerManagement';
 
 export default function LaborSubcontractorHub() {
@@ -94,7 +94,7 @@ export default function LaborSubcontractorHub() {
                 {activeTab === 'master' && (
                     <div className="absolute inset-0 flex flex-col p-4 md:p-6 pb-20 overflow-hidden">
                         <div className="h-full overflow-y-auto custom-scrollbar">
-                            <SubcontractorsMaster isModule={true} />
+                            <SubcontractorDebtSummary />
                         </div>
                     </div>
                 )}
