@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { fmt, formatInputNumber } from '../utils/formatters';
 import SearchableSelect from './SearchableSelect';
+import { smartToast } from '../utils/globalToast';
 
 export default function LaborRequestModal({ isOpen, onClose, onSuccess, project, projects = [] }) {
     const [form, setForm] = useState({
@@ -82,47 +83,48 @@ export default function LaborRequestModal({ isOpen, onClose, onSuccess, project,
 
         setSubmitting(true);
         const contract = selectedContract;
-        const teamName = contract?.partners?.short_name || contract?.partners?.code || contract?.partners?.name || 'Chưa xác định';
 
         const finalAmount = isCongNhat
             ? (Number(form.dailyLaborCount) || 0) * (Number(form.dailyLaborRate) || 0)
             : Number(form.requestedAmount) || 0;
 
-        const payload = {
-            project_id: form.projectId || null,
-            team_name: teamName,
-            payment_stage: form.paymentStage,
-            request_type: isCongNhat ? 'Công nhật' : (form.paymentStage === 'Tạm ứng' ? 'Tạm ứng' : 'Nghiệm thu'),
-            contract_value: Number(form.contractValue) || 0,
-            request_date: form.requestDate || null,
-            completed_previous: Number(form.completedPrevious) || 0,
-            completed_current: Number(form.completedCurrent) || 0,
-            requested_amount: finalAmount,
-            daily_labor_count: Number(form.dailyLaborCount) || 0,
-            daily_labor_rate: Number(form.dailyLaborRate) || 0,
-            approved_amount: 0,
-            payment_date: null,
-            paid_amount: 0,
-            priority: form.priority,
-            notes: form.notes,
-            status: 'PENDING'
-        };
+        // Qua RPC save_labor_request: bắt buộc contract_id, server tự lấy partner_id +
+        // team_name + giá trị HĐ từ hợp đồng (không tin client), tạo phiếu PENDING.
+        const { error } = await supabase.rpc('save_labor_request', {
+            p_id: null,
+            p_contract_id: form.contractId,
+            p_payment_stage: form.paymentStage,
+            p_request_type: isCongNhat ? 'Công nhật' : (form.paymentStage === 'Tạm ứng' ? 'Tạm ứng' : 'Nghiệm thu'),
+            p_request_date: form.requestDate || null,
+            p_completed_previous: Number(form.completedPrevious) || 0,
+            p_completed_current: Number(form.completedCurrent) || 0,
+            p_requested_amount: finalAmount,
+            p_daily_labor_count: Number(form.dailyLaborCount) || 0,
+            p_daily_labor_rate: Number(form.dailyLaborRate) || 0,
+            p_priority: form.priority,
+            p_notes: form.notes,
+        });
 
-        const { error } = await supabase.from('expense_labor').insert([payload]);
-
-        // Also update invoiced_amount on contract if provided
+        // Cập nhật tiền xuất hóa đơn lũy kế trên hợp đồng (nếu có nhập)
         if (!error && form.invoicedAmount && Number(form.invoicedAmount) > 0 && contract) {
-            await supabase
+            const { error: invErr } = await supabase
                 .from('subcontractor_contracts')
                 .update({ invoiced_amount: Number(form.invoicedAmount) })
                 .eq('id', contract.id);
+            if (invErr) smartToast('Đã tạo đề nghị, nhưng KHÔNG cập nhật được tiền xuất HĐ: ' + invErr.message, 'warning');
         }
 
         setSubmitting(false);
 
         if (error) {
-            alert('Lỗi: ' + error.message);
+            const msg = error.message?.includes('PGRST202')
+                ? 'Chưa có RPC save_labor_request — cần chạy db/labor_02_rpc_request.sql'
+                : error.message?.includes('forbidden')
+                ? 'Bạn không có quyền tạo đề nghị (cần quyền manage_labor)'
+                : 'Lỗi: ' + error.message;
+            smartToast(msg, 'error');
         } else {
+            smartToast('Đã tạo đề nghị thanh toán — chờ duyệt', 'success');
             onSuccess?.();
             onClose();
             setForm({

@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import ExcelImportModal from './ExcelImportModal';
 import LaborRequestModal from './LaborRequestModal';
 import LaborPaymentModal from './LaborPaymentModal';
+import LaborApproveModal from './LaborApproveModal';
 import { smartToast } from '../utils/globalToast';
 import { exportToExcel } from '../utils/exportExcel';
 import { fmt, fmtDate, fmtB } from '../utils/formatters';
@@ -12,13 +13,16 @@ import { fmt, fmtDate, fmtB } from '../utils/formatters';
 export default function LaborTracking({ project, onBack, embedded }) {
     const { hasPermission, profile } = useAuth();
     const isAdmin = profile?.role_code === 'ROLE01' || profile?.role_code === 'ADMIN';
-    const canCreate = isAdmin || hasPermission('create_labor');
+    const canCreate = isAdmin || hasPermission('manage_labor') || hasPermission('create_labor');
     const canApprove = isAdmin || hasPermission('approve_labor');
+    const canPay = isAdmin || hasPermission('pay_labor');
+    const canDelete = isAdmin || hasPermission('manage_labor');
 
     const [labors, setLabors] = useState([]);
     const [showImportModal, setShowImportModal] = useState(false);
     const [showRequestModal, setShowRequestModal] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [showApproveModal, setShowApproveModal] = useState(false);
     const [selectedLabor, setSelectedLabor] = useState(null);
     const [filterProjectId, setFilterProjectId] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all');
@@ -95,7 +99,9 @@ export default function LaborTracking({ project, onBack, embedded }) {
         const totalRequested = all.reduce((s, l) => s + Number(l.requested_amount || 0), 0);
         const totalPaid = all.reduce((s, l) => s + Number(l.paid_amount || 0), 0);
         const totalDebt = totalRequested - totalPaid;
-        const pendingCount = all.filter(l => l.status === 'PENDING' || (!l.status && !Number(l.paid_amount))).length;
+        const pendingApprove = all.filter(l => l.status === 'PENDING').length;
+        const pendingPay = all.filter(l => l.status === 'APPROVED' || l.status === 'PARTIAL').length;
+        const pendingCount = pendingApprove + pendingPay;
         // Unique contract values (by team_name to avoid duplication)
         const contractMap = {};
         all.forEach(l => {
@@ -105,7 +111,7 @@ export default function LaborTracking({ project, onBack, embedded }) {
         });
         const totalContractValue = Object.values(contractMap).reduce((s, v) => s + v, 0);
         const budgetUsedPct = totalContractValue > 0 ? (totalPaid / totalContractValue * 100) : 0;
-        return { totalRequested, totalPaid, totalDebt, pendingCount, totalContractValue, budgetUsedPct };
+        return { totalRequested, totalPaid, totalDebt, pendingCount, pendingApprove, pendingPay, totalContractValue, budgetUsedPct };
     }, [filteredLabors]);
 
     // ── Grouped data (by team_name) ──
@@ -138,10 +144,20 @@ export default function LaborTracking({ project, onBack, embedded }) {
 
     // ── Handlers ──
     const handleOpenPaymentModal = (labor) => { setSelectedLabor(labor); setShowPaymentModal(true); };
+    const handleOpenApproveModal = (labor) => { setSelectedLabor(labor); setShowApproveModal(true); };
     const handleDelete = async (id) => {
-        if (!window.confirm('Xóa bản ghi thanh toán thầu phụ này?')) return;
-        const { error } = await supabase.from('expense_labor').delete().eq('id', id);
-        if (!error) { smartToast('Đã xóa thành công!', 'success'); queryClient.invalidateQueries({ queryKey: ['labors'] }); }
+        if (!window.confirm('Xóa đề nghị thanh toán này?')) return;
+        const { error } = await supabase.rpc('delete_labor_request', { p_id: id });
+        if (error) {
+            const m = error.message || '';
+            smartToast(m.includes('da co dot chi') ? 'Đề nghị đã có đợt chi — không thể xóa (hủy từng đợt trước)'
+                : m.includes('forbidden') ? 'Bạn không có quyền xóa (cần manage_labor)'
+                : m.includes('PGRST202') ? 'Chưa có RPC — chạy db/labor_02_rpc_request.sql'
+                : 'Lỗi: ' + m, 'error');
+            return;
+        }
+        smartToast('Đã xóa đề nghị', 'success');
+        queryClient.invalidateQueries({ queryKey: ['labors'] });
     };
     const handleSuccess = () => { smartToast('Thao tác thành công!', 'success'); queryClient.invalidateQueries({ queryKey: ['labors'] }); };
 
@@ -180,19 +196,27 @@ export default function LaborTracking({ project, onBack, embedded }) {
     const activeFilterCount = [filterStatus, filterTeam, filterStage].filter(f => f !== 'all').length
         + (filterDateFrom ? 1 : 0) + (filterDateTo ? 1 : 0);
 
-    // ── Status Badge ──
+    // ── Status Badge (4+ trạng thái) ──
+    const STATUS_MAP = {
+        PENDING:  { label: 'Chờ Duyệt', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500', pulse: true },
+        APPROVED: { label: 'Đã Duyệt',  cls: 'bg-blue-50 text-blue-700 border-blue-200',    dot: 'bg-blue-500' },
+        PARTIAL:  { label: 'Chi 1 Phần',cls: 'bg-indigo-50 text-indigo-700 border-indigo-200', dot: 'bg-indigo-500', pulse: true },
+        PAID:     { label: 'Đã Chi',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
+        REJECTED: { label: 'Từ Chối',   cls: 'bg-rose-50 text-rose-700 border-rose-200',    dot: 'bg-rose-500' },
+    };
     const StatusBadge = ({ status, paidAmount }) => {
-        const isPaid = status === 'PAID' || Number(paidAmount) > 0;
+        const key = status || (Number(paidAmount) > 0 ? 'PAID' : 'PENDING');
+        const s = STATUS_MAP[key] || STATUS_MAP.PENDING;
         return (
-            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all ${
-                isPaid ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm'
-                    : 'bg-amber-50 text-amber-700 border-amber-200 shadow-sm animate-pulse'
-            }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${isPaid ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-                {isPaid ? 'Đã Chi' : 'Chờ Chi'}
+            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border shadow-sm ${s.cls} ${s.pulse ? 'animate-pulse' : ''}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`}></span>
+                {s.label}
             </span>
         );
     };
+    // Nút hành động theo trạng thái + quyền
+    const canApproveRow = (l) => l.status === 'PENDING' && canApprove;
+    const canPayRow = (l) => (l.status === 'APPROVED' || l.status === 'PARTIAL') && canPay;
 
     // ── Loading skeleton ──
     if (loading && labors.length === 0) {
@@ -353,8 +377,8 @@ export default function LaborTracking({ project, onBack, embedded }) {
             {/* ═══════ 6 KPI CARDS ═══════ */}
             <div className="grid grid-cols-3 xl:grid-cols-6 gap-3 p-4 bg-slate-50/80 border-b border-slate-100 shrink-0">
                 {[
-                    { label: 'Chờ Chi', value: kpis.pendingCount, icon: 'pending_actions', color: 'amber', pulse: kpis.pendingCount > 0 },
-                    { label: 'Tổng GT HĐ', value: fmtB(kpis.totalContractValue), icon: 'description', color: 'slate' },
+                    { label: 'Chờ Duyệt', value: kpis.pendingApprove, icon: 'verified', color: 'amber', pulse: kpis.pendingApprove > 0 },
+                    { label: 'Chờ Chi', value: kpis.pendingPay, icon: 'pending_actions', color: 'blue', pulse: kpis.pendingPay > 0 },
                     { label: 'Tổng Đề Nghị', value: fmtB(kpis.totalRequested), icon: 'request_quote', color: 'blue' },
                     { label: 'Đã Trả', value: fmtB(kpis.totalPaid), icon: 'payments', color: 'emerald' },
                     { label: 'Còn Nợ', value: fmtB(kpis.totalDebt), icon: 'account_balance', color: 'rose' },
@@ -403,14 +427,21 @@ export default function LaborTracking({ project, onBack, embedded }) {
                                         </div>
                                     </div>
                                     <div className="flex gap-1 shrink-0">
-                                        {!isPaid && (
-                                            <button onClick={() => handleOpenPaymentModal(labor)} className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200 shadow-sm active:scale-95 transition-transform">
+                                        {canApproveRow(labor) && (
+                                            <button onClick={() => handleOpenApproveModal(labor)} title="Duyệt" className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-200 shadow-sm active:scale-95 transition-transform">
+                                                <span className="material-symbols-outlined text-[18px]">verified</span>
+                                            </button>
+                                        )}
+                                        {canPayRow(labor) && (
+                                            <button onClick={() => handleOpenPaymentModal(labor)} title="Chi tiền" className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200 shadow-sm active:scale-95 transition-transform">
                                                 <span className="material-symbols-outlined text-[18px]">payments</span>
                                             </button>
                                         )}
-                                        <button onClick={() => handleDelete(labor.id)} className="w-8 h-8 rounded-lg bg-slate-50 text-rose-500 flex items-center justify-center border border-slate-200 shadow-sm active:scale-95 transition-transform">
-                                            <span className="material-symbols-outlined text-[18px]">delete</span>
-                                        </button>
+                                        {canDelete && (
+                                            <button onClick={() => handleDelete(labor.id)} title="Xóa" className="w-9 h-9 rounded-lg bg-slate-50 text-rose-500 flex items-center justify-center border border-slate-200 shadow-sm active:scale-95 transition-transform">
+                                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3 mb-3 border-t border-slate-50 pt-3">
@@ -489,19 +520,26 @@ export default function LaborTracking({ project, onBack, embedded }) {
                                                 <td className="px-3 py-2.5 text-slate-500 text-[11px] truncate max-w-[150px]" title={labor.notes}>{labor.notes}</td>
                                                 <td className="px-1.5 py-2.5 text-center">
                                                     <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        {!isPaid && (
-                                                            <button onClick={() => handleOpenPaymentModal(labor)} className="w-7 h-7 flex items-center justify-center bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-600 rounded shadow-sm transition-all" title="Xác nhận thanh toán">
+                                                        {canApproveRow(labor) && (
+                                                            <button onClick={() => handleOpenApproveModal(labor)} className="w-7 h-7 flex items-center justify-center bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-600 rounded shadow-sm transition-all" title="Duyệt">
+                                                                <span className="material-symbols-outlined notranslate text-[16px]" translate="no">verified</span>
+                                                            </button>
+                                                        )}
+                                                        {canPayRow(labor) && (
+                                                            <button onClick={() => handleOpenPaymentModal(labor)} className="w-7 h-7 flex items-center justify-center bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-600 rounded shadow-sm transition-all" title="Chi tiền">
                                                                 <span className="material-symbols-outlined notranslate text-[16px]" translate="no">payments</span>
                                                             </button>
                                                         )}
-                                                        {isPaid && (
-                                                            <button className="w-7 h-7 flex items-center justify-center bg-slate-50 border border-slate-200 text-slate-400 rounded shadow-sm cursor-default" title="Đã thanh toán">
+                                                        {labor.status === 'PAID' && (
+                                                            <button className="w-7 h-7 flex items-center justify-center bg-slate-50 border border-slate-200 text-emerald-400 rounded shadow-sm cursor-default" title="Đã chi đủ">
                                                                 <span className="material-symbols-outlined notranslate text-[16px]" translate="no">check_circle</span>
                                                             </button>
                                                         )}
-                                                        <button onClick={() => handleDelete(labor.id)} className="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 hover:border-rose-400 text-rose-600 hover:bg-rose-50 rounded shadow-sm transition-all" title="Xóa">
-                                                            <span className="material-symbols-outlined notranslate text-[16px]" translate="no">delete</span>
-                                                        </button>
+                                                        {canDelete && (
+                                                            <button onClick={() => handleDelete(labor.id)} className="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 hover:border-rose-400 text-rose-600 hover:bg-rose-50 rounded shadow-sm transition-all" title="Xóa">
+                                                                <span className="material-symbols-outlined notranslate text-[16px]" translate="no">delete</span>
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -597,14 +635,21 @@ export default function LaborTracking({ project, onBack, embedded }) {
                                                                 <td className="px-3 py-2 text-slate-500 truncate max-w-[150px]">{labor.notes}</td>
                                                                 <td className="px-2 py-2">
                                                                     <div className="flex gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity">
-                                                                        {!isPaid && (
-                                                                            <button onClick={() => handleOpenPaymentModal(labor)} className="w-6 h-6 flex items-center justify-center bg-emerald-50 border border-emerald-200 text-emerald-600 rounded transition-all" title="Thanh toán">
+                                                                        {canApproveRow(labor) && (
+                                                                            <button onClick={() => handleOpenApproveModal(labor)} className="w-6 h-6 flex items-center justify-center bg-indigo-50 border border-indigo-200 text-indigo-600 rounded transition-all" title="Duyệt">
+                                                                                <span className="material-symbols-outlined text-[14px]">verified</span>
+                                                                            </button>
+                                                                        )}
+                                                                        {canPayRow(labor) && (
+                                                                            <button onClick={() => handleOpenPaymentModal(labor)} className="w-6 h-6 flex items-center justify-center bg-emerald-50 border border-emerald-200 text-emerald-600 rounded transition-all" title="Chi tiền">
                                                                                 <span className="material-symbols-outlined text-[14px]">payments</span>
                                                                             </button>
                                                                         )}
-                                                                        <button onClick={() => handleDelete(labor.id)} className="w-6 h-6 flex items-center justify-center bg-white border border-slate-200 hover:border-rose-300 text-rose-500 rounded transition-all" title="Xóa">
-                                                                            <span className="material-symbols-outlined text-[14px]">delete</span>
-                                                                        </button>
+                                                                        {canDelete && (
+                                                                            <button onClick={() => handleDelete(labor.id)} className="w-6 h-6 flex items-center justify-center bg-white border border-slate-200 hover:border-rose-300 text-rose-500 rounded transition-all" title="Xóa">
+                                                                                <span className="material-symbols-outlined text-[14px]">delete</span>
+                                                                            </button>
+                                                                        )}
                                                                     </div>
                                                                 </td>
                                                             </tr>
@@ -648,6 +693,7 @@ export default function LaborTracking({ project, onBack, embedded }) {
 
         {/* Modals */}
         <LaborRequestModal isOpen={showRequestModal} onClose={() => setShowRequestModal(false)} onSuccess={handleSuccess} project={project} projects={projects} />
+        <LaborApproveModal isOpen={showApproveModal} onClose={() => { setShowApproveModal(false); setSelectedLabor(null); }} onSuccess={handleSuccess} labor={selectedLabor} />
         <LaborPaymentModal isOpen={showPaymentModal} onClose={() => { setShowPaymentModal(false); setSelectedLabor(null); }} onSuccess={handleSuccess} labor={selectedLabor} />
         <ExcelImportModal
             isOpen={showImportModal} onClose={() => setShowImportModal(false)}
