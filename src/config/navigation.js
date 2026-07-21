@@ -55,9 +55,19 @@ export const NAV_GROUPS = [
         ],
     },
     {
+        // Khu NHÂN CÔNG riêng (bố cục giống khu Vật tư): danh mục tổ đội/thầu phụ +
+        // hợp đồng thầu phụ + sổ thanh toán nhân công + công nợ 2 tầng.
+        key: 'labor_group', label: 'Nhân công & Thầu phụ', icon: 'engineering',
+        items: [
+            { id: 'labor_partners', icon: 'groups', label: 'Tổ đội & Thầu phụ', perms: ['view_labor', 'manage_labor', 'view_subcontractors', 'manage_partners'] },
+            { id: 'subcontractor_contracts', icon: 'description', label: 'Hợp đồng Thầu phụ', perms: ['view_subcontractors', 'manage_subcontractors', 'manage_labor'] },
+            { id: 'labor_tracking', icon: 'list_alt', label: 'Sổ Thanh toán NC', perms: ['view_labor', 'manage_labor', 'approve_labor', 'pay_labor'] },
+            { id: 'subcontractor_debt', icon: 'account_balance', label: 'Công nợ Thầu phụ', perms: ['view_labor', 'view_subcontractors', 'manage_labor'] },
+        ],
+    },
+    {
         key: 'operations', label: 'Vận hành', icon: 'construction',
         items: [
-            { id: 'labor_subcontractors', icon: 'engineering', label: 'Tổ đội & Thầu phụ', perms: ['view_labor', 'manage_labor', 'view_subcontractors'] },
             { id: 'task_management', icon: 'task_alt', label: 'Quản lý Công việc', perms: ['*'] },
             { id: 'site_diary', icon: 'edit_calendar', label: 'Nhật ký thi công', perms: ['view_construction', 'manage_construction'] },
             { id: 'construction', icon: 'build', label: 'Thi công', perms: ['view_construction', 'manage_construction'] },

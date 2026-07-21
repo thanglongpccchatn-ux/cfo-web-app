@@ -29,6 +29,8 @@ const PaymentsMaster = lazy(() => import('./components/PaymentsMaster'));
 const SuppliersMaster = lazy(() => import('./components/SuppliersMaster'));
 const SubcontractorsMaster = lazy(() => import('./components/SubcontractorsMaster'));
 const LaborSubcontractorHub = lazy(() => import('./components/LaborSubcontractorHub'));
+const SubcontractorContracts = lazy(() => import('./components/SubcontractorContracts'));
+const SubcontractorDebtSummary = lazy(() => import('./components/SubcontractorDebtSummary'));
 const MaterialsMaster = lazy(() => import('./components/MaterialsMaster'));
 const PartnerManagement = lazy(() => import('./components/PartnerManagement'));
 const UserManagement = lazy(() => import('./components/UserManagement'));
@@ -169,7 +171,10 @@ function MainLayout() {
       case 'site_diary': return { title: 'Nhật ký hiện trường', subtitle: 'Báo cáo hoạt động thi công hàng ngày' };
       case 'settlement': return { title: 'Quản lý Quyết Toán', subtitle: 'Theo dõi quyết toán, công nợ và hồ sơ pháp lý' };
       case 'bidding': return { title: 'Theo dõi Báo giá / Đấu thầu', subtitle: 'Quản lý vòng đời đấu thầu và phiên bản báo giá' };
-      case 'labor_tracking': return { title: 'Theo dõi Nhân công', subtitle: 'Chi phí thầu phụ và nhân công' };
+      case 'labor_partners': return { title: 'Tổ đội & Thầu phụ', subtitle: 'Danh mục nhà thầu (xuất HĐ) và tổ đội' };
+      case 'subcontractor_contracts': return { title: 'Hợp đồng Thầu phụ', subtitle: 'Giá trị hợp đồng, tạm ứng, xuất hóa đơn' };
+      case 'labor_tracking': return { title: 'Sổ Thanh toán Nhân công', subtitle: 'Đề nghị → Duyệt → Chi (nhiều đợt)' };
+      case 'subcontractor_debt': return { title: 'Công nợ Thầu phụ', subtitle: 'Công nợ đến kỳ · khối lượng · hóa đơn' };
       case 'material_tracking': return { title: 'Theo dõi Vật tư', subtitle: 'Chi phí vật tư hiện trường' };
       case 'supplier_payables': return { title: 'Mua hàng & Công nợ NCC', subtitle: 'Sổ theo dõi mua hàng & thanh toán nhà cung cấp' };
       case 'expense_tracking': return { title: 'Chi phí Chung', subtitle: 'Quản lý chi phí vận hành & văn phòng' };
@@ -244,8 +249,13 @@ function MainLayout() {
             <Route path="/site_diary" element={<ProtectedRoute requiredPerms={['view_construction', 'manage_construction']}><SiteDiary /></ProtectedRoute>} />
             <Route path="/warranty_tracking" element={<ProtectedRoute requiredPerms={['view_warranty', 'manage_warranty']}><WarrantyTracking /></ProtectedRoute>} />
             <Route path="/settlement" element={<ProtectedRoute requiredPerms={['view_settlement', 'manage_settlement']}><SettlementManagement /></ProtectedRoute>} />
+            {/* ── Khu NHÂN CÔNG & THẦU PHỤ (mỗi mục 1 route riêng, bố cục giống khu Vật tư) ── */}
+            <Route path="/labor_partners" element={<ProtectedRoute requiredPerms={['view_labor', 'manage_labor', 'view_subcontractors', 'manage_partners']}><PartnerManagement forcedTab="Subcontractor" hideHeader={true} /></ProtectedRoute>} />
+            <Route path="/subcontractor_contracts" element={<ProtectedRoute requiredPerms={['view_subcontractors', 'manage_subcontractors', 'manage_labor']}><SubcontractorContracts /></ProtectedRoute>} />
+            <Route path="/labor_tracking" element={<ProtectedRoute requiredPerms={['view_labor', 'manage_labor', 'approve_labor', 'pay_labor']}><LaborTracking embedded={true} /></ProtectedRoute>} />
+            <Route path="/subcontractor_debt" element={<ProtectedRoute requiredPerms={['view_labor', 'view_subcontractors', 'manage_labor']}><SubcontractorDebtSummary /></ProtectedRoute>} />
+            {/* Hub 4 tab cũ — giữ để không vỡ link/bookmark đã lưu */}
             <Route path="/labor_subcontractors" element={<ProtectedRoute requiredPerms={['view_labor', 'manage_labor', 'view_subcontractors']}><LaborSubcontractorHub /></ProtectedRoute>} />
-            <Route path="/labor_tracking" element={<Navigate to="/labor_subcontractors?tab=labor" replace />} />
             <Route path="/material_tracking" element={<ProtectedRoute requiredPerms={['view_materials', 'manage_materials_tracking', 'manage_materials']}><MaterialTracking /></ProtectedRoute>} />
             <Route path="/supplier_payables" element={<ProtectedRoute requiredPerms={['view_materials', 'manage_materials_tracking', 'view_suppliers']} moduleName="Công nợ NCC Vật tư"><div className="vt-scope"><SupplierPayables /></div></ProtectedRoute>} />
             <Route path="/expense_tracking" element={<ProtectedRoute requiredPerms={['view_expenses', 'manage_expenses']}><ExpenseTracking /></ProtectedRoute>} />
@@ -255,7 +265,7 @@ function MainLayout() {
             {/* Financial & Inventory Modules */}
             <Route path="/payments" element={<ProtectedRoute requiredPerms={['view_payments']}><PaymentsMaster /></ProtectedRoute>} />
             <Route path="/suppliers" element={<ProtectedRoute requiredPerms={['view_materials', 'view_suppliers', 'manage_partners']}><div className="vt-scope"><SuppliersMaster /></div></ProtectedRoute>} />
-            <Route path="/subcontractors" element={<Navigate to="/labor_subcontractors?tab=master" replace />} />
+            <Route path="/subcontractors" element={<Navigate to="/labor_partners" replace />} />
             <Route path="/materials" element={<ProtectedRoute requiredPerms={['view_materials', 'manage_materials', 'edit_materials_master']}><div className="vt-scope"><MaterialsMaster /></div></ProtectedRoute>} />
             <Route path="/inventory" element={<ProtectedRoute requiredPerms={['view_materials', 'import_inventory', 'export_inventory', 'manage_materials']}><div className="vt-scope"><InventoryManager /></div></ProtectedRoute>} />
             

@@ -1,14 +1,56 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { currentTheme } from '../config/brand';
 import { NavLink, useLocation } from 'react-router-dom';
 import Icon from './common/Icon';
 import { NAV_GROUPS, SYSTEM_TABS } from '../config/navigation';
 
+/**
+ * Route KHÔNG có mục riêng trên sidebar -> quy về mục cha để vẫn sáng đúng chỗ.
+ * (VD: Hub 4 tab cũ, các trang chi tiết/điều hướng lại.)
+ */
+/**
+ * Mỗi khu một màu riêng cho TIÊU ĐỀ NHÓM + icon nhóm — quét mắt là biết đang ở khu nào.
+ * Class viết tĩnh (không nội suy) để Tailwind không purge mất.
+ */
+const GROUP_TONE = {
+    overview:        'text-slate-600 dark:text-slate-300',
+    bidding_group:   'text-amber-600 dark:text-amber-400',
+    contracts:       'text-blue-600 dark:text-blue-400',
+    finance:         'text-emerald-600 dark:text-emerald-400',
+    accounting:      'text-violet-600 dark:text-violet-400',
+    labor_group:     'text-cyan-600 dark:text-cyan-400',
+    operations:      'text-orange-600 dark:text-orange-400',
+    materials_group: 'text-teal-600 dark:text-teal-400',
+    system:          'text-slate-500 dark:text-slate-400',
+};
+const GROUP_TONE_ACTIVE = {
+    overview:        'text-slate-900 dark:text-white',
+    bidding_group:   'text-amber-700 dark:text-amber-300',
+    contracts:       'text-blue-700 dark:text-blue-300',
+    finance:         'text-emerald-700 dark:text-emerald-300',
+    accounting:      'text-violet-700 dark:text-violet-300',
+    labor_group:     'text-cyan-700 dark:text-cyan-300',
+    operations:      'text-orange-700 dark:text-orange-300',
+    materials_group: 'text-teal-700 dark:text-teal-300',
+    system:          'text-slate-800 dark:text-white',
+};
+
+const ROUTE_ALIAS = {
+    labor_subcontractors: 'labor_tracking',
+    subcontractors: 'labor_partners',
+    material_tracking: 'supplier_payables',
+    payments: 'doc_tracking',
+};
+
 export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
     const { profile, hasPermission, logout } = useAuth();
     const location = useLocation();
-    const activeTab = location.pathname.substring(1) || 'dashboard';
+    const rawTab = location.pathname.substring(1) || 'dashboard';
+    const activeTab = ROUTE_ALIAS[rawTab] || rawTab;
+
+    // Sáng đúng mục kể cả khi đang ở route con (VD accounting/journals/123 -> accounting/journals)
+    const isItemActive = (item) => activeTab === item.id || activeTab.startsWith(item.id + '/');
     
     // Collapsed group state — persisted in localStorage
     const [collapsed, setCollapsed] = useState(() => {
@@ -25,6 +67,19 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
             return next;
         });
     };
+
+    // Chuyển trang -> tự mở nhóm chứa mục đang xem (nếu đang thu gọn) để luôn thấy chỗ sáng.
+    useEffect(() => {
+        const owner = NAV_GROUPS.find(g => g.items.some(it => activeTab === it.id || activeTab.startsWith(it.id + '/')));
+        const key = owner?.key || (SYSTEM_TABS.some(it => activeTab === it.id) ? 'system' : null);
+        if (!key) return;
+        setCollapsed(prev => {
+            if (!prev[key]) return prev;               // đang mở rồi -> không đụng
+            const next = { ...prev, [key]: false };
+            try { localStorage.setItem('sidebar_collapsed', JSON.stringify(next)); } catch { /* bỏ qua */ }
+            return next;
+        });
+    }, [activeTab]);
     
     // Admin always has full access. Otherwise, check permissions.
     const canView = (perms) => {
@@ -52,16 +107,16 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
             }}
             title={!isSidebarOpen ? item.label : undefined}
             aria-label={item.label}
-            className={({ isActive }) => `w-full flex items-center py-2 rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${isSidebarOpen ? 'pl-6 pr-3 gap-2.5' : 'justify-center px-0'
-                } ${isActive || (activeTab === item.id)
-                    ? 'bg-primary/10 text-primary font-semibold'
-                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white group font-medium'
+            className={() => `relative w-full flex items-center py-2.5 rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${isSidebarOpen ? 'pl-6 pr-3 gap-2.5' : 'justify-center px-0'
+                } ${isItemActive(item)
+                    ? 'bg-primary text-white font-bold shadow-md shadow-primary/25 before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-6 before:w-1 before:rounded-r-full before:bg-white/80'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-primary dark:hover:text-white group font-semibold'
                 }`}
         >
             {() => (
                 <>
                     <Icon name={item.icon} size={18} className="flex-shrink-0" />
-                    {isSidebarOpen && <span className="text-[13px] truncate animate-fade-in">{item.label}</span>}
+                    {isSidebarOpen && <span className="text-[13.5px] truncate animate-fade-in tracking-tight">{item.label}</span>}
                 </>
             )}
         </NavLink>
@@ -70,7 +125,7 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
     return (
         <aside className={`
             fixed md:relative top-0 left-0 bottom-0 z-40
-            flex-shrink-0 border-r border-slate-200 dark:border-slate-700 flex flex-col h-full shadow-2xl md:shadow-sm transition-all duration-300 ease-in-out
+            flex-shrink-0 border-r-2 border-slate-200/90 dark:border-slate-700 flex flex-col h-full shadow-2xl md:shadow-[2px_0_12px_-4px_rgba(15,23,42,0.10)] transition-all duration-300 ease-in-out
             ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 w-64 md:w-20'}
         `} style={{ backgroundColor: 'var(--bg-sidebar-light)' }} role="navigation" aria-label="Menu điều hướng chính">
             <style>{`.dark aside { background-color: var(--bg-sidebar-dark) !important; }`}</style>
@@ -109,7 +164,7 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
             <nav className={`flex-1 overflow-y-auto py-4 ${isSidebarOpen ? 'px-3' : 'px-2'} no-scrollbar`}>
                 {visibleGroups.map((group) => {
                     const isCollapsed = collapsed[group.key];
-                    const hasActiveChild = group.items.some(item => activeTab === item.id);
+                    const hasActiveChild = group.items.some(isItemActive);
 
                     return (
                         <div key={group.key} className="mb-1">
@@ -120,8 +175,10 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
                                     aria-expanded={!isCollapsed}
                                     aria-controls={`nav-group-${group.key}`}
                                     aria-label={`${isCollapsed ? 'Mở rộng' : 'Thu gọn'} ${group.label}`}
-                                    className={`w-full flex items-center justify-between px-3 pt-6 pb-2 mb-1 text-xs font-black uppercase tracking-widest transition-colors cursor-pointer outline-none ${
-                                        hasActiveChild ? 'text-primary' : 'text-slate-400 hover:text-slate-700'
+                                    className={`w-full flex items-center justify-between px-3 pt-6 pb-2 mb-1 text-xs font-black uppercase tracking-widest transition-colors cursor-pointer outline-none opacity-90 hover:opacity-100 ${
+                                        hasActiveChild
+                                            ? (GROUP_TONE_ACTIVE[group.key] || 'text-primary')
+                                            : (GROUP_TONE[group.key] || 'text-slate-500 dark:text-slate-400')
                                     }`}
                                 >
                                     <div className="flex items-center gap-2.5">
@@ -156,8 +213,8 @@ export default function Sidebar({ isSidebarOpen = true, setIsSidebarOpen }) {
                         <button
                             onClick={() => toggleGroup('system')}
                             aria-expanded={!collapsed['system']}
-                            className={`w-full flex items-center justify-between px-3 pt-4 pb-2 mb-1 text-xs font-black uppercase tracking-widest transition-colors cursor-pointer outline-none ${
-                                systemTabs.some(item => activeTab === item.id) ? 'text-primary' : 'text-slate-400 hover:text-slate-700'
+                            className={`w-full flex items-center justify-between px-3 pt-4 pb-2 mb-1 text-xs font-black uppercase tracking-widest transition-colors cursor-pointer outline-none opacity-90 hover:opacity-100 ${
+                                systemTabs.some(isItemActive) ? GROUP_TONE_ACTIVE.system : GROUP_TONE.system
                             }`}
                         >
                             <div className="flex items-center gap-2.5">
