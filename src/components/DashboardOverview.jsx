@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { CashFlowChart, PortfolioChart, ReceivablesAgingChart, TopProfitChart } from './DashboardCharts';
 import AIFinanceInsights from './AIFinanceInsights';
+import AIRoleInsights from './ai/AIRoleInsights';
 import LiquidityGauge from './LiquidityGauge';
 import DashboardDetailModal from './dashboard/DashboardDetailModal';
 import SkeletonLoader from './common/SkeletonLoader';
@@ -682,12 +683,15 @@ const DashboardOverview = () => {
                 </a>
             </div>
 
-            {/* AI Financial Insights Section */}
-            <AIFinanceInsights 
-                financials={financials} 
-                performance={performance} 
-                planData={planData} 
-                dashboardData={dashboardData} 
+            {/* Nhận định AI theo vai trò (gọi LLM khi bấm) — đặt trước phần luật tự động */}
+            <AIRoleInsights />
+
+            {/* AI Financial Insights Section (rule-based, hiện tức thì, không tốn phí) */}
+            <AIFinanceInsights
+                financials={financials}
+                performance={performance}
+                planData={planData}
+                dashboardData={dashboardData}
             />
 
             {/* Strategic Analysis Charts */}

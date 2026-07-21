@@ -14,6 +14,7 @@ import {
     Wrench, Truck, HandCoins, Warehouse, ListChecks, CalendarClock, Handshake,
     Package, Settings, UserCog, User, History, CircleHelp, ChevronLeft,
     ChevronRight, ChevronDown, LogOut, Menu, Plus, Search, X, Sun, Moon,
+    Sparkles, SendHorizontal, Trash2,
 } from 'lucide-react';
 
 // Material Symbol name → lucide component
@@ -64,6 +65,9 @@ const MAP = {
     menu: Menu,
     light_mode: Sun,
     dark_mode: Moon,
+    auto_awesome: Sparkles,
+    send: SendHorizontal,
+    delete: Trash2,
     add: Plus,
     search: Search,
     close: X,

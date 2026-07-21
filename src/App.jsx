@@ -31,6 +31,7 @@ const SubcontractorsMaster = lazy(() => import('./components/SubcontractorsMaste
 const LaborSubcontractorHub = lazy(() => import('./components/LaborSubcontractorHub'));
 const SubcontractorContracts = lazy(() => import('./components/SubcontractorContracts'));
 const SubcontractorDebtSummary = lazy(() => import('./components/SubcontractorDebtSummary'));
+const AIAssistantPanel = lazy(() => import('./components/ai/AIAssistantPanel'));
 const MaterialsMaster = lazy(() => import('./components/MaterialsMaster'));
 const PartnerManagement = lazy(() => import('./components/PartnerManagement'));
 const UserManagement = lazy(() => import('./components/UserManagement'));
@@ -226,6 +227,9 @@ function MainLayout() {
       )}
 
       <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
+
+      {/* Trợ lý AI — nút nổi, dùng chung mọi trang sau khi đăng nhập */}
+      <Suspense fallback={null}><AIAssistantPanel /></Suspense>
 
       <main className="flex-1 flex flex-col h-full overflow-hidden bg-background-light dark:bg-[#111827]">
         <Header
