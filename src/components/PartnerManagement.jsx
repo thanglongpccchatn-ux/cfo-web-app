@@ -9,6 +9,7 @@ const EMPTY_PARTNER = {
     phone: '', email: '', address: '',
     representative: '', representative_title: '',
     bank_name: '', bank_account: '', bank_branch: '', account_holder: '',
+    entity_type: 'team',   // 'contractor' = Nhà thầu (xuất HĐ) | 'team' = Tổ đội
     notes: ''
 };
 
@@ -55,11 +56,13 @@ export default function PartnerManagement({ forcedTab, hideHeader }) {
         fetchPartners();
     };
 
+    // Subcontractor gom về bảng partners (type=Subcontractor) — nguồn duy nhất mà
+    // hợp đồng thầu phụ + sổ thanh toán đều tham chiếu. Bảng subcontractors cũ ngừng dùng.
     const getTableName = (tab) => {
         if (tab === 'Supplier') return 'suppliers';
-        if (tab === 'Subcontractor') return 'subcontractors';
-        return 'partners'; // Client
+        return 'partners'; // Client + Subcontractor
     };
+    const isSubTab = activeTab === 'Subcontractor';
 
     const handleSavePartner = async (e) => {
         e.preventDefault();
@@ -82,9 +85,12 @@ export default function PartnerManagement({ forcedTab, hideHeader }) {
                 payload.contact_person = payload.representative;
                 delete payload.representative;
                 delete payload.representative_title;
-                delete payload.type; // type doesn't exist in suppliers/subcontractors
+                delete payload.type; // type doesn't exist in suppliers
+                delete payload.entity_type;
             } else {
                 payload.type = activeTab;
+                // entity_type (Nhà thầu/Tổ đội) chỉ có nghĩa với Subcontractor
+                if (!isSubTab) delete payload.entity_type;
             }
 
             let error;
@@ -125,6 +131,7 @@ export default function PartnerManagement({ forcedTab, hideHeader }) {
             bank_account: partner.bank_account || '',
             bank_branch: partner.bank_branch || '',
             account_holder: partner.account_holder || '',
+            entity_type: partner.entity_type || 'team',
             notes: partner.notes || ''
         });
         setEditingPartnerId(partner.id);
@@ -303,7 +310,17 @@ export default function PartnerManagement({ forcedTab, hideHeader }) {
                                             {partner.short_name && partner.code && <div className="text-xs text-slate-400 mt-0.5">{partner.short_name}</div>}
                                         </td>
                                         <td className="p-4">
-                                            <div className="font-semibold text-slate-900 dark:text-white">{partner.name}</div>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="font-semibold text-slate-900 dark:text-white">{partner.name}</span>
+                                                {isSubTab && (
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${partner.entity_type === 'contractor'
+                                                        ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/20'
+                                                        : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/20'}`}>
+                                                        <span className="material-symbols-outlined notranslate text-[12px]" translate="no">{partner.entity_type === 'contractor' ? 'receipt_long' : 'groups'}</span>
+                                                        {partner.entity_type === 'contractor' ? 'Nhà thầu' : 'Tổ đội'}
+                                                    </span>
+                                                )}
+                                            </div>
                                             {partner.representative && (
                                                 <div className="flex items-center gap-1 text-xs text-slate-500 mt-1">
                                                     <span className="material-symbols-outlined notranslate text-[12px]" translate="no">person</span>
@@ -383,6 +400,31 @@ export default function PartnerManagement({ forcedTab, hideHeader }) {
                             </button>
                         </div>
                         <form onSubmit={handleSavePartner} className="p-6 overflow-y-auto space-y-4">
+
+                            {/* --- PHÂN LOẠI (chỉ Tổ đội / Thầu phụ) --- */}
+                            {isSubTab && (
+                                <div className="p-3 bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-xl">
+                                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Loại đối tác <span className="text-red-500">*</span></label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {[
+                                            { v: 'contractor', label: 'Nhà thầu', sub: 'Xuất được hóa đơn', icon: 'receipt_long' },
+                                            { v: 'team', label: 'Tổ đội', sub: 'Không xuất hóa đơn', icon: 'groups' },
+                                        ].map(opt => (
+                                            <button key={opt.v} type="button"
+                                                onClick={() => setNewPartner({ ...newPartner, entity_type: opt.v })}
+                                                className={`flex items-start gap-2 p-3 rounded-lg border text-left transition-all ${newPartner.entity_type === opt.v
+                                                    ? 'border-primary bg-white dark:bg-slate-900 ring-2 ring-primary/30'
+                                                    : 'border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 hover:border-primary/40'}`}>
+                                                <span className={`material-symbols-outlined notranslate text-[20px] ${newPartner.entity_type === opt.v ? 'text-primary' : 'text-slate-400'}`} translate="no">{opt.icon}</span>
+                                                <span>
+                                                    <span className={`block text-sm font-bold ${newPartner.entity_type === opt.v ? 'text-primary' : 'text-slate-700 dark:text-slate-300'}`}>{opt.label}</span>
+                                                    <span className="block text-[11px] text-slate-500">{opt.sub}</span>
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* --- THÔNG TIN CƠ BẢN --- */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -514,11 +556,11 @@ export default function PartnerManagement({ forcedTab, hideHeader }) {
                 isOpen={isExcelImportModalOpen}
                 onClose={() => setIsExcelImportModalOpen(false)}
                 title={`Nhập Danh Sách ${getTabLabel(activeTab)}`}
-                tableName={activeTab === 'Client' ? 'partners' : (activeTab === 'Supplier' ? 'suppliers' : 'subcontractors')}
+                tableName={activeTab === 'Supplier' ? 'suppliers' : 'partners'}
                 columnMapping={
-                    activeTab === 'Client' 
-                    ? partnerMapping 
-                    : { ...partnerMapping, contact_person: "Người đại diện" } // Map Excel's "Người đại diện" to contact_person for suppliers/subcontractors
+                    activeTab === 'Supplier'
+                    ? { ...partnerMapping, contact_person: "Người đại diện" } // suppliers dùng contact_person
+                    : partnerMapping // Client + Subcontractor dùng partners (representative)
                 }
                 templateFilename={`mau_ncc_${activeTab.toLowerCase()}.xlsx`}
                 templateSampleRows={[
@@ -526,7 +568,11 @@ export default function PartnerManagement({ forcedTab, hideHeader }) {
                     ['HOANGVINH', 'CÔNG TY CỔ PHẦN HOÀNG VINH', 'HOÀNG VINH', 'Supplier', '0104987600', '0380.937760', '', 'Số 5, Tổ 7, P. Trần Đức Hoàng, Nam Định', 'C HOÀNG VINH', 'Giám đốc', 'Ngân hàng Vietinbank', '114403713959', 'CN Nam Định', 'C HOÀNG VINH', ''],
                 ]}
                 onSuccess={handleImportSuccess}
-                fixedData={activeTab === 'Client' ? { type: activeTab } : {}}
+                fixedData={
+                    activeTab === 'Client' ? { type: 'Client' }
+                    : activeTab === 'Subcontractor' ? { type: 'Subcontractor', entity_type: 'team' }
+                    : {}
+                }
             />
         </div>
     );
