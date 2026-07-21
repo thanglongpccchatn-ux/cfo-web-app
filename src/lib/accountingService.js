@@ -137,10 +137,20 @@ export async function createAutoJournalEntry(params) {
       return { success: false, error: `Không tìm thấy kỳ kế toán mở cho ngày ${entryDate}` };
     }
 
+    // 4b. Số bút toán — acc_journal_entries.entry_number là NOT NULL, không có default.
+    //     Thiếu cột này thì INSERT lỗi 23502 và bút toán tự động KHÔNG bao giờ được tạo.
+    let entryNumber = null;
+    const { data: genNum } = await supabase.rpc('generate_entry_number', {
+      p_type: journalType,
+      p_date: entryDate,
+    });
+    entryNumber = genNum || `TD-${new Date(entryDate).getFullYear()}-${Date.now().toString().slice(-6)}`;
+
     // 5. Insert journal entry
     const { data: entry, error: entryErr } = await supabase
       .from('acc_journal_entries')
       .insert([{
+        entry_number: entryNumber,
         journal_type: journalType,
         entry_date: entryDate,
         description: `[Tự động] ${description}`,
@@ -166,9 +176,11 @@ export async function createAutoJournalEntry(params) {
     }
 
     // 6. Insert journal lines
+    //    LƯU Ý: cột thứ tự dòng tên là `line_order` (KHÔNG phải line_number) — dùng sai
+    //    tên khiến insert lines lỗi, entry bị rollback, bút toán tự động mất trắng.
     const linePayloads = resolvedLines.map((line, idx) => ({
       journal_entry_id: entry.id,
-      line_number: idx + 1,
+      line_order: idx + 1,
       ...line,
     }));
 
