@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { fmt, formatInputNumber } from '../utils/formatters';
 import { smartToast } from '../utils/globalToast';
+import { stageCap, stageDef } from '../utils/laborStages';
 
 /**
  * Duyệt đề nghị thanh toán nhân công (bước 2). Kế toán trưởng/GĐ nhập SỐ DUYỆT
@@ -11,12 +12,19 @@ import { smartToast } from '../utils/globalToast';
 export default function LaborApproveModal({ isOpen, onClose, onSuccess, labor }) {
     const [approvedAmount, setApprovedAmount] = useState('');
     const [note, setNote] = useState('');
+    const [ctx, setCtx] = useState(null);     // dòng view công nợ của hợp đồng (để tính trần)
+    const [confirmOver, setConfirmOver] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
         if (isOpen && labor) {
             setApprovedAmount(String(labor.requested_amount || ''));
-            setNote('');
+            setNote(''); setConfirmOver(false); setCtx(null);
+            if (labor.contract_id) {
+                supabase.from('v_subcontractor_contract_debt').select('*')
+                    .eq('contract_id', labor.contract_id).maybeSingle()
+                    .then(({ data }) => setCtx(data || null));
+            }
         }
     }, [isOpen, labor?.id]);
 
@@ -25,9 +33,19 @@ export default function LaborApproveModal({ isOpen, onClose, onSuccess, labor })
     const requested = Number(labor.requested_amount) || 0;
     const approved = Number(approvedAmount) || 0;
 
+    // Trần lũy kế của mốc này = GT hợp đồng × pct%. Đã duyệt của các phiếu KHÁC + phiếu này.
+    const cap = stageCap(labor.payment_stage, ctx);
+    const daDuyetKhac = Math.max(0, (Number(ctx?.gt_duyet) || 0) - (Number(labor.approved_amount) || 0));
+    const conDuoc = cap ? Math.max(0, cap.tran - daDuyetKhac) : null;
+    const vuotTran = cap != null && approved > conDuoc + 1;
+
     const doApprove = async (e) => {
         e.preventDefault();
         if (approved <= 0) { smartToast('Nhập số duyệt', 'error'); return; }
+        if (vuotTran && !confirmOver) {
+            smartToast('Số duyệt vượt trần giai đoạn — tích xác nhận để tiếp tục', 'warning');
+            return;
+        }
         setSubmitting(true);
         const { error } = await supabase.rpc('approve_labor_request', {
             p_id: labor.id, p_approved_amount: approved, p_note: note || null,
@@ -89,6 +107,24 @@ export default function LaborApproveModal({ isOpen, onClose, onSuccess, labor })
                             </div>
                         )}
                     </div>
+
+                    {/* Trần thanh toán theo mốc — chặn mềm khi duyệt vượt */}
+                    {cap && (
+                        <div className={`rounded-xl px-3 py-2.5 border text-[11.5px] ${vuotTran ? 'bg-rose-50 border-rose-200' : 'bg-indigo-50/60 border-indigo-100'}`}>
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="font-bold text-slate-600">Trần mốc <b className="text-indigo-700">{stageDef(labor.payment_stage)?.label}</b> ({cap.pct}%)</span>
+                                <span className="font-black text-slate-700 tabular-nums">còn duyệt được {fmt(conDuoc)} ₫</span>
+                            </div>
+                            {vuotTran && (
+                                <label className="mt-2 flex items-start gap-2 cursor-pointer">
+                                    <input type="checkbox" checked={confirmOver} onChange={(e) => setConfirmOver(e.target.checked)} className="mt-0.5 w-4 h-4 accent-rose-500" />
+                                    <span className="text-rose-700 font-medium">
+                                        Số duyệt <b>{fmt(approved)}</b> vượt trần <b>{fmt(cap.tran)}</b> (đã duyệt {fmt(daDuyetKhac)}). Tôi xác nhận <b>duyệt vượt trần</b>.
+                                    </span>
+                                </label>
+                            )}
+                        </div>
+                    )}
 
                     <div>
                         <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Ghi chú duyệt</label>

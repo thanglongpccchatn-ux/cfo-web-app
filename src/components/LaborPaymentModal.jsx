@@ -22,6 +22,7 @@ export default function LaborPaymentModal({ isOpen, onClose, onSuccess, labor })
     const [allowOver, setAllowOver] = useState(false);
     const [note, setNote] = useState('');
     const [history, setHistory] = useState([]);
+    const [advance, setAdvance] = useState(null);   // { tam_ung, da_khau_tru } của hợp đồng
     const [submitting, setSubmitting] = useState(false);
 
     // Số duyệt là mốc chi (chưa duyệt thì lấy số đề nghị)
@@ -36,6 +37,7 @@ export default function LaborPaymentModal({ isOpen, onClose, onSuccess, labor })
         setPaymentDate(new Date().toISOString().split('T')[0]);
         setMethod('Chuyển khoản');
         setDeduction(''); setDeductionReason(''); setAllowOver(false); setNote('');
+        setAdvance(null);
         (async () => {
             const { data } = await supabase
                 .from('labor_payments')
@@ -46,8 +48,21 @@ export default function LaborPaymentModal({ isOpen, onClose, onSuccess, labor })
             setHistory(rows);
             const paid = rows.reduce((s, h) => s + Number(h.amount || 0), 0);
             setAmount(String(Math.max(0, approved - paid) || ''));
+
+            // Tạm ứng của hợp đồng + tổng đã khấu trừ (để nhắc kế toán thu hồi dần).
+            // Chỉ hiển thị — kế toán tự nhập ô khấu trừ, hệ thống không tự trừ.
+            if (labor.contract_id) {
+                const { data: c } = await supabase
+                    .from('v_subcontractor_contract_debt')
+                    .select('tam_ung, gt_khau_tru')
+                    .eq('contract_id', labor.contract_id)
+                    .maybeSingle();
+                if (c) setAdvance({ tam_ung: Number(c.tam_ung) || 0, da_khau_tru: Number(c.gt_khau_tru) || 0 });
+            }
         })();
     }, [isOpen, labor?.id]);
+
+    const advanceRemaining = advance ? Math.max(0, advance.tam_ung - advance.da_khau_tru) : 0;
 
     const handleNum = (setter) => (v) => setter(v.replace(/[^0-9]/g, ''));
 
@@ -192,6 +207,23 @@ export default function LaborPaymentModal({ isOpen, onClose, onSuccess, labor })
                             </div>
                         </div>
 
+                        {/* Nhắc thu hồi tạm ứng — CHỈ hiển thị, kế toán tự nhập ô khấu trừ */}
+                        {advanceRemaining > 0 && (
+                            <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                                <span className="text-[11px] font-bold text-amber-700 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-[16px]">savings</span>
+                                    Còn phải thu hồi tạm ứng
+                                    {advance.da_khau_tru > 0 && <span className="text-[10px] font-medium text-amber-500">(đã thu {fmt(advance.da_khau_tru)})</span>}
+                                </span>
+                                <button type="button"
+                                    onClick={() => setDeduction(String(Math.min(advanceRemaining, payAmt || advanceRemaining)))}
+                                    title="Điền nhanh vào ô khấu trừ"
+                                    className="text-sm font-black text-amber-700 tabular-nums hover:underline">
+                                    {fmt(advanceRemaining)} ₫
+                                </button>
+                            </div>
+                        )}
+
                         <div className="p-3 bg-rose-50/50 border border-rose-100 rounded-xl grid grid-cols-5 gap-2">
                             <div className="col-span-2">
                                 <label className="block text-[10px] font-bold text-rose-500 uppercase mb-1">Khấu trừ</label>
@@ -201,7 +233,7 @@ export default function LaborPaymentModal({ isOpen, onClose, onSuccess, labor })
                             <div className="col-span-3">
                                 <label className="block text-[10px] font-bold text-rose-500 uppercase mb-1">Lý do khấu trừ</label>
                                 <input value={deductionReason} onChange={(e) => setDeductionReason(e.target.value)}
-                                    className="w-full bg-white border border-rose-200 rounded-lg px-2.5 py-2 text-sm focus:ring-2 focus:ring-rose-400 outline-none" placeholder="VD: phạt chậm..." />
+                                    className="w-full bg-white border border-rose-200 rounded-lg px-2.5 py-2 text-sm focus:ring-2 focus:ring-rose-400 outline-none" placeholder="VD: thu hồi tạm ứng, phạt chậm..." />
                             </div>
                         </div>
 

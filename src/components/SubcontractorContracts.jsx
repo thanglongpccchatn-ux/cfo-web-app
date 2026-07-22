@@ -61,10 +61,16 @@ function getScheduleForSystem(systemCode) {
     return PAYMENT_SCHEDULE_DEFAULTS[first] || DEFAULT_SCHEDULE;
 }
 
-// ─── AUTO-DETECT: tên bắt đầu "Công ty" → Thầu phụ (VAT 8%), còn lại → Tổ đội (0%)
-function detectContractType(partnerName) {
-    if (!partnerName) return { type: 'Tổ đội', vat: '0' };
-    const normalized = partnerName.toLowerCase().trim();
+// ─── LOẠI HĐ theo phân loại ĐÃ CHỌN ở danh mục (partners.entity_type) là nguồn CHÍNH.
+// entity_type = 'contractor' (Nhà thầu, xuất HĐ) → Thầu phụ, VAT 8%
+//             = 'team'       (Tổ đội, không HĐ)  → Tổ đội, VAT 0%
+// Chỉ khi danh mục chưa gán entity_type mới đoán theo tên (fallback tương thích cũ).
+function detectContractType(partner) {
+    const et = typeof partner === 'object' ? partner?.entity_type : null;
+    if (et === 'contractor') return { type: 'Thầu phụ', vat: '8' };
+    if (et === 'team') return { type: 'Tổ đội', vat: '0' };
+    const name = (typeof partner === 'object' ? partner?.name : partner) || '';
+    const normalized = name.toLowerCase().trim();
     if (normalized.startsWith('công ty') || normalized.startsWith('cong ty')) {
         return { type: 'Thầu phụ', vat: '8' };
     }
@@ -161,8 +167,7 @@ function ContractModal({ isOpen, onClose, onSuccess, editData, partners, project
     // Auto-detect type when partner changes
     const handlePartnerChange = (partnerId) => {
         const partner = partners.find(p => p.id === partnerId);
-        const partnerName = partner?.name || '';
-        const { type, vat } = detectContractType(partnerName);
+        const { type, vat } = detectContractType(partner);
         const code = rebuildCode({ partnerId });
         setForm(prev => ({ ...prev, partnerId, contractType: type, vatRate: vat, contractCode: code }));
     };
@@ -198,6 +203,33 @@ function ContractModal({ isOpen, onClose, onSuccess, editData, partners, project
         e.preventDefault();
         if (!form.partnerId || !form.projectId || !form.contractName) {
             alert('Vui lòng điền đầy đủ: Thầu phụ, Dự án, Nội dung HĐ.');
+            return;
+        }
+        // Siết kiểm tra: tránh dữ liệu vô lý làm sai lệch trần thanh toán/công nợ về sau.
+        if ((Number(form.contractValue) || 0) <= 0) {
+            alert('Giá trị hợp đồng phải lớn hơn 0.');
+            return;
+        }
+        if (form.startDate && form.endDate && form.endDate < form.startDate) {
+            alert('Ngày kết thúc phải sau ngày bắt đầu.');
+            return;
+        }
+        // Tỷ lệ thanh toán phải KHÔNG GIẢM theo tiến độ (thô ≤ lắp đặt ≤ nghiệm thu ≤ quyết toán),
+        // bỏ qua mốc để trống (=0). Ngược đời sẽ khiến trần giai đoạn sau thấp hơn giai đoạn trước.
+        const pcts = [
+            ['Phần thô', Number(form.pctRough) || 0],
+            ['Lắp đặt', Number(form.pctInstall) || 0],
+            ['Nghiệm thu', Number(form.pctAcceptance) || 0],
+            ['Quyết toán', Number(form.pctSettlement) || 0],
+        ].filter(([, v]) => v > 0);
+        for (let i = 1; i < pcts.length; i++) {
+            if (pcts[i][1] < pcts[i - 1][1]) {
+                alert(`Tỷ lệ thanh toán phải tăng dần: "${pcts[i][0]}" (${pcts[i][1]}%) đang thấp hơn "${pcts[i - 1][0]}" (${pcts[i - 1][1]}%).`);
+                return;
+            }
+        }
+        if (pcts.some(([, v]) => v > 100)) {
+            alert('Tỷ lệ thanh toán không được vượt 100%.');
             return;
         }
         setSubmitting(true);
@@ -887,7 +919,7 @@ export default function SubcontractorContracts() {
     const { data: partners = [] } = useQuery({
         queryKey: ['partners-subcontractor-dropdown'],
         queryFn: async () => {
-            const { data } = await supabase.from('partners').select('id, code, name, short_name').eq('type', 'Subcontractor').order('name');
+            const { data } = await supabase.from('partners').select('id, code, name, short_name, entity_type').eq('type', 'Subcontractor').order('name');
             return data || [];
         },
     });
@@ -1345,7 +1377,7 @@ export default function SubcontractorContracts() {
 
                         // 2. Load lookup tables
                         const { data: allProjects } = await supabase.from('projects').select('id, code, internal_code, name');
-                        const { data: allPartners } = await supabase.from('partners').select('id, code, name, short_name').eq('type', 'Subcontractor');
+                        const { data: allPartners } = await supabase.from('partners').select('id, code, name, short_name, entity_type').eq('type', 'Subcontractor');
                         
                         const projectMap = new Map();
                         (allProjects || []).forEach(p => {
