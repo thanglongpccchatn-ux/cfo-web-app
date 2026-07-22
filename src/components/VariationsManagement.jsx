@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { smartToast } from '../utils/globalToast';
 import { fmt, fmtDatePadded as formatDate, formatVND as formatCurrency } from '../utils/formatters';
+import SearchableSelect from './SearchableSelect';
 
 export default function VariationsManagement() {
     const { profile, hasPermission: _hasPermission } = useAuth();
@@ -49,8 +50,9 @@ export default function VariationsManagement() {
     const projects = queryData?.projects || [];
     const variations = queryData?.variations || [];
 
-    const handleProjectSelection = (e) => {
-        const pId = e.target.value;
+    const handleProjectSelection = (value) => {
+        // SearchableSelect trả value trực tiếp; vẫn nhận event từ <select> cũ nếu có
+        const pId = (value && typeof value === 'object' && 'target' in value) ? value.target.value : value;
         const proj = projects.find(p => p.id === pId);
         
         let autoVariationNo = '';
@@ -471,18 +473,24 @@ export default function VariationsManagement() {
                             <form id="variationForm" onSubmit={handleSave} className="space-y-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wide">Dự án áp dụng <span className="text-rose-500">*</span></label>
-                                    <select 
-                                        required
-                                        disabled={!!editingVar}
-                                        value={formData.project_id}
-                                        onChange={handleProjectSelection}
-                                        className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm disabled:bg-slate-50 disabled:text-slate-500"
-                                    >
-                                        <option value="" disabled>-- Chọn dự án --</option>
-                                        {projects.map(p => (
-                                            <option key={p.id} value={p.id}>{p.internal_code || p.code}</option>
-                                        ))}
-                                    </select>
+                                    {editingVar ? (
+                                        <input
+                                            readOnly value={projects.find(p => p.id === formData.project_id)?.internal_code || projects.find(p => p.id === formData.project_id)?.code || ''}
+                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-sm cursor-not-allowed"
+                                        />
+                                    ) : (
+                                        <SearchableSelect
+                                            required
+                                            value={formData.project_id}
+                                            onChange={handleProjectSelection}
+                                            placeholder="Gõ tìm mã dự án..."
+                                            options={projects.map(p => ({
+                                                value: p.id,
+                                                label: p.internal_code || p.code || '(chưa có mã)',
+                                                sub: p.name,
+                                            }))}
+                                        />
+                                    )}
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
