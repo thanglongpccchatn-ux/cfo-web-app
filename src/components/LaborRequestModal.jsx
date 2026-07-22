@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { fmt, formatInputNumber } from '../utils/formatters';
 import SearchableSelect from './SearchableSelect';
 import { smartToast } from '../utils/globalToast';
+import { LABOR_STAGES, stageCap, stageDef } from '../utils/laborStages';
 
 export default function LaborRequestModal({ isOpen, onClose, onSuccess, project, projects = [] }) {
     const [form, setForm] = useState({
@@ -15,7 +16,6 @@ export default function LaborRequestModal({ isOpen, onClose, onSuccess, project,
         completedPrevious: '',
         completedCurrent: '',
         requestedAmount: '',
-        invoicedAmount: '',
         dailyLaborCount: '',
         dailyLaborRate: '',
         priority: 'Bình thường',
@@ -45,6 +45,38 @@ export default function LaborRequestModal({ isOpen, onClose, onSuccess, project,
     });
 
     const selectedContract = activeContracts.find(c => c.id === form.contractId);
+
+    // ── BỐI CẢNH HỢP ĐỒNG: đã đề nghị/đã chi/nghiệm thu lũy kế + tỷ lệ từng mốc ──
+    // Trước đây người lập phải mở tab khác tra rồi quay lại, và gõ tay lũy kế kỳ trước.
+    const { data: ctx } = useQuery({
+        queryKey: ['contract-debt-ctx', form.contractId],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('v_subcontractor_contract_debt')
+                .select('*')
+                .eq('contract_id', form.contractId)
+                .maybeSingle();
+            return data || null;
+        },
+        enabled: isOpen && !!form.contractId,
+        staleTime: 30 * 1000,
+    });
+
+    // Tự tính khối lượng lũy kế kỳ trước từ chính các phiếu đã lập của hợp đồng này
+    const luyKeTruoc = Number(ctx?.gt_nghiem_thu) || 0;
+    useEffect(() => {
+        if (!form.contractId) return;
+        setForm(prev => ({ ...prev, completedPrevious: String(luyKeTruoc || '') }));
+    }, [form.contractId, luyKeTruoc]);
+
+    const cap = stageCap(form.paymentStage, ctx);           // trần lũy kế của mốc đang chọn
+    const daDuyet = Number(ctx?.gt_duyet) || 0;
+    const daChi = Number(ctx?.gt_thuc_tra) || 0;
+    const conDuocDeNghi = cap ? Math.max(0, cap.tran - daDuyet) : null;
+    const soDeNghi = isCongNhat
+        ? (Number(form.dailyLaborCount) || 0) * (Number(form.dailyLaborRate) || 0)
+        : Number(form.requestedAmount) || 0;
+    const vuotTran = cap != null && soDeNghi > conDuocDeNghi;
 
     const handleContractChange = (val) => {
         const contract = activeContracts.find(c => c.id === val);
@@ -105,14 +137,8 @@ export default function LaborRequestModal({ isOpen, onClose, onSuccess, project,
             p_notes: form.notes,
         });
 
-        // Cập nhật tiền xuất hóa đơn lũy kế trên hợp đồng (nếu có nhập)
-        if (!error && form.invoicedAmount && Number(form.invoicedAmount) > 0 && contract) {
-            const { error: invErr } = await supabase
-                .from('subcontractor_contracts')
-                .update({ invoiced_amount: Number(form.invoicedAmount) })
-                .eq('id', contract.id);
-            if (invErr) smartToast('Đã tạo đề nghị, nhưng KHÔNG cập nhật được tiền xuất HĐ: ' + invErr.message, 'warning');
-        }
+        // KHÔNG ghi đè invoiced_amount của hợp đồng từ đây nữa: đó là số liệu quyết định
+        // công nợ hóa đơn, sửa ở màn Hợp đồng thầu phụ (có quyền riêng + audit) mới đúng.
 
         setSubmitting(false);
 
@@ -131,7 +157,7 @@ export default function LaborRequestModal({ isOpen, onClose, onSuccess, project,
                 contractId: '', projectId: project?.id || '', paymentStage: 'Tạm ứng',
                 contractValue: '', requestDate: new Date().toISOString().split('T')[0],
                 completedPrevious: '', completedCurrent: '', requestedAmount: '',
-                invoicedAmount: '', dailyLaborCount: '', dailyLaborRate: '',
+                dailyLaborCount: '', dailyLaborRate: '',
                 priority: 'Bình thường', notes: ''
             });
         }
@@ -200,6 +226,55 @@ export default function LaborRequestModal({ isOpen, onClose, onSuccess, project,
                         </div>
                     )}
 
+                    {/* ── BỐI CẢNH HỢP ĐỒNG: khỏi phải mở tab khác tra ── */}
+                    {ctx && (
+                        <div className="bg-white border-2 border-indigo-100 rounded-xl p-3.5">
+                            <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[13px]">query_stats</span>
+                                Tình hình hợp đồng này
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                                <div className="bg-slate-50 rounded-lg py-2">
+                                    <div className="text-[9px] text-slate-400 font-bold uppercase">Đã đề nghị</div>
+                                    <div className="text-[13px] font-black text-slate-700 tabular-nums">{fmt(ctx.gt_de_nghi)}</div>
+                                </div>
+                                <div className="bg-blue-50 rounded-lg py-2">
+                                    <div className="text-[9px] text-blue-400 font-bold uppercase">Đã duyệt</div>
+                                    <div className="text-[13px] font-black text-blue-700 tabular-nums">{fmt(daDuyet)}</div>
+                                </div>
+                                <div className="bg-emerald-50 rounded-lg py-2">
+                                    <div className="text-[9px] text-emerald-500 font-bold uppercase">Đã chi</div>
+                                    <div className="text-[13px] font-black text-emerald-700 tabular-nums">{fmt(daChi)}</div>
+                                </div>
+                                <div className="bg-amber-50 rounded-lg py-2">
+                                    <div className="text-[9px] text-amber-500 font-bold uppercase">Tạm ứng</div>
+                                    <div className="text-[13px] font-black text-amber-700 tabular-nums">{fmt(ctx.tam_ung)}</div>
+                                </div>
+                            </div>
+
+                            {/* Trần thanh toán theo mốc đang chọn */}
+                            {cap ? (
+                                <div className={`mt-2.5 rounded-lg px-3 py-2 border text-[11.5px] ${vuotTran ? 'bg-rose-50 border-rose-200' : 'bg-indigo-50/60 border-indigo-100'}`}>
+                                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                                        <span className="font-bold text-slate-600">
+                                            Mốc <b className="text-indigo-700">{stageDef(form.paymentStage)?.label}</b> — hợp đồng cho thanh toán tối đa <b className="text-indigo-700">{cap.pct}%</b>
+                                        </span>
+                                        <span className="font-black text-slate-700 tabular-nums">Trần lũy kế: {fmt(cap.tran)} ₫</span>
+                                    </div>
+                                    <div className={`mt-1 font-bold ${vuotTran ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                        {vuotTran
+                                            ? `⚠️ Vượt trần ${fmt(soDeNghi - conDuocDeNghi)} ₫ — chỉ còn được đề nghị ${fmt(conDuocDeNghi)} ₫`
+                                            : `Còn được đề nghị tối đa: ${fmt(conDuocDeNghi)} ₫`}
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="mt-2 text-[11px] text-slate-400 italic">
+                                    Giai đoạn này không bị khống chế theo tỷ lệ hợp đồng — tính theo khối lượng/thỏa thuận thực tế.
+                                </p>
+                            )}
+                        </div>
+                    )}
+
                     {/* Row 2: Giai đoạn + Ngày */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="space-y-2">
@@ -208,18 +283,7 @@ export default function LaborRequestModal({ isOpen, onClose, onSuccess, project,
                                 value={form.paymentStage}
                                 onChange={(val) => setForm({ ...form, paymentStage: val })}
                                 placeholder="Chọn giai đoạn..."
-                                options={[
-                                    { value: 'Tạm ứng', label: 'Tạm ứng' },
-                                    { value: 'Nghiệm thu lần 1', label: 'Nghiệm thu lần 1' },
-                                    { value: 'Nghiệm thu lần 2', label: 'Nghiệm thu lần 2' },
-                                    { value: 'Nghiệm thu lần 3', label: 'Nghiệm thu lần 3' },
-                                    { value: 'Nghiệm thu lần 4', label: 'Nghiệm thu lần 4' },
-                                    { value: 'Nghiệm thu lần 5', label: 'Nghiệm thu lần 5' },
-                                    { value: 'Công nhật', label: '🔨 Công nhật' },
-                                    { value: 'Phát sinh', label: '📌 Phát sinh' },
-                                    { value: 'Quyết toán', label: 'Quyết toán' },
-                                    { value: 'Bảo lãnh', label: 'Bảo lãnh' },
-                                ]}
+                                options={LABOR_STAGES.map(s => ({ value: s.value, label: s.label, sub: s.hint }))}
                             />
                         </div>
                         <div className="space-y-2">
@@ -270,13 +334,17 @@ export default function LaborRequestModal({ isOpen, onClose, onSuccess, project,
                         <>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div className="space-y-2">
-                                <label className="block text-[11px] font-extrabold text-orange-500 uppercase tracking-wider">KL Hoàn thành Lũy kế Kỳ trước</label>
+                                <label className="block text-[11px] font-extrabold text-orange-500 uppercase tracking-wider flex items-center gap-1">
+                                    KL Hoàn thành Lũy kế Kỳ trước
+                                    <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">TỰ TÍNH</span>
+                                </label>
                                 <input
-                                    placeholder="VD: 500,000,000"
-                                    value={form.completedPrevious ? formatInputNumber(form.completedPrevious) : ''}
-                                    onChange={(e) => handleNumChange('completedPrevious', e.target.value)}
-                                    className="w-full bg-orange-50/30 border border-orange-200 rounded-xl px-4 py-3 text-sm text-right font-medium text-orange-700 focus:ring-2 focus:ring-orange-400 outline-none transition-all"
+                                    readOnly
+                                    value={form.completedPrevious ? formatInputNumber(form.completedPrevious) : '0'}
+                                    title="Cộng tự động từ các phiếu đã lập của hợp đồng này"
+                                    className="w-full bg-slate-100 border border-slate-200 rounded-xl px-4 py-3 text-sm text-right font-bold text-slate-500 cursor-not-allowed"
                                 />
+                                <p className="text-[10px] text-slate-400">Cộng tự động từ các đợt trước của hợp đồng — không cần gõ tay.</p>
                             </div>
                             <div className="space-y-2">
                                 <label className="block text-[11px] font-extrabold text-orange-600 uppercase tracking-wider">KL Hoàn thành Kỳ này</label>
@@ -289,19 +357,17 @@ export default function LaborRequestModal({ isOpen, onClose, onSuccess, project,
                             </div>
                         </div>
 
-                        {/* Row 4: Tiền Hóa đơn (chỉ hiển thị nếu là Thầu phụ) */}
-                        {selectedContract?.contract_type === 'Thầu phụ' && (
-                            <div className="space-y-2">
-                                <label className="block text-[11px] font-extrabold text-amber-600 uppercase tracking-wider">
-                                    <span className="material-symbols-outlined text-[13px] align-middle mr-1">receipt_long</span>
-                                    Tiền Hóa đơn (Lũy kế đến hiện tại)
-                                </label>
-                                <input
-                                    placeholder="Tổng tiền đã xuất hóa đơn..."
-                                    value={form.invoicedAmount ? formatInputNumber(form.invoicedAmount) : ''}
-                                    onChange={(e) => handleNumChange('invoicedAmount', e.target.value)}
-                                    className="w-full bg-amber-50/50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-right font-bold text-amber-700 focus:ring-2 focus:ring-amber-400 outline-none transition-all"
-                                />
+                        {/* Tiền hóa đơn lũy kế: CHỈ XEM.
+                            Trước đây ô này cho sửa rồi ghi đè thẳng subcontractor_contracts.invoiced_amount
+                            — tức người lập đề nghị sửa được sổ hợp đồng (con số quyết định công nợ hóa đơn),
+                            không qua kiểm soát, không audit. Nay chuyển về màn Hợp đồng thầu phụ. */}
+                        {selectedContract?.contract_type === 'Thầu phụ' && ctx && (
+                            <div className="flex items-center justify-between gap-3 bg-amber-50/60 border border-amber-200 rounded-xl px-4 py-3">
+                                <span className="text-[11px] font-extrabold text-amber-600 uppercase tracking-wider flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[14px]">receipt_long</span>
+                                    Tiền hóa đơn lũy kế
+                                </span>
+                                <span className="text-sm font-black text-amber-700 tabular-nums">{fmt(ctx.gt_xuat_hoa_don)} ₫</span>
                             </div>
                         )}
                         </>
